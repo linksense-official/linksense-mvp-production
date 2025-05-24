@@ -1,0 +1,66 @@
+{
+  "users": [
+    {
+      "id": "U01",
+      "name": "山田太郎",
+      "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face"
+    },
+    {
+      "id": "U02",
+      "name": "佐藤花子",
+      "avatar": "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face"
+    },
+    {
+      "id": "U03",
+      "name": "田中一郎",
+      "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
+    },
+    {
+      "id": "U04",
+      "name": "鈴木美咲",
+      "avatar": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face"
+    },
+    {
+      "id": "U05",
+      "name": "高橋健太",
+      "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face"
+    },
+    {
+      "id": "U06",
+      "name": "渡辺真理",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face"
+    }
+  ],
+  "messages": [
+    {
+      "user_id": "U01",
+      "text": "おはようございます！今日のタスクについて @U02 さんと相談したいです。",
+      "timestamp": "2023-11-01T09:00:00Z",
+      "channel_id": "C01"
+    },
+    {
+      "user_id": "U02",
+      "text": "@U01 さん、承知しました！10時頃にお時間いただけますか？",
+      "timestamp": "2023-11-01T09:15:00Z",
+      "channel_id": "C01"
+    },
+    {
+      "user_id": "U03",
+      "text": "プロジェクトの進捗はいかがですか？ @U04 さん、レビューお願いします。",
+      "timestamp": "2023-11-01T10:30:00Z",
+      "channel_id": "C01"
+    },
+    {
+      "user_id": "U04",
+      "text": "@U03 さん、レビュー完了しました。いくつか修正点があります。",
+      "timestamp": "2023-11-01T11:00:00Z",
+      "channel_id": "C01"
+    },
+    {
+      "user_id": "U01",
+      "text": "@U02 さん、ミーティングありがとうございました。資料の件、@U05 さんにも共有しておきます。",
+      "timestamp": "2023-11-01T14:00:00Z",
+      "channel_id": "C01"
+    }
+  ]
+}
