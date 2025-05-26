@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas" width="512" height="512"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        function createIcon(size, text) {
+            canvas.width = size;
+            canvas.height = size;
+            
+            // 背景色（LinkSenseのブルー）
+            ctx.fillStyle = '#3B82F6';
+            ctx.fillRect(0, 0, size, size);
+            
+            // テキスト
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size/4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, size/2, size/2);
+            
+            // ダウンロード
+            const link = document.createElement('a');
+            link.download = `icon-${size}x${size}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // 各サイズのアイコンを生成
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        sizes.forEach(size => {
+            setTimeout(() => createIcon(size, 'LS'), size);
+        });
+    </script>
+</body>
+</html>

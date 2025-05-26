@@ -17,17 +17,17 @@
     },
     {
       "id": "U04",
-      "name": "鈴木美咲",
+      "name": "高橋美香",
       "avatar": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face"
     },
     {
       "id": "U05",
-      "name": "高橋健太",
+      "name": "鈴木大介",
       "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face"
     },
     {
       "id": "U06",
-      "name": "渡辺真理",
+      "name": "中島美由紀",
       "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face"
     }
   ],
@@ -40,7 +40,7 @@
     },
     {
       "user_id": "U02",
-      "text": "@U01 さん、承知しました！10時頃にお時間いただけますか？",
+      "text": "@U01 さん、承知しました。10時にお時間いただけますか？",
       "timestamp": "2023-11-01T09:15:00Z",
       "channel_id": "C01"
     },
@@ -60,6 +60,24 @@
       "user_id": "U01",
       "text": "@U02 さん、ミーティングありがとうございました。資料の件、@U05 さんにも共有しておきます。",
       "timestamp": "2023-11-01T14:00:00Z",
+      "channel_id": "C01"
+    },
+    {
+      "user_id": "U05",
+      "text": "@U01 ありがとうございます。確認いたします。",
+      "timestamp": "2023-11-01T14:30:00Z",
+      "channel_id": "C01"
+    },
+    {
+      "user_id": "U02",
+      "text": "チーム全体での定例会議の件、@U03 @U04 いかがでしょうか？",
+      "timestamp": "2023-11-01T15:00:00Z",
+      "channel_id": "C01"
+    },
+    {
+      "user_id": "U03",
+      "text": "@U02 良いですね。金曜日の午後はいかがですか？ @U04",
+      "timestamp": "2023-11-01T15:15:00Z",
       "channel_id": "C01"
     }
   ]

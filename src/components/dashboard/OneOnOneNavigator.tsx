@@ -54,7 +54,7 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
         </div>
         
         <div className="space-y-3">
-          {suggestedPairs.slice(0, 5).map((pair, index) => {
+          {suggestedPairs.slice(0, 5).map((pair) => {
             const user1 = getUserById(pair.userId1);
             const user2 = getUserById(pair.userId2);
             
