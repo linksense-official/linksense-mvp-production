@@ -136,11 +136,12 @@ const Notification = ({ notification, onClose }: NotificationProps) => {
     if (notification.show) {
       const timer = setTimeout(() => {
         onClose();
-      }, 4000);
+      }, 3000);
       return () => clearTimeout(timer);
     }
+    return undefined; // ← この行を追加
   }, [notification.show, onClose]);
-
+  
   if (!notification.show) return null;
 
   const typeConfig = {

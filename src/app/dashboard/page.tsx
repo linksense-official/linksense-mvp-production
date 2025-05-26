@@ -143,9 +143,9 @@ const DashboardPage: React.FC = () => {
                   <dt className="text-sm font-medium text-gray-500 truncate">
                     チーム健全性スコア
                   </dt>
-                  <dd className={`text-lg font-medium ${getHealthScoreColor(stats.teamHealthScore)}`}>
-                    {stats.teamHealthScore}/100
-                  </dd>
+                  <dd className={`text-lg font-medium ${getHealthScoreColor(stats.averageHealthScore)}`}>
+  {stats.averageHealthScore}/100
+</dd>
                 </dl>
               </div>
             </div>

@@ -17,7 +17,6 @@ export const usePWA = (): UsePWAReturn => {
   const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
-    // 既存のコード（変更なし）
     const checkPWASupport = () => {
       if (typeof window !== 'undefined') {
         const isSupported = 'serviceWorker' in navigator && 'PushManager' in window;
@@ -30,8 +29,6 @@ export const usePWA = (): UsePWAReturn => {
         setIsInstalled(isStandaloneMode);
       }
     };
-
-    checkPWASupport();
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -46,6 +43,8 @@ export const usePWA = (): UsePWAReturn => {
       setDeferredPrompt(null);
     };
 
+    checkPWASupport();
+
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.addEventListener('appinstalled', handleAppInstalled);
@@ -55,6 +54,9 @@ export const usePWA = (): UsePWAReturn => {
         window.removeEventListener('appinstalled', handleAppInstalled);
       };
     }
+
+    // 明示的に undefined を返す（window が undefined の場合）
+    return undefined;
   }, []);
 
   const install = async (): Promise<void> => {

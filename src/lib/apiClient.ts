@@ -1,6 +1,6 @@
 'use client';
 
-import { mockApi } from './mockApi';
+import mockApi from './mockApi';
 
 interface RequestConfig {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -128,7 +128,7 @@ class APIClient {
         case '/auth/login':
           if (config.method === 'POST' && config.body) {
             console.log('Calling mockApi.login with:', config.body);
-            const result = await mockApi.login(config.body.email, config.body.password) as APIResponse<T>;
+            const result = await mockApi.login(config.body) as APIResponse<T>;
             console.log('mockApi.login result:', result);
             return result;
           }
@@ -136,9 +136,9 @@ class APIClient {
 
         case '/auth/register':
           if (config.method === 'POST' && config.body) {
-            console.log('Calling mockApi.register with:', config.body);
-            const result = await mockApi.register(config.body.email, config.body.password, config.body.name) as APIResponse<T>;
-            console.log('mockApi.register result:', result);
+            console.log('Calling mockApi.login with:', config.body);
+            const result = await mockApi.login(config.body) as APIResponse<T>;
+            console.log('mockApi.login result:', result);
             return result;
           }
           break;
@@ -191,13 +191,19 @@ class APIClient {
         case '/user/settings':
           if (config.method === 'GET') {
             console.log('Mock get user settings');
-            const result = await mockApi.getSettings() as APIResponse<T>;
-            console.log('mockApi.getSettings result:', result);
-            return result;
+            // 現在のユーザーの設定を返す（仮のユーザーID使用）
+            const result = await mockApi.getUser('demo-user') as APIResponse<any>;
+            if (result.success && result.data) {
+              return {
+                success: true,
+                data: result.data.settings as T,
+              };
+            }
+            return result as APIResponse<T>;
           } else if (config.method === 'PUT') {
             console.log('Mock update user settings with:', config.body);
-            const result = await mockApi.updateSettings(config.body) as APIResponse<T>;
-            console.log('mockApi.updateSettings result:', result);
+            const result = await mockApi.updateUserSettings('demo-user', config.body) as APIResponse<T>;
+            console.log('mockApi.updateUserSettings result:', result);
             return result;
           }
           break;

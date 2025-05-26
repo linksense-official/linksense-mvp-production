@@ -388,6 +388,7 @@ const Notification = ({ notification, onClose }: NotificationProps) => {
       }, 3000);
       return () => clearTimeout(timer);
     }
+    return undefined; // ← この行を追加
   }, [notification.show, onClose]);
 
   if (!notification.show) return null;

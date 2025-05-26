@@ -209,6 +209,7 @@ export interface HealthAlert {
   actionRequired: boolean;
 }
 
+// DashboardStats型を修正（不足しているプロパティを追加）
 export interface DashboardStats {
   totalMembers: number;
   activeMembers: number;
@@ -224,7 +225,24 @@ export interface DashboardStats {
     healthScoreChange: number;
     engagementChange: number;
     stressChange: number;
+    teamHealthScore: number; // この行を追加
   };
+  // 不足していたプロパティを追加
+  teamHealthScore: number;
+  atRiskMembers: number;
+  teamSatisfaction: number;
+  recentAlerts: HealthAlert[];
+}
+// UsageData型を追加
+export interface UsageData {
+  name: string;
+  current: number;
+  limit: number;
+  percentage: number;
+   clicks: number;    // ← 追加
+  links: number;     // ← 追加
+  revenue: number;
+  period: string;   // ← 追加
 }
 
 // 設定関連

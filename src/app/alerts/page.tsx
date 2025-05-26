@@ -138,6 +138,8 @@ const Notification = ({ notification, onClose }: NotificationProps) => {
       }, 3000);
       return () => clearTimeout(timer);
     }
+    // 明示的に undefined を返す
+    return undefined;
   }, [notification.show, onClose]);
 
   if (!notification.show) return null;
@@ -149,25 +151,21 @@ const Notification = ({ notification, onClose }: NotificationProps) => {
     error: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', icon: '❌' }
   };
 
-  const config = typeConfig[notification.type];
+  const config = typeConfig[notification.type] || typeConfig.info;
 
   return (
-    <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
-      <div className={`${config.bg} ${config.border} border rounded-lg p-4 shadow-lg max-w-md`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg">{config.icon}</span>
-            <p className={`${config.text} font-medium`}>{notification.message}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className={`${config.text} hover:opacity-70 transition-opacity`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg border ${config.bg} ${config.border} ${config.text} shadow-lg`}>
+      <div className="flex items-center space-x-2">
+        <span>{config.icon}</span>
+        <span>{notification.message}</span>
+        <button
+          onClick={onClose}
+          className={`ml-2 ${config.text} hover:opacity-70 transition-opacity`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
     </div>
   );

@@ -110,13 +110,14 @@ const SettingsPage: React.FC = () => {
 
   // メッセージの自動消去
   useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => {
-        setMessage(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
+  if (message) {
+    const timer = setTimeout(() => {
+      setMessage(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }
+  return undefined; // ← この行を追加
+}, [message]);
 
   if (isLoading || !isAuthenticated) {
     return (

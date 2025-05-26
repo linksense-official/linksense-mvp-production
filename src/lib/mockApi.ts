@@ -231,10 +231,23 @@ const mockAlerts: HealthAlert[] = [
     createdAt: '2025-05-24T14:30:00Z',
     status: 'acknowledged',
     actionRequired: false
+  },
+  {
+    id: 'alert-003',
+    type: 'high_stress',
+    severity: 'high',
+    title: '高ストレス状態',
+    description: '開発部全体のストレスレベルが上昇傾向にあります。',
+    memberId: 'member-001',
+    memberName: '田中太郎',
+    department: '開発部',
+    createdAt: '2025-05-23T16:00:00Z',
+    status: 'active',
+    actionRequired: true
   }
 ];
 
-// モックダッシュボード統計
+// モックダッシュボード統計（修正版）
 const mockDashboardStats: DashboardStats = {
   totalMembers: 45,
   activeMembers: 42,
@@ -250,8 +263,14 @@ const mockDashboardStats: DashboardStats = {
   trends: {
     healthScoreChange: -3,
     engagementChange: -8,
-    stressChange: 12
-  }
+    stressChange: 12,
+    teamHealthScore: 85,
+  },
+  // 不足していたプロパティを追加
+  teamHealthScore: 68,
+  atRiskMembers: 3,
+  teamSatisfaction: 72,
+  recentAlerts: mockAlerts
 };
 
 // API遅延シミュレーション
