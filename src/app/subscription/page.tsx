@@ -21,6 +21,12 @@ interface Plan {
   enterprise?: boolean;
   color: string;
   icon: string;
+  detailedFeatures: {
+    category: string;
+    items: string[];
+  }[];
+  useCases: string[];
+  support: string;
 }
 
 // 通知状態型定義
@@ -30,7 +36,7 @@ interface NotificationState {
   type: 'success' | 'info' | 'warning' | 'error';
 }
 
-// プランデータ
+// プランデータ（詳細情報追加）
 const plans: Plan[] = [
   {
     id: 'starter',
@@ -53,7 +59,28 @@ const plans: Plan[] = [
       storage: '1GB'
     },
     color: 'gray',
-    icon: '🚀'
+    icon: '🚀',
+    detailedFeatures: [
+      {
+        category: '分析機能',
+        items: ['基本的な健全性スコア', 'チーム概要ダッシュボード', '基本メトリクス表示']
+      },
+      {
+        category: 'レポート',
+        items: ['週次サマリーレポート', 'PDF出力', 'メール配信']
+      },
+      {
+        category: 'サポート',
+        items: ['メールサポート', 'ヘルプドキュメント', 'コミュニティフォーラム']
+      }
+    ],
+    useCases: [
+      '5人以下の小規模チーム',
+      'スタートアップ企業',
+      'プロジェクトチーム',
+      'フリーランスグループ'
+    ],
+    support: 'メールサポート（48時間以内返信）'
   },
   {
     id: 'professional',
@@ -80,7 +107,32 @@ const plans: Plan[] = [
     },
     popular: true,
     color: 'blue',
-    icon: '⭐'
+    icon: '⭐',
+    detailedFeatures: [
+      {
+        category: '高度な分析',
+        items: ['リアルタイム健全性監視', '予測分析', 'トレンド分析', 'チーム比較', 'カスタムメトリクス']
+      },
+      {
+        category: 'レポート & アラート',
+        items: ['日次/週次/月次レポート', 'カスタムレポート', 'リアルタイムアラート', 'Slack/Teams統合']
+      },
+      {
+        category: 'API & 統合',
+        items: ['REST API', 'Webhook', 'Slack統合', 'Teams統合', 'Jira統合']
+      },
+      {
+        category: 'サポート',
+        items: ['優先メールサポート', 'チャットサポート', 'オンボーディング支援']
+      }
+    ],
+    useCases: [
+      '10-50人の成長企業',
+      '複数チームを持つ組織',
+      'リモートワーク中心企業',
+      'アジャイル開発チーム'
+    ],
+    support: '優先サポート（12時間以内返信）+ チャットサポート'
   },
   {
     id: 'enterprise',
@@ -108,7 +160,32 @@ const plans: Plan[] = [
     },
     enterprise: true,
     color: 'purple',
-    icon: '👑'
+    icon: '👑',
+    detailedFeatures: [
+      {
+        category: 'AI & 機械学習',
+        items: ['AI予測分析', '異常検知', '自動レコメンデーション', '感情分析', 'パフォーマンス予測']
+      },
+      {
+        category: 'エンタープライズ機能',
+        items: ['SSO統合（SAML/LDAP）', 'カスタムブランディング', '専用インスタンス', 'API制限なし']
+      },
+      {
+        category: 'セキュリティ & コンプライアンス',
+        items: ['SOC2準拠', 'GDPR対応', 'セキュリティ監査', 'データ暗号化', 'アクセス制御']
+      },
+      {
+        category: 'サポート & サービス',
+        items: ['専用カスタマーサクセス', 'オンサイト研修', '24/7サポート', 'SLA保証', 'カスタム開発']
+      }
+    ],
+    useCases: [
+      '50人以上の大企業',
+      '多国籍企業',
+      '規制業界（金融・医療等）',
+      'カスタム要件のある組織'
+    ],
+    support: '専用サポート（1時間以内返信）+ 24/7電話サポート + 専属CSM'
   }
 ];
 
@@ -175,16 +252,168 @@ const Notification = ({ notification, onClose }: NotificationProps) => {
   );
 };
 
+// プラン詳細モーダルコンポーネント
+interface PlanDetailModalProps {
+  plan: Plan | null;
+  isOpen: boolean;
+  onClose: () => void;
+  isYearly: boolean;
+}
+
+const PlanDetailModal = ({ plan, isOpen, onClose, isYearly }: PlanDetailModalProps) => {
+  if (!isOpen || !plan) return null;
+
+  const price = isYearly ? plan.yearlyPrice : plan.price;
+  const monthlyPrice = isYearly ? Math.round(plan.yearlyPrice / 12) : plan.price;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+        {/* ヘッダー */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="text-4xl">{plan.icon}</div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{plan.name}プラン</h2>
+                <p className="text-gray-600">{plan.description}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-8">
+          {/* 価格情報 */}
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">料金</h3>
+            {plan.price === 0 ? (
+              <div className="text-3xl font-bold text-gray-900">無料</div>
+            ) : (
+              <div className="flex items-baseline space-x-2">
+                <span className="text-3xl font-bold text-gray-900">
+                  ¥{monthlyPrice.toLocaleString()}
+                </span>
+                <span className="text-gray-600">/月</span>
+                {isYearly && (
+                  <span className="text-sm text-green-600 font-medium">
+                    （年間 ¥{price.toLocaleString()}）
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 制限情報 */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">プラン制限</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {plan.limits.members}{typeof plan.limits.members === 'number' ? '人' : ''}
+                </div>
+                <div className="text-sm text-blue-800">メンバー</div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {plan.limits.teams}{typeof plan.limits.teams === 'number' ? '個' : ''}
+                </div>
+                <div className="text-sm text-green-800">チーム</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-purple-600">{plan.limits.reports}</div>
+                <div className="text-sm text-purple-800">レポート/月</div>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-orange-600">{plan.limits.storage}</div>
+                <div className="text-sm text-orange-800">ストレージ</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 詳細機能 */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">詳細機能</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {plan.detailedFeatures.map((category, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-3">{category.category}</h4>
+                  <ul className="space-y-2">
+                    {category.items.map((item, itemIndex) => (
+                      <li key={itemIndex} className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-gray-700">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 利用用途 */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">こんな組織におすすめ</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {plan.useCases.map((useCase, index) => (
+                <div key={index} className="flex items-center bg-blue-50 rounded-lg p-3">
+                  <svg className="w-5 h-5 text-blue-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-blue-800 font-medium">{useCase}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* サポート */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">サポート内容</h3>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-gray-700">{plan.support}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* フッター */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 rounded-b-2xl">
+          <div className="flex justify-end space-x-4">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            >
+              閉じる
+            </button>
+            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+              {plan.price === 0 ? '無料で始める' : `${plan.name}を選択`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // プランカードコンポーネント
 interface PlanCardProps {
   plan: Plan;
   isCurrentPlan: boolean;
   isYearly: boolean;
   onSelectPlan: (planId: string) => void;
+  onShowDetails: (plan: Plan) => void;
   index: number;
 }
 
-const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCardProps) => {
+const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, onShowDetails, index }: PlanCardProps) => {
   const price = isYearly ? plan.yearlyPrice : plan.price;
   const monthlyPrice = isYearly ? Math.round(plan.yearlyPrice / 12) : plan.price;
   const savings = isYearly && plan.price > 0 ? Math.round(((plan.price * 12 - plan.yearlyPrice) / (plan.price * 12)) * 100) : 0;
@@ -334,24 +563,24 @@ const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCa
           )}
         </div>
 
-        {/* 制限情報 */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        {/* 制限情報（視認性改善） */}
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600">メンバー:</span>
-              <span className="font-medium ml-1">{plan.limits.members}{typeof plan.limits.members === 'number' ? '人' : ''}</span>
+            <div className="flex justify-between">
+              <span className="text-blue-700 font-medium">メンバー:</span>
+              <span className="font-bold text-blue-900">{plan.limits.members}{typeof plan.limits.members === 'number' ? '人' : ''}</span>
             </div>
-            <div>
-              <span className="text-gray-600">チーム:</span>
-              <span className="font-medium ml-1">{plan.limits.teams}{typeof plan.limits.teams === 'number' ? '個' : ''}</span>
+            <div className="flex justify-between">
+              <span className="text-blue-700 font-medium">チーム:</span>
+              <span className="font-bold text-blue-900">{plan.limits.teams}{typeof plan.limits.teams === 'number' ? '個' : ''}</span>
             </div>
-            <div>
-              <span className="text-gray-600">レポート:</span>
-              <span className="font-medium ml-1">{plan.limits.reports}/月</span>
+            <div className="flex justify-between">
+              <span className="text-blue-700 font-medium">レポート:</span>
+              <span className="font-bold text-blue-900">{plan.limits.reports}/月</span>
             </div>
-            <div>
-              <span className="text-gray-600">ストレージ:</span>
-              <span className="font-medium ml-1">{plan.limits.storage}</span>
+            <div className="flex justify-between">
+              <span className="text-blue-700 font-medium">ストレージ:</span>
+              <span className="font-bold text-blue-900">{plan.limits.storage}</span>
             </div>
           </div>
         </div>
@@ -381,7 +610,10 @@ const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCa
             {buttonConfig.text}
           </button>
           
-          <button className="w-full py-2 px-4 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+          <button 
+            onClick={() => onShowDetails(plan)}
+            className="w-full py-2 px-4 border border-blue-300 text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+          >
             詳細を見る
           </button>
         </div>
@@ -390,7 +622,7 @@ const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCa
   );
 };
 
-// 使用状況コンポーネント
+// 使用状況コンポーネント（視認性改善）
 const UsageStats = () => {
   const currentPlan = plans.find(p => p.id === currentUserPlan.planId)!;
   
@@ -407,72 +639,86 @@ const UsageStats = () => {
     return 'bg-green-500';
   };
 
+  const getUsageTextColor = (percentage: number) => {
+    if (percentage >= 90) return 'text-red-700';
+    if (percentage >= 70) return 'text-yellow-700';
+    return 'text-green-700';
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8 animate-slide-up">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">現在の使用状況</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div>
+        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">メンバー</span>
-            <span className="text-sm text-gray-600">
+                       <span className="text-sm font-bold text-blue-800">メンバー</span>
+            <span className="text-sm font-bold text-blue-900">
               {currentUserPlan.usage.members}/{currentPlan.limits.members}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-blue-200 rounded-full h-3">
             <div
-              className={`h-2 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.members)}`}
+              className={`h-3 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.members)}`}
               style={{ width: `${usagePercentages.members}%` }}
             ></div>
           </div>
-          <div className="text-xs text-gray-500 mt-1">{Math.round(usagePercentages.members)}% 使用中</div>
+          <div className={`text-xs font-medium mt-1 ${getUsageTextColor(usagePercentages.members)}`}>
+            {Math.round(usagePercentages.members)}% 使用中
+          </div>
         </div>
 
-        <div>
+        <div className="bg-green-50 rounded-lg p-4 border border-green-100">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">チーム</span>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm font-bold text-green-800">チーム</span>
+            <span className="text-sm font-bold text-green-900">
               {currentUserPlan.usage.teams}/{currentPlan.limits.teams}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-green-200 rounded-full h-3">
             <div
-              className={`h-2 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.teams)}`}
+              className={`h-3 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.teams)}`}
               style={{ width: `${usagePercentages.teams}%` }}
             ></div>
           </div>
-          <div className="text-xs text-gray-500 mt-1">{Math.round(usagePercentages.teams)}% 使用中</div>
+          <div className={`text-xs font-medium mt-1 ${getUsageTextColor(usagePercentages.teams)}`}>
+            {Math.round(usagePercentages.teams)}% 使用中
+          </div>
         </div>
 
-        <div>
+        <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">レポート</span>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm font-bold text-purple-800">レポート</span>
+            <span className="text-sm font-bold text-purple-900">
               {currentUserPlan.usage.reports}/{currentPlan.limits.reports}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-purple-200 rounded-full h-3">
             <div
-              className={`h-2 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.reports)}`}
+              className={`h-3 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.reports)}`}
               style={{ width: `${usagePercentages.reports}%` }}
             ></div>
           </div>
-          <div className="text-xs text-gray-500 mt-1">{Math.round(usagePercentages.reports)}% 使用中</div>
+          <div className={`text-xs font-medium mt-1 ${getUsageTextColor(usagePercentages.reports)}`}>
+            {Math.round(usagePercentages.reports)}% 使用中
+          </div>
         </div>
 
-        <div>
+        <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">ストレージ</span>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm font-bold text-orange-800">ストレージ</span>
+            <span className="text-sm font-bold text-orange-900">
               {currentUserPlan.usage.storage}/{currentPlan.limits.storage}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-orange-200 rounded-full h-3">
             <div
-              className={`h-2 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.storage)}`}
+              className={`h-3 rounded-full transition-all duration-500 ${getUsageColor(usagePercentages.storage)}`}
               style={{ width: `${usagePercentages.storage}%` }}
             ></div>
           </div>
-          <div className="text-xs text-gray-500 mt-1">{Math.round(usagePercentages.storage)}% 使用中</div>
+          <div className={`text-xs font-medium mt-1 ${getUsageTextColor(usagePercentages.storage)}`}>
+            {Math.round(usagePercentages.storage)}% 使用中
+          </div>
         </div>
       </div>
 
@@ -498,6 +744,8 @@ const UsageStats = () => {
 export default function SubscriptionPage() {
   const { user } = useAuth();
   const [isYearly, setIsYearly] = useState(false);
+  const [selectedPlanForDetails, setSelectedPlanForDetails] = useState<Plan | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [notification, setNotification] = useState<NotificationState>({
     show: false,
     message: '',
@@ -530,6 +778,16 @@ export default function SubscriptionPage() {
     } else {
       showNotification(`${selectedPlan?.name}プランを選択しました`, 'success');
     }
+  };
+
+  const handleShowDetails = (plan: Plan) => {
+    setSelectedPlanForDetails(plan);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setIsDetailModalOpen(false);
+    setSelectedPlanForDetails(null);
   };
 
   return (
@@ -584,6 +842,7 @@ export default function SubscriptionPage() {
               isCurrentPlan={plan.id === currentUserPlan.planId}
               isYearly={isYearly}
               onSelectPlan={handleSelectPlan}
+              onShowDetails={handleShowDetails}
               index={index}
             />
           ))}
@@ -632,6 +891,14 @@ export default function SubscriptionPage() {
         <div className="h-8"></div>
       </div>
 
+      {/* プラン詳細モーダル */}
+      <PlanDetailModal
+        plan={selectedPlanForDetails}
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetails}
+        isYearly={isYearly}
+      />
+
       {/* 通知 */}
       <Notification
         notification={notification}
@@ -640,3 +907,4 @@ export default function SubscriptionPage() {
     </div>
   );
 }
+ 
