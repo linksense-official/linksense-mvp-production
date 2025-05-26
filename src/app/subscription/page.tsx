@@ -139,7 +139,7 @@ const Notification = ({ notification, onClose }: NotificationProps) => {
       }, 3000);
       return () => clearTimeout(timer);
     }
-    return undefined; // ← この行を追加
+    return undefined;
   }, [notification.show, onClose]);
   
   if (!notification.show) return null;
@@ -189,6 +189,12 @@ const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCa
   const monthlyPrice = isYearly ? Math.round(plan.yearlyPrice / 12) : plan.price;
   const savings = isYearly && plan.price > 0 ? Math.round(((plan.price * 12 - plan.yearlyPrice) / (plan.price * 12)) * 100) : 0;
 
+  // 現在のプランより上位かどうかを判定
+  const currentPlanIndex = plans.findIndex(p => p.id === currentUserPlan.planId);
+  const thisPlanIndex = plans.findIndex(p => p.id === plan.id);
+  const isUpgrade = thisPlanIndex > currentPlanIndex;
+  const isDowngrade = thisPlanIndex < currentPlanIndex && !isCurrentPlan;
+
   const colorConfig = {
     gray: {
       border: 'border-gray-200',
@@ -215,6 +221,49 @@ const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCa
 
   const config = colorConfig[plan.color as keyof typeof colorConfig];
 
+  // ボタンテキストとスタイルを決定
+  const getButtonConfig = () => {
+    if (isCurrentPlan) {
+      return {
+        text: '現在のプラン',
+        className: 'w-full py-3 px-4 bg-green-100 text-green-700 rounded-lg font-medium cursor-not-allowed',
+        disabled: true
+      };
+    }
+    
+    if (plan.price === 0) {
+      return {
+        text: '無料で始める',
+        className: `w-full py-3 px-4 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 ${config.button}`,
+        disabled: false
+      };
+    }
+    
+    if (isUpgrade) {
+      return {
+        text: `${plan.name}にアップグレード`,
+        className: `w-full py-3 px-4 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 ${config.button}`,
+        disabled: false
+      };
+    }
+    
+    if (isDowngrade) {
+      return {
+        text: `${plan.name}にダウングレード`,
+        className: `w-full py-3 px-4 border-2 border-gray-300 text-gray-700 rounded-lg font-medium transition-all duration-200 hover:bg-gray-50`,
+        disabled: false
+      };
+    }
+    
+    return {
+      text: `${plan.name}を選択`,
+      className: `w-full py-3 px-4 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 ${config.button}`,
+      disabled: false
+    };
+  };
+
+  const buttonConfig = getButtonConfig();
+
   return (
     <div 
       className={`relative bg-white rounded-2xl shadow-lg border-2 transition-all duration-300 hover:shadow-xl hover:scale-105 animate-slide-up ${
@@ -236,6 +285,15 @@ const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCa
         <div className="absolute -top-3 right-4">
           <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
             ✅ 現在のプラン
+          </span>
+        </div>
+      )}
+
+      {/* アップグレード推奨バッジ */}
+      {isUpgrade && plan.popular && (
+        <div className="absolute -top-3 right-4">
+          <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+            🚀 おすすめ
           </span>
         </div>
       )}
@@ -315,21 +373,13 @@ const PlanCard = ({ plan, isCurrentPlan, isYearly, onSelectPlan, index }: PlanCa
 
         {/* アクションボタン */}
         <div className="space-y-3">
-          {isCurrentPlan ? (
-            <button
-              disabled
-              className="w-full py-3 px-4 bg-green-100 text-green-700 rounded-lg font-medium cursor-not-allowed"
-            >
-              現在のプラン
-            </button>
-          ) : (
-            <button
-              onClick={() => onSelectPlan(plan.id)}
-              className={`w-full py-3 px-4 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 ${config.button}`}
-            >
-              {plan.price === 0 ? '無料で始める' : 'お問い合わせ'}
-            </button>
-          )}
+          <button
+            onClick={() => onSelectPlan(plan.id)}
+            disabled={buttonConfig.disabled}
+            className={buttonConfig.className}
+          >
+            {buttonConfig.text}
+          </button>
           
           <button className="w-full py-2 px-4 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">
             詳細を見る
@@ -468,10 +518,17 @@ export default function SubscriptionPage() {
 
   const handleSelectPlan = (planId: string) => {
     const selectedPlan = plans.find(p => p.id === planId);
+    const currentPlanIndex = plans.findIndex(p => p.id === currentUserPlan.planId);
+    const selectedPlanIndex = plans.findIndex(p => p.id === planId);
+    
     if (selectedPlan?.price === 0) {
       showNotification('無料プランでの利用を開始します', 'success');
+    } else if (selectedPlanIndex > currentPlanIndex) {
+      showNotification(`${selectedPlan?.name}プランへのアップグレードを開始します`, 'success');
+    } else if (selectedPlanIndex < currentPlanIndex) {
+      showNotification(`${selectedPlan?.name}プランへのダウングレードを受け付けました`, 'info');
     } else {
-      showNotification(`${selectedPlan?.name}プランのお問い合わせを受け付けました`, 'success');
+      showNotification(`${selectedPlan?.name}プランを選択しました`, 'success');
     }
   };
 
