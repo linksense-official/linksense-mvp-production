@@ -1,63 +1,54 @@
-// src/lib/pricing-utils.ts - 完全再作成版
-import type { StripePlan, PriceDisplay, PlanComparison } from '@/types/subscription';
+// src/lib/pricing-utils.ts
+import type { StripePlan, PriceDisplay, BillingInterval } from '@/types/subscription';
 
-/**
- * 価格を表示用にフォーマット
- */
-export function formatPrice(plan: StripePlan, interval: 'monthly' | 'yearly'): PriceDisplay {
-  if (plan.isFree) {
+export function formatPrice(plan: StripePlan, interval: BillingInterval): PriceDisplay {
+  if (plan.price === 0) {
     return {
-      amount: '無料',
-      interval: '',
+      amount: 0,
+      currency: plan.currency,
+      interval: interval,
+      formatted: '無料'
     };
   }
 
-  const pricing = interval === 'yearly' && plan.pricing.yearly 
-    ? plan.pricing.yearly 
-    : plan.pricing.monthly;
-
-  const amount = `¥${pricing.price.toLocaleString()}`;
-  const intervalText = interval === 'yearly' ? '/年' : '/月';
-
-  let monthlyEquivalent: string | undefined;
-  let discount: string | undefined;
-  let savings: string | undefined;
-
-  if (interval === 'yearly' && plan.pricing.yearly) {
-    const monthlyPrice = Math.round(plan.pricing.yearly.price / 12);
-    monthlyEquivalent = `月割り ¥${monthlyPrice.toLocaleString()}`;
-
-    if (plan.pricing.yearly.discount) {
-      discount = `${plan.pricing.yearly.discount}% OFF`;
-    }
-
-    const yearlyTotal = plan.pricing.monthly.price * 12;
-    const savingsAmount = yearlyTotal - plan.pricing.yearly.price;
-    savings = `年間 ¥${savingsAmount.toLocaleString()} お得`;
+  let price = plan.price;
+  
+  if (interval === 'yearly' && plan.yearlyDiscount) {
+    const yearlyPrice = plan.price * 12;
+    price = Math.round(yearlyPrice * (1 - plan.yearlyDiscount));
   }
 
-  return {
-    amount,
-    interval: intervalText,
-    monthlyEquivalent,
-    discount,
-    savings
+  const formatted = `¥${price.toLocaleString()}${interval === 'yearly' ? '/年' : '/月'}`;
+
+  const result: PriceDisplay = {
+    amount: price,
+    currency: plan.currency,
+    interval: interval,
+    formatted: formatted
   };
+
+  if (interval === 'yearly' && plan.yearlyDiscount) {
+    const yearlyTotal = plan.price * 12;
+    const savings = yearlyTotal - price;
+    const discountPercentage = Math.round(plan.yearlyDiscount * 100);
+
+    result.originalAmount = yearlyTotal;
+    result.discountPercentage = discountPercentage;
+  }
+
+  return result;
 }
 
-/**
- * プランの比較データを生成
- */
-export function generatePlanComparison(plan: StripePlan): PlanComparison | null {
-  if (plan.isFree || !plan.pricing.yearly) {
+export function generatePlanComparison(plan: StripePlan) {
+  if (plan.price === 0 || !plan.yearlyDiscount) {
     return null;
   }
 
-  const monthlyPrice = plan.pricing.monthly.price;
-  const yearlyPrice = plan.pricing.yearly.price;
+  const monthlyPrice = plan.price;
   const yearlyTotal = monthlyPrice * 12;
+  const yearlyPrice = Math.round(yearlyTotal * (1 - plan.yearlyDiscount));
   const savings = yearlyTotal - yearlyPrice;
-  const discountPercentage = Math.round((savings / yearlyTotal) * 100);
+  const discountPercentage = Math.round(plan.yearlyDiscount * 100);
 
   return {
     monthly: {
@@ -73,92 +64,25 @@ export function generatePlanComparison(plan: StripePlan): PlanComparison | null 
   };
 }
 
-/**
- * 適切なpriceIdを取得
- */
-export function getPriceId(plan: StripePlan, interval: 'monthly' | 'yearly'): string {
-  if (plan.isFree) {
-    return plan.pricing.monthly.priceId;
+export function getPriceId(plan: StripePlan, interval: BillingInterval): string {
+  if (plan.price === 0) {
+    return plan.stripePriceId || `price_${plan.id}_free`;
   }
 
-  if (interval === 'yearly' && plan.pricing.yearly) {
-    return plan.pricing.yearly.priceId;
+  if (interval === 'yearly' && plan.yearlyDiscount) {
+    return plan.stripePriceId?.replace('_monthly', '_yearly') || `price_${plan.id}_yearly`;
   }
 
-  return plan.pricing.monthly.priceId;
+  return plan.stripePriceId || `price_${plan.id}_monthly`;
 }
 
-/**
- * 無料プランかどうかを判定
- */
-export function isFreeplan(planId: string): boolean {
-  return planId === 'starter' || planId === 'price_starter_free';
+export function isFreeplan(plan: StripePlan | string): boolean {
+  if (typeof plan === 'string') {
+    return plan === 'starter' || plan === 'price_starter_free';
+  }
+  return plan.price === 0;
 }
 
-/**
- * 価格計算ヘルパー
- */
-export function calculatePricing(plan: StripePlan): {
-  monthly: number;
-  yearly: number | null;
-  savings: number | null;
-  discountPercentage: number | null;
-} {
-  const monthly = plan.pricing.monthly.price;
-  const yearly = plan.pricing.yearly?.price || null;
-  
-  if (!yearly) {
-    return {
-      monthly,
-      yearly: null,
-      savings: null,
-      discountPercentage: null
-    };
-  }
-
-  const yearlyTotal = monthly * 12;
-  const savings = yearlyTotal - yearly;
-  const discountPercentage = Math.round((savings / yearlyTotal) * 100);
-
-  return {
-    monthly,
-    yearly,
-    savings,
-    discountPercentage
-  };
-}
-
-/**
- * プランの機能制限チェック
- */
-export function checkPlanLimits(planId: string, usage: {
-  members: number;
-  teams: number;
-  storage: number;
-}): {
-  isWithinLimits: boolean;
-  exceeded: string[];
-} {
-  const exceeded: string[] = [];
-  
-  switch (planId) {
-    case 'starter':
-      if (usage.members > 3) exceeded.push('メンバー数上限（3名）');
-      if (usage.teams > 1) exceeded.push('チーム数上限（1チーム）');
-      if (usage.storage > 1024) exceeded.push('ストレージ上限（1GB）');
-      break;
-    case 'professional':
-      if (usage.members > 50) exceeded.push('メンバー数上限（50名）');
-      if (usage.teams > 10) exceeded.push('チーム数上限（10チーム）');
-      if (usage.storage > 10240) exceeded.push('ストレージ上限（10GB）');
-      break;
-    case 'enterprise':
-      // 無制限
-      break;
-  }
-
-  return {
-    isWithinLimits: exceeded.length === 0,
-    exceeded
-  };
+export function isRecommendedPlan(plan: StripePlan): boolean {
+  return plan.isRecommended === true;
 }

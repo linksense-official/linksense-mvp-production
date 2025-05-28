@@ -25,12 +25,13 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      const result = await login({ email, password });
+      // ✅ 修正: login関数を正しい引数で呼び出し
+      const result = await login(email, password);
       
-      if (result.success) {
+      if (result) {
         router.push('/dashboard');
       } else {
-        setError(result.error || 'ログインに失敗しました');
+        setError('ログインに失敗しました');
       }
     } catch (err) {
       setError('ログイン処理中にエラーが発生しました');
@@ -47,12 +48,13 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      const result = await login({ email: demoEmail, password: demoPassword });
+      // ✅ 修正: login関数を正しい引数で呼び出し
+      const result = await login(demoEmail, demoPassword);
       
-      if (result.success) {
+      if (result) {
         router.push('/dashboard');
       } else {
-        setError(result.error || 'ログインに失敗しました');
+        setError('ログインに失敗しました');
       }
     } catch (err) {
       setError('ログイン処理中にエラーが発生しました');

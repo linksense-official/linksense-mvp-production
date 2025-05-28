@@ -2,12 +2,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { pricingPlans, billingIntervals } from '@/data/pricing-plans';
-import { StripePlan } from '@/types/subscription';
-import { formatPrice, generatePlanComparison, getPriceId, isFreeplan } from '@/lib/pricing-utils';
+import { pricingPlans, billingIntervalConfig, isFreeplan, isRecommendedPlan } from '@/data/pricing-plans';
+import type { StripePlan, BillingInterval } from '@/types/subscription';
+import { formatPrice, generatePlanComparison, getPriceId } from '@/lib/pricing-utils';
 
 export default function PricingPage() {
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
   const handleSelectPlan = async (plan: StripePlan) => {
@@ -15,8 +15,8 @@ export default function PricingPage() {
     
     const priceId = getPriceId(plan, billingInterval);
     
-    // 無料プランの場合は決済をスキップ
-    if (plan.isFree) {
+    // ✅ 修正: isFreeplan関数を使用
+    if (isFreeplan(plan)) {
       setIsLoading(plan.id);
       console.log('✅ 無料プラン処理開始');
       
@@ -112,10 +112,10 @@ export default function PricingPage() {
             年間プランなら最大17%お得になります。
           </p>
           
-          {/* 請求間隔切り替え */}
+          {/* ✅ 修正: 請求間隔切り替え */}
           <div className="flex justify-center mb-8">
             <div className="bg-white rounded-lg p-1 shadow-md border">
-              {billingIntervals.map((interval) => (
+              {billingIntervalConfig.map((interval) => (
                 <button
                   key={interval.type}
                   onClick={() => setBillingInterval(interval.type)}
@@ -186,7 +186,7 @@ function PricingCard({
   onSelect 
 }: { 
   plan: StripePlan;
-  billingInterval: 'monthly' | 'yearly';
+  billingInterval: BillingInterval;
   isLoading: boolean;
   onSelect: () => void; 
 }) {
@@ -195,11 +195,11 @@ function PricingCard({
 
   return (
     <div className={`relative bg-white rounded-xl shadow-lg p-8 transition-all duration-200 hover:shadow-xl ${
-      plan.recommended ? 'ring-2 ring-blue-500 scale-105' : ''
+      isRecommendedPlan(plan) ? 'ring-2 ring-blue-500 scale-105' : '' // ✅ 修正: isRecommendedPlan関数使用
     }`}>
       
       {/* バッジ */}
-      {plan.recommended && (
+      {isRecommendedPlan(plan) && ( // ✅ 修正: isRecommendedPlan関数使用
         <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
           <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-medium shadow-lg">
             人気プラン
@@ -207,7 +207,7 @@ function PricingCard({
         </div>
       )}
 
-      {plan.isFree && (
+      {isFreeplan(plan) && ( // ✅ 修正: isFreeplan関数使用
         <div className="absolute top-4 right-4">
           <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
             無料
@@ -215,10 +215,11 @@ function PricingCard({
         </div>
       )}
 
-      {priceDisplay.discount && (
+      {/* ✅ 修正: 割引表示（年間プランかつ割引がある場合のみ） */}
+      {billingInterval === 'yearly' && plan.yearlyDiscount && (
         <div className="absolute top-4 right-4">
           <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-            {priceDisplay.discount}
+            {Math.round(plan.yearlyDiscount * 100)}% OFF
           </span>
         </div>
       )}
@@ -231,20 +232,21 @@ function PricingCard({
         
         <div className="mb-2">
           <span className="text-4xl font-bold text-gray-900">
-            {priceDisplay.amount}
+            {priceDisplay.formatted}
           </span>
-          <span className="text-gray-600 text-lg">{priceDisplay.interval}</span>
         </div>
         
-        {priceDisplay.monthlyEquivalent && (
+        {/* ✅ 修正: 年間プランの月額換算表示 */}
+        {billingInterval === 'yearly' && plan.yearlyDiscount && (
           <p className="text-sm text-gray-500 mb-1">
-            {priceDisplay.monthlyEquivalent}
+            月割り ¥{Math.round((plan.price * 12 * (1 - plan.yearlyDiscount)) / 12).toLocaleString()}
           </p>
         )}
         
-        {priceDisplay.savings && (
+        {/* ✅ 修正: 年間プランの節約額表示 */}
+        {billingInterval === 'yearly' && plan.yearlyDiscount && (
           <p className="text-sm text-green-600 font-medium">
-            {priceDisplay.savings}
+            年間 ¥{(plan.price * 12 * plan.yearlyDiscount).toLocaleString()} お得
           </p>
         )}
       </div>
@@ -266,9 +268,9 @@ function PricingCard({
         onClick={onSelect}
         disabled={isLoading}
         className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-          plan.isFree
+          isFreeplan(plan) // ✅ 修正: isFreeplan関数使用
             ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
-            : plan.recommended
+            : isRecommendedPlan(plan) // ✅ 修正: isRecommendedPlan関数使用
             ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl'
             : 'bg-gray-800 text-white hover:bg-gray-900 shadow-lg hover:shadow-xl'
         }`}
@@ -281,7 +283,7 @@ function PricingCard({
             </svg>
             処理中...
           </div>
-        ) : plan.isFree ? (
+        ) : isFreeplan(plan) ? ( // ✅ 修正: isFreeplan関数使用
           '無料で始める'
         ) : (
           'プランを選択'

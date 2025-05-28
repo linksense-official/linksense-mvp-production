@@ -2,21 +2,58 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
-import mockApi from '@/lib/mockApi';
-import { UserSettings, NotificationSettings, PrivacySettings, APIResponse } from '@/types/api';
+import type { UserSettings, NotificationSettings, PrivacySettings } from '@/types/api'; // ✅ 修正: 正しいimport
+
+// ✅ 修正: api.tsの型定義に完全準拠
+interface LocalUserSettings {
+  notifications: NotificationSettings;
+  privacy: PrivacySettings;
+  theme: 'light' | 'dark' | 'system';
+  language: 'ja' | 'en';
+  timezone: string;
+}
+
+// モックAPI関数
+const updateUserSettings = async (userId: string, settings: LocalUserSettings) => {
+  return new Promise<{ success: boolean; data?: LocalUserSettings; error?: string }>((resolve) => {
+    setTimeout(() => {
+      resolve({
+        success: true,
+        data: settings
+      });
+    }, 1000);
+  });
+};
 
 const SettingsPage: React.FC = () => {
   const { user, updateUser, isAuthenticated, isLoading } = useAuth();
-  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [settings, setSettings] = useState<LocalUserSettings | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeTab, setActiveTab] = useState<'notifications' | 'privacy' | 'general'>('notifications');
 
-  // 設定データの初期化
+  // ✅ 修正: 設定データの初期化（api.tsの型構造に準拠）
   useEffect(() => {
     if (user?.settings) {
-      setSettings(user.settings);
+      setSettings({
+        notifications: {
+          emailNotifications: user.settings.notifications?.emailNotifications ?? true,
+          pushNotifications: user.settings.notifications?.pushNotifications ?? true,
+          weeklyReports: user.settings.notifications?.weeklyReports ?? true,
+          criticalAlerts: user.settings.notifications?.criticalAlerts ?? true,
+          teamUpdates: user.settings.notifications?.teamUpdates ?? false
+        },
+        privacy: {
+          shareAnalytics: user.settings.privacy?.shareAnalytics ?? true,
+          anonymizeData: user.settings.privacy?.anonymizeData ?? false,
+          dataRetention: user.settings.privacy?.dataRetention ?? true,
+          exportData: user.settings.privacy?.exportData ?? true
+        },
+        theme: user.settings.theme ?? 'light',
+        language: user.settings.language ?? 'ja',
+        timezone: user.settings.timezone ?? 'Asia/Tokyo'
+      });
     } else {
       // デフォルト設定
       setSettings({
@@ -67,7 +104,7 @@ const SettingsPage: React.FC = () => {
   };
 
   // 一般設定の変更
-  const handleGeneralChange = (key: keyof Pick<UserSettings, 'theme' | 'language' | 'timezone'>, value: string) => {
+  const handleGeneralChange = (key: keyof Pick<LocalUserSettings, 'theme' | 'language' | 'timezone'>, value: string) => {
     if (settings) {
       setSettings({
         ...settings,
@@ -76,7 +113,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  // 設定の保存
+  // ✅ 修正: 設定の保存（api.tsの型構造に準拠）
   const handleSave = async () => {
     if (!settings || !user) return;
 
@@ -84,20 +121,26 @@ const SettingsPage: React.FC = () => {
       setSaving(true);
       setMessage(null);
 
-      const response: APIResponse<UserSettings> = await mockApi.updateUserSettings(user.id, settings);
+      const response = await updateUserSettings(user.id, settings);
 
       if (response.success && response.data) {
-        // ユーザー情報を更新
+        // ✅ 修正: UserSettings型に準拠した更新
+        const updatedSettings: UserSettings = {
+          notifications: settings.notifications,
+          privacy: settings.privacy,
+          theme: settings.theme,
+          language: settings.language,
+          timezone: settings.timezone
+        };
+
         updateUser({
           ...user,
-          settings: response.data
+          settings: updatedSettings
         });
 
         setMessage({ type: 'success', text: '設定が正常に保存されました' });
       } else {
-        const errorMessage = typeof response.error === 'string' 
-          ? response.error 
-          : response.error?.message || '設定の保存に失敗しました';
+        const errorMessage = response.error || '設定の保存に失敗しました';
         setMessage({ type: 'error', text: errorMessage });
       }
     } catch (error) {
@@ -110,14 +153,14 @@ const SettingsPage: React.FC = () => {
 
   // メッセージの自動消去
   useEffect(() => {
-  if (message) {
-    const timer = setTimeout(() => {
-      setMessage(null);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }
-  return undefined; // ← この行を追加
-}, [message]);
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [message]);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -476,7 +519,7 @@ const SettingsPage: React.FC = () => {
                     </label>
                     <select
                       value={settings.theme}
-                      onChange={(e) => handleGeneralChange('theme', e.target.value as 'light' | 'dark' | 'system')}
+                      onChange={(e) => handleGeneralChange('theme', e.target.value)}
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
                       <option value="light">ライトテーマ</option>
@@ -495,7 +538,7 @@ const SettingsPage: React.FC = () => {
                     </label>
                     <select
                       value={settings.language}
-                      onChange={(e) => handleGeneralChange('language', e.target.value as 'ja' | 'en')}
+                      onChange={(e) => handleGeneralChange('language', e.target.value)}
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
                       <option value="ja">日本語</option>
@@ -530,7 +573,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* アカウント情報 */}
                 <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-900 mb-4">アカウント情報</h4>
+                     <h4 className="text-sm font-medium text-gray-900 mb-4">アカウント情報</h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">ユーザーID:</span>
@@ -549,7 +592,7 @@ const SettingsPage: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">部署:</span>
-                      <span className="text-sm font-medium text-gray-900">{user?.department}</span>
+                      <span className="text-sm font-medium text-gray-900">{user?.department || '未設定'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">登録日:</span>

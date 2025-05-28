@@ -232,6 +232,96 @@ export interface SubscriptionError {
   details?: Record<string, any>;
 }
 
+// ===== Stripe関連型定義（追加） =====
+
+/**
+ * Stripeプラン
+ */
+export interface StripePlan {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  interval: BillingInterval;
+  currency: string;
+  status: 'active' | 'trial' | 'expired' | 'cancelled';
+  features: string[];
+  limits?: {
+    teams?: number; // -1 = unlimited
+    members?: number; // -1 = unlimited
+    storage?: number; // GB, -1 = unlimited
+    apiCalls?: number; // -1 = unlimited
+    messageAnalysis?: number; // -1 = unlimited
+  };
+  isPopular?: boolean;
+  isRecommended?: boolean;
+  yearlyDiscount?: number; // 0.0 - 1.0
+  nextBillingDate?: Date;
+  trialEndsAt?: Date;
+  stripeProductId?: string;
+  stripePriceId?: string;
+}
+
+/**
+ * 課金間隔
+ */
+export type BillingInterval = 'monthly' | 'yearly';
+
+/**
+ * 価格表示
+ */
+export interface PriceDisplay {
+  amount: number;
+  currency: string;
+  interval: BillingInterval;
+  formatted: string;
+  originalAmount?: number;
+  discountPercentage?: number;
+}
+
+/**
+ * プラン比較
+ */
+export interface PlanComparison {
+  plans: StripePlan[];
+  features: FeatureComparison[];
+  recommendations: {
+    bestValue: string;
+    mostPopular: string;
+    enterprise: string;
+  };
+}
+
+/**
+ * 機能比較
+ */
+export interface FeatureComparison {
+  name: string;
+  description: string;
+  category: string;
+  plans: {
+    [planId: string]: boolean | string | number;
+  };
+}
+
+/**
+ * Stripeサブスクリプション状態
+ */
+export interface StripeSubscriptionState {
+  subscriptionId?: string;
+  customerId?: string;
+  status: 'incomplete' | 'incomplete_expired' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid';
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  trialStart?: Date;
+  trialEnd?: Date;
+  plan: StripePlan;
+  paymentMethod?: PaymentMethod;
+  lastInvoice?: Invoice;
+  nextInvoice?: Partial<Invoice>;
+}
+
 // ===== プッシュ通知専用型 =====
 
 export interface PushSubscription {
@@ -435,274 +525,7 @@ export type EmailDeliveryStatus =
   | 'unsubscribed'
   | 'failed';
 
-// ===== 購読管理型 =====
-
-export interface SubscriptionManager {
-  subscriptions: Subscription[];
-  templates: NotificationTemplate[];
-  analytics: SubscriptionManagerAnalytics;
-  settings: SubscriptionManagerSettings;
-}
-
-export interface SubscriptionManagerAnalytics {
-  totalSubscriptions: number;
-  activeSubscriptions: number;
-  totalNotifications: number;
-  deliveryRate: number;
-  engagementRate: number;
-  errorRate: number;
-  topChannels: ChannelUsage[];
-  recentActivity: SubscriptionActivity[];
-}
-
-export interface ChannelUsage {
-  type: SubscriptionType;
-  count: number;
-  percentage: number;
-  trend: number; // percentage change
-}
-
-export interface SubscriptionActivity {
-  timestamp: Date;
-  type: ActivityType;
-  subscriptionId: string;
-  details: Record<string, any>;
-}
-
-export type ActivityType = 
-  | 'created'
-  | 'updated'
-  | 'deleted'
-  | 'triggered'
-  | 'delivered'
-  | 'failed'
-  | 'paused'
-  | 'resumed';
-
-export interface SubscriptionManagerSettings {
-  defaultFrequency: NotificationFrequency;
-  maxSubscriptionsPerUser: number;
-  defaultRetryPolicy: RetryPolicy;
-  allowUserCreation: boolean;
-  requireVerification: boolean;
-  enableAnalytics: boolean;
-  dataRetentionDays: number;
-}
-
-// ===== バッチ処理型 =====
-
-export interface BatchNotification {
-  id: string;
-  name: string;
-  subscriptionIds: string[];
-  payload: NotificationPayload;
-  schedule: BatchSchedule;
-  status: BatchStatus;
-  progress: BatchProgress;
-  createdAt: Date;
-  startedAt?: Date;
-  completedAt?: Date;
-}
-
-export interface NotificationPayload {
-  type: SubscriptionType;
-  data: Record<string, any>;
-  template?: string;
-  priority: NotificationPriority;
-}
-
-export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
-
-export interface BatchSchedule {
-  type: ScheduleType;
-  startAt?: Date;
-  cron?: string;
-  timezone?: string;
-  repeat?: RepeatConfig;
-}
-
-export type ScheduleType = 'immediate' | 'scheduled' | 'recurring';
-
-export interface RepeatConfig {
-  enabled: boolean;
-  interval: RepeatInterval;
-  count?: number;
-  until?: Date;
-}
-
-export type RepeatInterval = 
-  | 'hourly'
-  | 'daily'
-  | 'weekly'
-  | 'monthly'
-  | 'yearly'
-  | 'custom';
-
-export type BatchStatus = 
-  | 'pending'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'paused';
-
-export interface BatchProgress {
-  total: number;
-  processed: number;
-  successful: number;
-  failed: number;
-  percentage: number;
-  estimatedTimeRemaining?: number; // seconds
-  currentRate: number; // items per second
-}
-
-// ===== 購読統計型 =====
-
-export interface SubscriptionStats {
-  timeRange: StatsTimeRange;
-  overview: StatsOverview;
-  byType: TypeStats[];
-  byChannel: ChannelStats[];
-  byUser: UserStats[];
-  trends: StatsTrend[];
-  errors: ErrorStats[];
-}
-
-export interface StatsTimeRange {
-  start: Date;
-  end: Date;
-  granularity: StatsGranularity;
-}
-
-export type StatsGranularity = 'hour' | 'day' | 'week' | 'month';
-
-export interface StatsOverview {
-  totalSubscriptions: number;
-  activeSubscriptions: number;
-  totalNotifications: number;
-  successRate: number;
-  averageDeliveryTime: number;
-  engagementRate: number;
-}
-
-export interface TypeStats {
-  type: SubscriptionType;
-  count: number;
-  notifications: number;
-  successRate: number;
-  averageDeliveryTime: number;
-}
-
-export interface ChannelStats {
-  channelId: string;
-  channelName: string;
-  subscriptions: number;
-  notifications: number;
-  engagementRate: number;
-}
-
-export interface UserStats {
-  userId: string;
-  userName: string;
-  subscriptions: number;
-  notifications: number;
-  engagementRate: number;
-  lastActivity: Date;
-}
-
-export interface StatsTrend {
-  metric: string;
-  dataPoints: TrendDataPoint[];
-  direction: TrendDirection;
-  changePercentage: number;
-}
-
-export interface TrendDataPoint {
-  timestamp: Date;
-  value: number;
-}
-
-export type TrendDirection = 'up' | 'down' | 'stable';
-
-export interface ErrorStats {
-  errorCode: string;
-  count: number;
-  percentage: number;
-  lastOccurrence: Date;
-  affectedSubscriptions: string[];
-}
-
-// ===== ユーティリティ型 =====
-
-export type SubscriptionCreate = Omit<Subscription, 'id' | 'createdAt' | 'updatedAt'>;
-export type SubscriptionUpdate = Partial<Pick<Subscription, 'status' | 'config' | 'expiresAt'>>;
-
-export type PushSubscriptionCreate = Omit<PushSubscription, 'id' | 'createdAt' | 'lastUsedAt'>;
-export type WebhookSubscriptionCreate = Omit<WebhookSubscription, 'id' | 'lastTriggeredAt' | 'statistics'>;
-export type EmailSubscriptionCreate = Omit<EmailSubscription, 'id' | 'isVerified' | 'verifiedAt' | 'lastSentAt' | 'bounceCount' | 'isBlocked'>;
-
-// ===== 型ガード関数 =====
-
-export const isPushSubscription = (subscription: any): subscription is PushSubscription => {
-  return subscription && typeof subscription.endpoint === 'string' && subscription.keys;
-};
-
-export const isWebhookSubscription = (subscription: any): subscription is WebhookSubscription => {
-  return subscription && typeof subscription.url === 'string' && Array.isArray(subscription.events);
-};
-
-export const isEmailSubscription = (subscription: any): subscription is EmailSubscription => {
-  return subscription && typeof subscription.emailAddress === 'string';
-};
-
-export const isActiveSubscription = (subscription: Subscription): boolean => {
-  return subscription.status === 'active' && 
-         subscription.config.enabled && 
-         (!subscription.expiresAt || subscription.expiresAt > new Date());
-};
-
-// ===== 定数 =====
-
-export const SUBSCRIPTION_LIMITS = {
-  MAX_SUBSCRIPTIONS_PER_USER: 100,
-  MAX_FILTERS_PER_SUBSCRIPTION: 20,
-  MAX_WEBHOOK_TIMEOUT: 30, // seconds
-  MAX_EMAIL_ATTACHMENTS: 10,
-  MAX_BATCH_SIZE: 10000,
-  DEFAULT_RETRY_ATTEMPTS: 3
-} as const;
-
-export const DEFAULT_NOTIFICATION_FREQUENCIES: NotificationFrequency[] = [
-  'real_time',
-  'every_15_minutes',
-  'hourly',
-  'daily',
-  'weekly'
-];
-
-export const SUPPORTED_PLATFORMS: Platform[] = [
-  'web_chrome',
-  'web_firefox',
-  'web_safari',
-  'web_edge',
-  'android',
-  'ios'
-];
-
-// ===== エクスポート =====
-
-export default {
-  SUBSCRIPTION_LIMITS,
-  DEFAULT_NOTIFICATION_FREQUENCIES,
-  SUPPORTED_PLATFORMS,
-  isPushSubscription,
-  isWebhookSubscription,
-  isEmailSubscription,
-  isActiveSubscription
-} as const;
-
-// src/types/subscription.ts
-// サブスクリプション関連の型定義
+// ===== サブスクリプションプラン（統合版） =====
 
 /**
  * サブスクリプションプラン
@@ -913,33 +736,6 @@ export interface Discount {
 }
 
 /**
- * サブスクリプション分析
- */
-export interface SubscriptionAnalytics {
-  period: {
-    start: Date;
-    end: Date;
-  };
-  metrics: {
-    newSubscriptions: number;
-    cancelledSubscriptions: number;
-    upgrades: number;
-    downgrades: number;
-    revenue: number;
-    churnRate: number;
-    growthRate: number;
-  };
-  planDistribution: {
-    planId: string;
-    planName: string;
-    count: number;
-    percentage: number;
-    revenue: number;
-  }[];
-  cohortAnalysis: CohortData[];
-}
-
-/**
  * コホート分析データ
  */
 export interface CohortData {
@@ -951,3 +747,63 @@ export interface CohortData {
     revenue: number;
   }[];
 }
+
+// ===== 定数 =====
+
+export const SUBSCRIPTION_LIMITS = {
+  MAX_SUBSCRIPTIONS_PER_USER: 100,
+  MAX_FILTERS_PER_SUBSCRIPTION: 20,
+  MAX_WEBHOOK_TIMEOUT: 30, // seconds
+  MAX_EMAIL_ATTACHMENTS: 10,
+  MAX_BATCH_SIZE: 10000,
+  DEFAULT_RETRY_ATTEMPTS: 3
+} as const;
+
+export const DEFAULT_NOTIFICATION_FREQUENCIES: NotificationFrequency[] = [
+  'real_time',
+  'every_15_minutes',
+  'hourly',
+  'daily',
+  'weekly'
+];
+
+export const SUPPORTED_PLATFORMS: Platform[] = [
+  'web_chrome',
+  'web_firefox',
+  'web_safari',
+  'web_edge',
+  'android',
+  'ios'
+];
+
+// ===== 型ガード関数 =====
+
+export const isPushSubscription = (subscription: any): subscription is PushSubscription => {
+  return subscription && typeof subscription.endpoint === 'string' && subscription.keys;
+};
+
+export const isWebhookSubscription = (subscription: any): subscription is WebhookSubscription => {
+  return subscription && typeof subscription.url === 'string' && Array.isArray(subscription.events);
+};
+
+export const isEmailSubscription = (subscription: any): subscription is EmailSubscription => {
+  return subscription && typeof subscription.emailAddress === 'string';
+};
+
+export const isActiveSubscription = (subscription: Subscription): boolean => {
+  return subscription.status === 'active' && 
+         subscription.config.enabled && 
+         (!subscription.expiresAt || subscription.expiresAt > new Date());
+};
+
+// ===== エクスポート =====
+
+export default {
+  SUBSCRIPTION_LIMITS,
+  DEFAULT_NOTIFICATION_FREQUENCIES,
+  SUPPORTED_PLATFORMS,
+  isPushSubscription,
+  isWebhookSubscription,
+  isEmailSubscription,
+  isActiveSubscription
+} as const;

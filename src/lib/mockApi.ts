@@ -18,9 +18,10 @@ const mockUsers: User[] = [
     name: 'デモユーザー',
     role: 'member',
     department: '開発部',
-    avatar: undefined,
+    avatar: '/api/placeholder/40/40',
     createdAt: '2025-01-01T00:00:00Z',
     updatedAt: '2025-05-25T00:00:00Z',
+    status: 'active', // ✅ 追加: 必須プロパティ
     subscription: {
       id: 'sub-demo-001',
       plan: 'basic',
@@ -60,9 +61,10 @@ const mockUsers: User[] = [
     name: '管理者ユーザー',
     role: 'admin',
     department: '経営企画',
-    avatar: undefined,
+    avatar: '/api/placeholder/40/40',
     createdAt: '2024-12-01T00:00:00Z',
     updatedAt: '2025-05-25T00:00:00Z',
+    status: 'active', // ✅ 追加: 必須プロパティ
     subscription: {
       id: 'sub-admin-001',
       plan: 'enterprise',
@@ -102,9 +104,10 @@ const mockUsers: User[] = [
     name: 'マネージャーユーザー',
     role: 'manager',
     department: '人事部',
-    avatar: undefined,
+    avatar: '/api/placeholder/40/40',
     createdAt: '2025-02-01T00:00:00Z',
     updatedAt: '2025-05-25T00:00:00Z',
+    status: 'active', // ✅ 追加: 必須プロパティ
     subscription: {
       id: 'sub-manager-001',
       plan: 'premium',
@@ -149,6 +152,9 @@ const mockTeamMembers: TeamMember[] = [
     department: '開発部',
     role: 'シニアエンジニア',
     joinDate: '2023-04-01',
+    avatar: '/api/placeholder/40/40',
+    healthScore: 75,
+    status: 'active', // ✅ 既に正しく設定済み
     healthMetrics: {
       overallScore: 75,
       stressLevel: 45,
@@ -159,8 +165,7 @@ const mockTeamMembers: TeamMember[] = [
       lastUpdated: '2025-05-25T09:00:00Z',
       trends: { week: 5, month: -2 }
     },
-    lastActive: '2025-05-25T16:30:00Z',
-    status: 'active'
+    lastActive: '2025-05-25T16:30:00Z'
   },
   {
     id: 'member-002',
@@ -169,6 +174,9 @@ const mockTeamMembers: TeamMember[] = [
     department: 'デザイン部',
     role: 'UXデザイナー',
     joinDate: '2023-06-15',
+    avatar: '/api/placeholder/40/40',
+    healthScore: 65,
+    status: 'active', // ✅ 既に正しく設定済み
     healthMetrics: {
       overallScore: 65,
       stressLevel: 70,
@@ -179,8 +187,7 @@ const mockTeamMembers: TeamMember[] = [
       lastUpdated: '2025-05-25T10:15:00Z',
       trends: { week: -8, month: -15 }
     },
-    lastActive: '2025-05-25T17:45:00Z',
-    status: 'active'
+    lastActive: '2025-05-25T17:45:00Z'
   },
   {
     id: 'member-003',
@@ -189,6 +196,9 @@ const mockTeamMembers: TeamMember[] = [
     department: 'マーケティング部',
     role: 'マーケティングマネージャー',
     joinDate: '2022-09-01',
+    avatar: '/api/placeholder/40/40',
+    healthScore: 40,
+    status: 'active', // ✅ 既に正しく設定済み
     healthMetrics: {
       overallScore: 40,
       stressLevel: 90,
@@ -199,8 +209,7 @@ const mockTeamMembers: TeamMember[] = [
       lastUpdated: '2025-05-25T11:30:00Z',
       trends: { week: -12, month: -25 }
     },
-    lastActive: '2025-05-25T19:20:00Z',
-    status: 'active'
+    lastActive: '2025-05-25T19:20:00Z'
   }
 ];
 
@@ -247,13 +256,16 @@ const mockAlerts: HealthAlert[] = [
   }
 ];
 
-// モックダッシュボード統計（修正版）
+// モックダッシュボード統計
 const mockDashboardStats: DashboardStats = {
   totalMembers: 45,
   activeMembers: 42,
   averageHealthScore: 68,
   alertsCount: 8,
   criticalAlertsCount: 2,
+  teamHealthScore: 68,
+  atRiskMembers: 3,
+  teamSatisfaction: 72,
   departmentBreakdown: [
     { department: '開発部', memberCount: 15, averageScore: 72 },
     { department: 'デザイン部', memberCount: 8, averageScore: 65 },
@@ -264,12 +276,8 @@ const mockDashboardStats: DashboardStats = {
     healthScoreChange: -3,
     engagementChange: -8,
     stressChange: 12,
-    teamHealthScore: 85,
+    teamHealthScore: 68
   },
-  // 不足していたプロパティを追加
-  teamHealthScore: 68,
-  atRiskMembers: 3,
-  teamSatisfaction: 72,
   recentAlerts: mockAlerts
 };
 

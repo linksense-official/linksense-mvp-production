@@ -2,7 +2,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { StripeSubscriptionState } from '@/types/subscription';
+import type { StripeSubscriptionState, StripePlan, BillingInterval } from '@/types/subscription';
+import { pricingPlans } from '@/data/pricing-plans';
 
 interface UseSubscriptionReturn {
   subscription: StripeSubscriptionState | null;
@@ -26,7 +27,7 @@ export const useSubscription = (userId?: string): UseSubscriptionReturn => {
 
       // ローカルストレージから基本情報を取得
       const localPlan: string | null = localStorage.getItem('currentPlan');
-      const localInterval: 'monthly' | 'yearly' = (localStorage.getItem('billingInterval') as 'monthly' | 'yearly') ?? 'monthly';
+      const localInterval: BillingInterval = (localStorage.getItem('billingInterval') as BillingInterval) ?? 'monthly';
       const localSubscriptionId: string | null = localStorage.getItem('subscriptionId');
 
       console.log('🔍 ローカル情報確認:', { localPlan, localInterval, localSubscriptionId });
@@ -50,34 +51,42 @@ export const useSubscription = (userId?: string): UseSubscriptionReturn => {
       console.log('✅ サブスクリプション情報取得:', data);
 
       if (data.success && data.subscription) {
+        // ✅ 修正: プランオブジェクトを取得
+        const planId = data.subscription.planId ?? localPlan ?? 'starter';
+        const plan = pricingPlans.find(p => p.id === planId) || pricingPlans[0];
+
         const subscriptionData: StripeSubscriptionState = {
           subscriptionId: data.subscription.subscriptionId,
-          planId: data.subscription.planId ?? localPlan ?? 'starter',
-          interval: data.subscription.interval ?? localInterval,
-          status: data.subscription.status ?? 'free',
-          currentPeriodStart: data.subscription.currentPeriodStart,
-          currentPeriodEnd: data.subscription.currentPeriodEnd,
+          customerId: data.subscription.customerId,
+          status: data.subscription.status === 'free' ? 'active' : data.subscription.status, // ✅ 修正: 'free'は無効なので'active'に変換
+          currentPeriodStart: new Date(data.subscription.currentPeriodStart || Date.now()),
+          currentPeriodEnd: new Date(data.subscription.currentPeriodEnd || Date.now() + 30 * 24 * 60 * 60 * 1000),
           cancelAtPeriodEnd: data.subscription.cancelAtPeriodEnd ?? false,
-          isActive: data.subscription.isActive !== undefined ? data.subscription.isActive : true,
-          isFree: data.subscription.isFree !== undefined ? data.subscription.isFree : localPlan === 'starter'
+          trialStart: data.subscription.trialStart ? new Date(data.subscription.trialStart) : undefined,
+          trialEnd: data.subscription.trialEnd ? new Date(data.subscription.trialEnd) : undefined,
+          plan: plan, // ✅ 修正: StripePlanオブジェクト
+          paymentMethod: data.subscription.paymentMethod,
+          lastInvoice: data.subscription.lastInvoice,
+          nextInvoice: data.subscription.nextInvoice
         };
 
         setSubscription(subscriptionData);
         
         // ローカルストレージを更新
-        localStorage.setItem('currentPlan', subscriptionData.planId);
-        localStorage.setItem('billingInterval', subscriptionData.interval);
+        localStorage.setItem('currentPlan', plan.id);
+        localStorage.setItem('billingInterval', plan.interval);
         if (subscriptionData.subscriptionId) {
           localStorage.setItem('subscriptionId', subscriptionData.subscriptionId);
         }
       } else {
-        // デフォルト無料プラン
+        // ✅ 修正: デフォルト無料プラン
+        const starterPlan = pricingPlans.find(p => p.id === 'starter') || pricingPlans[0];
         const defaultSubscription: StripeSubscriptionState = {
-          planId: 'starter',
-          interval: 'monthly',
-          status: 'free',
-          isActive: true,
-          isFree: true
+          status: 'active', // ✅ 修正: 'free'は無効
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          cancelAtPeriodEnd: false,
+          plan: starterPlan
         };
         setSubscription(defaultSubscription);
       }
@@ -89,12 +98,13 @@ export const useSubscription = (userId?: string): UseSubscriptionReturn => {
       // エラー時はローカル情報で復旧を試行
       const localPlan: string | null = localStorage.getItem('currentPlan');
       if (localPlan) {
+        const plan = pricingPlans.find(p => p.id === localPlan) || pricingPlans[0];
         const fallbackSubscription: StripeSubscriptionState = {
-          planId: localPlan,
-          interval: (localStorage.getItem('billingInterval') as 'monthly' | 'yearly') ?? 'monthly',
-          status: localPlan === 'starter' ? 'free' : 'active',
-          isActive: true,
-          isFree: localPlan === 'starter'
+          status: 'active',
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          cancelAtPeriodEnd: false,
+          plan: plan
         };
         setSubscription(fallbackSubscription);
       }
@@ -147,17 +157,21 @@ export const useSubscription = (userId?: string): UseSubscriptionReturn => {
       ]
     };
 
-    const allowedFeatures: string[] = planFeatures[subscription.planId] ?? planFeatures.starter;
+    const allowedFeatures: string[] = planFeatures[subscription.plan.id] ?? planFeatures.starter; // ✅ 修正: subscription.plan.id
     return allowedFeatures.includes(feature);
   }, [subscription]);
+
+  // ✅ 修正: プランの価格で無料プランを判定
+  const isFreePlan = subscription ? subscription.plan.price === 0 : false; // ✅ 修正: ?? false を削除
+  const isPaidPlan = subscription ? subscription.plan.price > 0 : false;
 
   return {
     subscription,
     isLoading,
     error,
     refetch: fetchSubscription,
-    isFreePlan: subscription?.isFree ?? false,
-    isPaidPlan: subscription ? !subscription.isFree : false,
+    isFreePlan,
+    isPaidPlan,
     canAccess
   };
 };

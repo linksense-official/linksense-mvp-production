@@ -144,8 +144,8 @@ const DashboardPage: React.FC = () => {
                     チーム健全性スコア
                   </dt>
                   <dd className={`text-lg font-medium ${getHealthScoreColor(stats.averageHealthScore)}`}>
-  {stats.averageHealthScore}/100
-</dd>
+                    {stats.averageHealthScore}/100
+                  </dd>
                 </dl>
               </div>
             </div>
@@ -437,33 +437,53 @@ const DashboardPage: React.FC = () => {
                           {member.department}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`text-sm font-medium ${getHealthScoreColor(member.healthMetrics.overallScore)}`}>
-                            {member.healthMetrics.overallScore}/100
-                          </span>
+                          {/* ✅ 修正: healthMetrics の undefined チェック追加 */}
+                          {member.healthMetrics ? (
+                            <span className={`text-sm font-medium ${getHealthScoreColor(member.healthMetrics.overallScore)}`}>
+                              {member.healthMetrics.overallScore}/100
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">データなし</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  member.healthMetrics.stressLevel >= 80 ? 'bg-red-600' :
-                                  member.healthMetrics.stressLevel >= 60 ? 'bg-orange-600' :
-                                  member.healthMetrics.stressLevel >= 40 ? 'bg-yellow-600' : 'bg-green-600'
-                                }`}
-                                style={{ width: `${member.healthMetrics.stressLevel}%` }}
-                              ></div>
+                          {/* ✅ 修正: healthMetrics の undefined チェック追加 */}
+                          {member.healthMetrics ? (
+                            <div className="flex items-center">
+                              <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                <div
+                                  className={`h-2 rounded-full ${
+                                    member.healthMetrics.stressLevel >= 80 ? 'bg-red-600' :
+                                    member.healthMetrics.stressLevel >= 60 ? 'bg-orange-600' :
+                                    member.healthMetrics.stressLevel >= 40 ? 'bg-yellow-600' : 'bg-green-600'
+                                  }`}
+                                  style={{ width: `${member.healthMetrics.stressLevel}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-sm text-gray-600">{member.healthMetrics.stressLevel}%</span>
                             </div>
-                            <span className="text-sm text-gray-600">{member.healthMetrics.stressLevel}%</span>
-                          </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">データなし</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBurnoutRiskColor(member.healthMetrics.burnoutRisk)}`}>
-                            {member.healthMetrics.burnoutRisk === 'high' ? '高' :
-                             member.healthMetrics.burnoutRisk === 'medium' ? '中' : '低'}
-                          </span>
+                          {/* ✅ 修正: healthMetrics の undefined チェック追加 */}
+                          {member.healthMetrics ? (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBurnoutRiskColor(member.healthMetrics.burnoutRisk)}`}>
+                              {member.healthMetrics.burnoutRisk === 'high' ? '高' :
+                               member.healthMetrics.burnoutRisk === 'medium' ? '中' : '低'}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">データなし</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(member.healthMetrics.lastUpdated).toLocaleDateString('ja-JP')}
+                          {/* ✅ 修正: healthMetrics の undefined チェック追加 */}
+                          {member.healthMetrics ? (
+                            new Date(member.healthMetrics.lastUpdated).toLocaleDateString('ja-JP')
+                          ) : (
+                            '未更新'
+                          )}
                         </td>
                       </tr>
                     ))}
