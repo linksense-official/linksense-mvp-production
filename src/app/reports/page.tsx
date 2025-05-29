@@ -1,39 +1,132 @@
+// src/app/reports/page.tsx - 実データ統合版
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { realDataReportService, TeamHealthReport, ReportSummary } from '../../lib/services/real-data-report-service';
 
-// レポート型定義
-interface TeamHealthReport {
-  id: string;
-  teamName: string;
-  period: string;
-  healthScore: number;
-  previousScore: number;
-  metrics: {
-    communication: number;
-    productivity: number;
-    satisfaction: number;
-    workLifeBalance: number;
-    collaboration: number;
-  };
-  trends: {
-    improving: string[];
-    declining: string[];
-    stable: string[];
-  };
-  recommendations: string[];
-  lastUpdated: Date;
+// DataSourceIndicatorコンポーネント
+interface DataSourceIndicatorProps {
+  isRealData: boolean;
+  syncStatus: 'syncing' | 'success' | 'error' | 'idle';
+  lastSyncTime: Date | null;
+  dataCompleteness: number;
+  onRefresh?: () => void;
 }
 
-interface ReportSummary {
-  totalTeams: number;
-  averageHealthScore: number;
-  teamsImproving: number;
-  teamsDeclining: number;
-  criticalIssues: number;
-  period: string;
+const DataSourceIndicator = ({ 
+  isRealData, 
+  syncStatus, 
+  lastSyncTime, 
+  dataCompleteness, 
+  onRefresh 
+}: DataSourceIndicatorProps) => {
+  const getStatusColor = () => {
+    if (syncStatus === 'syncing') return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (syncStatus === 'success') return 'bg-green-100 text-green-800 border-green-200';
+    if (syncStatus === 'error') return 'bg-red-100 text-red-800 border-red-200';
+    return 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const getStatusIcon = () => {
+    if (syncStatus === 'syncing') return '🔄';
+    if (syncStatus === 'success') return '✅';
+    if (syncStatus === 'error') return '⚠️';
+    return '⏸️';
+  };
+
+  const formatLastSync = () => {
+    if (!lastSyncTime) return '未同期';
+    const now = new Date();
+    const diffMinutes = Math.floor((now.getTime() - lastSyncTime.getTime()) / (1000 * 60));
+    if (diffMinutes < 1) return '1分未満前';
+    if (diffMinutes < 60) return `${diffMinutes}分前`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}時間前`;
+    return `${Math.floor(diffHours / 24)}日前`;
+  };
+
+  return (
+    <div className={`px-4 py-3 rounded-lg border ${getStatusColor()} animate-slide-up`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <span className="text-lg">{getStatusIcon()}</span>
+          <div>
+            <div className="font-medium">
+              {isRealData ? '実際のSlackデータに基づくレポート' : 'デモデータ表示中'}
+            </div>
+            <div className="text-sm opacity-75">
+              データ品質: {dataCompleteness}% | 最終同期: {formatLastSync()}
+            </div>
+          </div>
+        </div>
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={syncStatus === 'syncing'}
+            className="px-3 py-1 text-sm bg-white bg-opacity-50 rounded-md hover:bg-opacity-75 transition-colors disabled:opacity-50"
+          >
+            {syncStatus === 'syncing' ? '同期中...' : '再同期'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Notificationコンポーネント
+interface NotificationProps {
+  message: string;
+  type: 'success' | 'error' | 'info';
+  onClose: () => void;
 }
+
+const Notification = ({ message, type, onClose }: NotificationProps) => {
+  const getNotificationStyle = () => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-100 border-green-500 text-green-700';
+      case 'error':
+        return 'bg-red-100 border-red-500 text-red-700';
+      case 'info':
+        return 'bg-blue-100 border-blue-500 text-blue-700';
+      default:
+        return 'bg-gray-100 border-gray-500 text-gray-700';
+    }
+  };
+
+  const getIcon = () => {
+    switch (type) {
+      case 'success': return '✅';
+      case 'error': return '❌';
+      case 'info': return 'ℹ️';
+      default: return '📢';
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className={`fixed top-4 right-4 z-50 p-4 border-l-4 rounded-md shadow-lg ${getNotificationStyle()} animate-slide-down`}>
+      <div className="flex items-center">
+        <span className="mr-2">{getIcon()}</span>
+        <p className="text-sm font-medium">{message}</p>
+        <button
+          onClick={onClose}
+          className="ml-4 text-lg leading-none hover:opacity-75"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // フィルター状態型定義
 interface ReportFilterState {
@@ -42,161 +135,6 @@ interface ReportFilterState {
   metric: string;
   sortBy: string;
 }
-
-// モックレポートデータ
-const mockReports: TeamHealthReport[] = [
-  {
-    id: '1',
-    teamName: 'マーケティング',
-    period: '2024年11月',
-    healthScore: 72,
-    previousScore: 78,
-    metrics: {
-      communication: 68,
-      productivity: 75,
-      satisfaction: 70,
-      workLifeBalance: 65,
-      collaboration: 82
-    },
-    trends: {
-      improving: ['collaboration'],
-      declining: ['communication', 'workLifeBalance'],
-      stable: ['productivity', 'satisfaction']
-    },
-    recommendations: [
-      'チーム内コミュニケーションの改善',
-      'ワークライフバランスの見直し',
-      '定期的な1on1ミーティングの実施'
-    ],
-    lastUpdated: new Date(Date.now() - 2 * 60 * 60 * 1000)
-  },
-  {
-    id: '2',
-    teamName: '開発',
-    period: '2024年11月',
-    healthScore: 85,
-    previousScore: 82,
-    metrics: {
-      communication: 88,
-      productivity: 90,
-      satisfaction: 85,
-      workLifeBalance: 75,
-      collaboration: 87
-    },
-    trends: {
-      improving: ['productivity', 'satisfaction', 'communication'],
-      declining: [],
-      stable: ['workLifeBalance', 'collaboration']
-    },
-    recommendations: [
-      '現在の好調な状態を維持',
-      'ワークライフバランスの更なる改善',
-      'チーム間連携の強化'
-    ],
-    lastUpdated: new Date(Date.now() - 1 * 60 * 60 * 1000)
-  },
-  {
-    id: '3',
-    teamName: '営業',
-    period: '2024年11月',
-    healthScore: 79,
-    previousScore: 76,
-    metrics: {
-      communication: 82,
-      productivity: 78,
-      satisfaction: 80,
-      workLifeBalance: 70,
-      collaboration: 85
-    },
-    trends: {
-      improving: ['satisfaction', 'communication'],
-      declining: ['workLifeBalance'],
-      stable: ['productivity', 'collaboration']
-    },
-    recommendations: [
-      'ワークライフバランスの改善施策',
-      '目標設定の見直し',
-      'チーム内情報共有の促進'
-    ],
-    lastUpdated: new Date(Date.now() - 3 * 60 * 60 * 1000)
-  },
-  {
-    id: '4',
-    teamName: 'デザイン',
-    period: '2024年11月',
-    healthScore: 68,
-    previousScore: 72,
-    metrics: {
-      communication: 65,
-      productivity: 70,
-      satisfaction: 68,
-      workLifeBalance: 60,
-      collaboration: 77
-    },
-    trends: {
-      improving: [],
-      declining: ['communication', 'satisfaction', 'workLifeBalance'],
-      stable: ['productivity', 'collaboration']
-    },
-    recommendations: [
-      '緊急：チーム健全性の改善が必要',
-      'プロジェクト負荷の見直し',
-      'チームビルディング活動の実施',
-      'メンタルヘルスサポートの強化'
-    ],
-    lastUpdated: new Date(Date.now() - 30 * 60 * 1000)
-  },
-  {
-    id: '5',
-    teamName: 'カスタマーサポート',
-    period: '2024年11月',
-    healthScore: 83,
-    previousScore: 80,
-    metrics: {
-      communication: 85,
-      productivity: 82,
-      satisfaction: 88,
-      workLifeBalance: 78,
-      collaboration: 82
-    },
-    trends: {
-      improving: ['satisfaction', 'workLifeBalance'],
-      declining: [],
-      stable: ['communication', 'productivity', 'collaboration']
-    },
-    recommendations: [
-      '現在の良好な状態を維持',
-      'ベストプラクティスの他チーム展開',
-      '継続的な改善活動の推進'
-    ],
-    lastUpdated: new Date(Date.now() - 4 * 60 * 60 * 1000)
-  },
-  {
-    id: '6',
-    teamName: '人事',
-    period: '2024年11月',
-    healthScore: 75,
-    previousScore: 73,
-    metrics: {
-      communication: 78,
-      productivity: 72,
-      satisfaction: 75,
-      workLifeBalance: 80,
-      collaboration: 70
-    },
-    trends: {
-      improving: ['workLifeBalance', 'communication'],
-      declining: [],
-      stable: ['productivity', 'satisfaction', 'collaboration']
-    },
-    recommendations: [
-      'チーム間連携の強化',
-      'プロセス効率化の推進',
-      '社内制度の見直し'
-    ],
-    lastUpdated: new Date(Date.now() - 5 * 60 * 60 * 1000)
-  }
-];
 
 // 時間フォーマット関数
 const formatTimeAgo = (timestamp: Date): string => {
@@ -375,6 +313,20 @@ const ReportCard = ({ report, onViewDetails, index }: ReportCardProps) => {
       style={{ animationDelay: `${index * 0.1}s` }}
       onClick={() => onViewDetails(report)}
     >
+      {/* データソースバッジ */}
+      <div className="flex items-center justify-between mb-2">
+        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+          report.isRealData 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-gray-100 text-gray-800'
+        }`}>
+          {report.isRealData ? '🔗 実データ' : '📊 デモ'}
+        </div>
+        <div className="text-xs text-gray-500">
+          {report.dataSource.toUpperCase()}
+        </div>
+      </div>
+
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -589,6 +541,7 @@ const ReportFilter = ({ filter, onFilterChange, teams, reportCounts }: ReportFil
 export default function ReportsPage() {
   const { user } = useAuth();
   const [reports, setReports] = useState<TeamHealthReport[]>([]);
+  const [reportSummary, setReportSummary] = useState<ReportSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<TeamHealthReport | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -598,24 +551,70 @@ export default function ReportsPage() {
     metric: 'all',
     sortBy: 'healthScore'
   });
+  
+  // 実データ統合状態
+  const [isRealData, setIsRealData] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'syncing' | 'success' | 'error' | 'idle'>('idle');
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [dataCompleteness, setDataCompleteness] = useState(0);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
 
-  // レポートデータの初期化
-  useEffect(() => {
-    const initializeReports = async () => {
-      try {
-        setLoading(true);
-        // 実際のAPIコールをシミュレート
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setReports(mockReports);
-      } catch (error) {
-        console.error('レポートデータの読み込みに失敗しました:', error);
-      } finally {
-        setLoading(false);
+  // レポートデータの取得
+  const fetchReports = async () => {
+    try {
+      setSyncStatus('syncing');
+      setNotification({ message: 'レポートデータを同期中...', type: 'info' });
+      
+      const result = await realDataReportService.fetchRealReports();
+      
+      setReports(result.reports);
+      setReportSummary(result.summary);
+      setIsRealData(result.isRealData);
+      setSyncStatus(result.syncStatus);
+      setLastSyncTime(result.summary.lastSyncTime);
+      setDataCompleteness(result.summary.dataCompleteness);
+      
+      if (result.isRealData) {
+        setNotification({ 
+          message: 'Slackデータからレポートを生成しました', 
+          type: 'success' 
+        });
+      } else {
+        setNotification({ 
+          message: 'デモデータを表示中（Slack連携を確認してください）', 
+          type: 'info' 
+        });
       }
-    };
+    } catch (error) {
+      console.error('レポートデータの読み込みに失敗しました:', error);
+      setSyncStatus('error');
+      setNotification({ 
+        message: 'レポートデータの読み込みに失敗しました', 
+        type: 'error' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    initializeReports();
+  // 初期データ読み込み
+  useEffect(() => {
+    fetchReports();
   }, []);
+
+  // 5分間隔の自動更新
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading) {
+        fetchReports();
+      }
+    }, 5 * 60 * 1000); // 5分間隔
+
+    return () => clearInterval(interval);
+  }, [loading]);
 
   // フィルタリング & ソート
   const filteredAndSortedReports = useMemo(() => {
@@ -652,26 +651,6 @@ export default function ReportsPage() {
     setIsDetailModalOpen(true);
   };
 
-  // サマリー計算
-  const reportSummary: ReportSummary = useMemo(() => {
-    const totalTeams = reports.length;
-    const averageHealthScore = Math.round(
-      reports.reduce((sum, report) => sum + report.healthScore, 0) / totalTeams
-    );
-    const teamsImproving = reports.filter(r => r.healthScore > r.previousScore).length;
-    const teamsDeclining = reports.filter(r => r.healthScore < r.previousScore).length;
-    const criticalIssues = reports.filter(r => r.healthScore < 70).length;
-
-    return {
-      totalTeams,
-      averageHealthScore,
-      teamsImproving,
-      teamsDeclining,
-      criticalIssues,
-      period: '2024年11月'
-    };
-  }, [reports]);
-
   // ユニークなチーム取得
   const teams = useMemo(() => 
     Array.from(new Set(reports.map(report => report.teamName))).sort(), 
@@ -695,12 +674,35 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6 space-y-6 pb-16">
+        {/* 通知 */}
+        {notification && (
+          <Notification
+            message={notification.message}
+            type={notification.type}
+            onClose={() => setNotification(null)}
+          />
+        )}
+
+        {/* データソースインジケーター */}
+        <DataSourceIndicator
+          isRealData={isRealData}
+          syncStatus={syncStatus}
+          lastSyncTime={lastSyncTime}
+          dataCompleteness={dataCompleteness}
+          onRefresh={fetchReports}
+        />
+
         {/* ページヘッダー */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 animate-slide-down">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">チーム健全性レポート</h1>
-              <p className="text-gray-600 mt-1">各チームの詳細な健全性分析とトレンドレポート</p>
+              <p className="text-gray-600 mt-1">
+                {isRealData 
+                  ? '実際のSlackデータに基づく詳細な健全性分析とトレンドレポート'
+                  : 'デモデータによる健全性分析とトレンドレポート'
+                }
+              </p>
             </div>
             <div className="flex items-center space-x-4">
               <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
@@ -714,69 +716,71 @@ export default function ReportsPage() {
         </div>
 
         {/* サマリーカード */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-lg">👥</span>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-600">総チーム数</div>
-                <div className="text-2xl font-bold text-blue-600">{reportSummary.totalTeams}</div>
+        {reportSummary && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-lg">👥</span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-600">総チーム数</div>
+                  <div className="text-2xl font-bold text-blue-600">{reportSummary.totalTeams}</div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-lg">📊</span>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-lg">📊</span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-600">平均健全性スコア</div>
+                  <div className={`text-2xl font-bold ${getScoreColor(reportSummary.averageHealthScore).split(' ')[0]}`}>
+                    {reportSummary.averageHealthScore}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-gray-600">平均健全性スコア</div>
-                <div className={`text-2xl font-bold ${getScoreColor(reportSummary.averageHealthScore).split(' ')[0]}`}>
-                  {reportSummary.averageHealthScore}
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-lg">📈</span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-600">改善中チーム</div>
+                  <div className="text-2xl font-bold text-green-600">{reportSummary.teamsImproving}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <span className="text-lg">📉</span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-600">悪化中チーム</div>
+                  <div className="text-2xl font-bold text-red-600">{reportSummary.teamsDeclining}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.5s' }}>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                  <span className="text-lg">⚠️</span>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-600">要注意チーム</div>
+                  <div className="text-2xl font-bold text-orange-600">{reportSummary.criticalIssues}</div>
                 </div>
               </div>
             </div>
           </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-lg">📈</span>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-600">改善中チーム</div>
-                <div className="text-2xl font-bold text-green-600">{reportSummary.teamsImproving}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.4s' }}>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <span className="text-lg">📉</span>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-600">悪化中チーム</div>
-                <div className="text-2xl font-bold text-red-600">{reportSummary.teamsDeclining}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-slide-up" style={{ animationDelay: '0.5s' }}>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                <span className="text-lg">⚠️</span>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-600">要注意チーム</div>
-                <div className="text-2xl font-bold text-orange-600">{reportSummary.criticalIssues}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* フィルターコンポーネント */}
         <ReportFilter
@@ -840,7 +844,14 @@ export default function ReportsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-2xl font-bold">{selectedReport.teamName}チーム 詳細レポート</h2>
-                    <p className="text-blue-100">{selectedReport.period} | {formatTimeAgo(selectedReport.lastUpdated)}</p>
+                    <p className="text-blue-100">
+                      {selectedReport.period} | {formatTimeAgo(selectedReport.lastUpdated)}
+                      {selectedReport.isRealData && (
+                        <span className="ml-2 px-2 py-1 bg-green-500 bg-opacity-30 rounded-full text-xs">
+                          🔗 実データ
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <button
                     onClick={() => setIsDetailModalOpen(false)}
@@ -880,6 +891,14 @@ export default function ReportsPage() {
                           {selectedReport.healthScore >= 60 && selectedReport.healthScore < 70 && '注意が必要な状態です。早急な改善施策の実施を推奨します。'}
                           {selectedReport.healthScore < 60 && '緊急対応が必要です。包括的な改善計画の策定と実行が急務です。'}
                         </p>
+                        {selectedReport.isRealData && (
+                          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center text-green-800 text-sm">
+                              <span className="mr-2">🔗</span>
+                              このスコアは実際のSlackデータに基づいて算出されています
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -894,7 +913,14 @@ export default function ReportsPage() {
 
                     {/* 推奨事項 */}
                     <div className="bg-white rounded-lg border border-gray-200 p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">推奨改善施策</h4>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                        推奨改善施策
+                        {selectedReport.isRealData && (
+                          <span className="ml-2 text-sm font-normal text-green-600">
+                            (実データ分析に基づく)
+                          </span>
+                        )}
+                      </h4>
                       <div className="space-y-3">
                         {selectedReport.recommendations.map((recommendation, index) => (
                           <div key={index} className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
@@ -969,4 +995,4 @@ export default function ReportsPage() {
       )}
     </div>
   );
-} 
+}

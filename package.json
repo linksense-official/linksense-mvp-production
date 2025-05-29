@@ -9,14 +9,39 @@
     "lint": "next lint",
     "build:android": "npx cap add android && npx cap copy && npx cap open android",
     "build:ios": "npx cap add ios && npx cap copy && npx cap open ios",
-    "build:pwa": "next build && next export"
+    "build:pwa": "next build && next export",
+    "ngrok": "node scripts/start-ngrok.js",
+    "ngrok:simple": "node scripts/simple-ngrok.js",
+    "ngrok:latest": "node scripts/ngrok-latest.js",
+    "ngrok:manual": "ngrok http 3000",
+    "ngrok:kill": "taskkill /F /IM ngrok.exe || true",
+    "ngrok:update": "npm install -g ngrok@latest",
+    "ngrok:version": "ngrok version",
+    "ngrok:localtunnel": "npx localtunnel --port 3000",
+    "ngrok:cloudflare": "npx wrangler tunnel --url http://localhost:3000",
+    "dev:ngrok": "npm run ngrok:latest",
+    "dev:tunnel": "npm run ngrok:localtunnel",
+    "setup:ngrok": "node scripts/dev-setup.js",
+    "quick:ngrok": "node scripts/quick-ngrok.js",
+    "clean:ngrok": "npm run ngrok:kill && timeout /t 2 /nobreak && npm run ngrok:latest",
+    "check:ngrok": "node scripts/check-ngrok.js",
+    "tunnel:status": "curl -s http://localhost:4040/api/tunnels || echo 'ngrok not running'",
+    "env:show": "type .env.local || echo 'No .env.local file'",
+    "env:backup": "copy .env.local .env.local.backup",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "localtunnel": "^2.0.2",
     "lucide-react": "^0.511.0",
     "next": "^15.3.2",
     "next-auth": "^4.24.11",
     "next-pwa": "^5.6.0",
+    "ngrok": "^5.0.0-beta.2",
+    "open": "^8.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "stripe": "^18.1.1"
@@ -25,12 +50,77 @@
     "@types/node": "^20.17.51",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.0.0",
     "eslint-config-next": "14.0.4",
     "postcss": "^8.4.31",
+    "prettier": "^3.0.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.0.0",
     "webpack": "^5.99.9"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/linksense-mvp.git"
+  },
+  "keywords": [
+    "saas",
+    "team-management",
+    "slack-integration",
+    "remote-work",
+    "analytics",
+    "nextjs",
+    "typescript",
+    "stripe",
+    "ngrok",
+    "tunnel",
+    "webhook"
+  ],
+  "author": "LinkSense Team",
+  "license": "MIT",
+  "description": "LinkSense MVP - リモートワーク特化型チーム健全性分析SaaS",
+  "homepage": "https://linksense-mvp.vercel.app",
+  "bugs": {
+    "url": "https://github.com/your-username/linksense-mvp/issues"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/your-username"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 80,
+    "tabWidth": 2,
+    "useTabs": false
+  },
+  "eslintConfig": {
+    "extends": [
+      "next/core-web-vitals",
+      "@typescript-eslint/recommended"
+    ],
+    "rules": {
+      "@typescript-eslint/no-unused-vars": "warn",
+      "@typescript-eslint/no-explicit-any": "warn"
+    }
   }
 }
