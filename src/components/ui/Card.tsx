@@ -14,6 +14,26 @@ interface CardProps {
   onClick?: () => void;
 }
 
+interface CardHeaderProps {
+  children: ReactNode;
+  className?: string;
+}
+
+interface CardTitleProps {
+  children: ReactNode;
+  className?: string;
+}
+
+interface CardDescriptionProps {
+  children: ReactNode;
+  className?: string;
+}
+
+interface CardContentProps {
+  children: ReactNode;
+  className?: string;
+}
+
 export const Card: React.FC<CardProps> = ({
   title,
   subtitle,
@@ -25,11 +45,7 @@ export const Card: React.FC<CardProps> = ({
   error,
   onClick,
 }) => {
-  const cardClasses = `
-    bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden
-    ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow duration-200' : ''}
-    ${className}
-  `;
+  const cardClasses = `bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow duration-200' : ''} ${className}`;
 
   const handleClick = () => {
     if (onClick && !loading) {
@@ -39,7 +55,6 @@ export const Card: React.FC<CardProps> = ({
 
   return (
     <div className={cardClasses} onClick={handleClick}>
-      {/* カードヘッダー */}
       {(title || subtitle || headerAction) && (
         <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between">
@@ -64,7 +79,6 @@ export const Card: React.FC<CardProps> = ({
         </div>
       )}
 
-      {/* カードコンテンツ */}
       <div className="px-6 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -84,7 +98,6 @@ export const Card: React.FC<CardProps> = ({
         )}
       </div>
 
-      {/* カードフッター */}
       {footer && (
         <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
           {footer}
@@ -94,7 +107,37 @@ export const Card: React.FC<CardProps> = ({
   );
 };
 
-// 特定用途向けのCard variants
+export const CardHeader: React.FC<CardHeaderProps> = ({ children, className = '' }) => {
+  return (
+    <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>
+      {children}
+    </div>
+  );
+};
+
+export const CardTitle: React.FC<CardTitleProps> = ({ children, className = '' }) => {
+  return (
+    <h3 className={`text-lg font-semibold leading-none tracking-tight ${className}`}>
+      {children}
+    </h3>
+  );
+};
+
+export const CardDescription: React.FC<CardDescriptionProps> = ({ children, className = '' }) => {
+  return (
+    <p className={`text-sm text-gray-600 ${className}`}>
+      {children}
+    </p>
+  );
+};
+
+export const CardContent: React.FC<CardContentProps> = ({ children, className = '' }) => {
+  return (
+    <div className={`p-6 pt-0 ${className}`}>
+      {children}
+    </div>
+  );
+};
 
 export const StatsCard: React.FC<{
   title: string;
@@ -144,3 +187,5 @@ export const StatsCard: React.FC<{
     </Card>
   );
 };
+
+export default Card;

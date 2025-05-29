@@ -1,2 +1,6 @@
-// src/components/ui/index.ts
-export { Card, StatsCard } from './Card';
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, StatsCard } from './card';
+export { Badge } from './badge';
+export { Button } from './button';
+export { Progress } from './progress';
+export { Alert, AlertTitle, AlertDescription } from './alert';
+export { Avatar, AvatarImage, AvatarFallback } from './avatar';

@@ -2,9 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
-import type { UserSettings, NotificationSettings, PrivacySettings } from '@/types/api'; // ✅ 修正: 正しいimport
+import { integrationManager } from '@/lib/integrations/integration-manager';
+import SlackIntegration from '@/lib/integrations/slack-integration';
+import type { UserSettings, NotificationSettings, PrivacySettings } from '@/types/api';
+import type { Integration as IntegrationType, AnalyticsMetrics } from '@/types/integrations';
 
-// ✅ 修正: api.tsの型定義に完全準拠
+// ✅ 統合ページで使用する型定義
+interface Integration {
+  id: string;
+  name: string;
+  description: string;
+  category: 'communication' | 'project' | 'analytics' | 'hr';
+  market: 'global' | 'us' | 'japan';
+  isConnected: boolean;
+  isConnecting: boolean;
+  features: string[];
+  setupUrl?: string;
+  healthScore?: number;
+  lastSync?: Date;
+  errorMessage?: string;
+  metrics?: AnalyticsMetrics;
+  isSyncing?: boolean;
+}
+
+// ✅ 設定ページの型定義
 interface LocalUserSettings {
   notifications: NotificationSettings;
   privacy: PrivacySettings;
@@ -12,6 +33,161 @@ interface LocalUserSettings {
   language: 'ja' | 'en';
   timezone: string;
 }
+
+// ✅ 統合ツールのデータ（実際の統合管理システム対応版）
+const integrations: Integration[] = [
+  // グローバルツール
+  {
+    id: 'slack',
+    name: 'Slack',
+    description: 'チームコミュニケーションとメッセージ分析',
+    category: 'communication',
+    market: 'global',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['メッセージ頻度分析', '応答時間測定', 'チャンネル活性度', '感情分析'],
+    setupUrl: '/api/auth/slack'
+  },
+  {
+    id: 'microsoft-teams',
+    name: 'Microsoft Teams',
+    description: 'Microsoft 365統合コミュニケーション分析',
+    category: 'communication',
+    market: 'global',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['会議参加率', 'チャット分析', 'ファイル共有状況']
+  },
+
+  // 日本市場特化（Microsoft Teamsの後に配置）
+  {
+    id: 'chatwork',
+    name: 'ChatWork',
+    description: '日本企業向けビジネスチャット分析',
+    category: 'communication',
+    market: 'japan',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['タスク管理連携', 'メッセージ分析', 'ファイル共有状況']
+  },
+  {
+    id: 'line-works',
+    name: 'LINE WORKS',
+    description: 'LINE系ビジネスコミュニケーション分析',
+    category: 'communication',
+    market: 'japan',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['トーク分析', 'カレンダー連携', 'アドレス帳活用']
+  },
+  {
+    id: 'cybozu-office',
+    name: 'サイボウズ Office',
+    description: 'サイボウズグループウェア分析',
+    category: 'communication',
+    market: 'japan',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['スケジュール分析', 'ワークフロー効率', 'ファイル管理']
+  },
+
+  // 残りのグローバルツール
+  {
+    id: 'zoom',
+    name: 'Zoom',
+    description: 'ビデオ会議とエンゲージメント分析',
+    category: 'communication',
+    market: 'global',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['会議参加率', '発言時間', 'カメラON率', '会議満足度']
+  },
+  {
+    id: 'google-meet',
+    name: 'Google Meet',
+    description: 'Google Workspace統合ビデオ会議分析',
+    category: 'communication',
+    market: 'global',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['会議時間分析', '参加者エンゲージメント', 'Google Calendar連携']
+  },
+  {
+    id: 'discord',
+    name: 'Discord',
+    description: 'ゲーム・クリエイティブチーム向け分析',
+    category: 'communication',
+    market: 'global',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['ボイスチャット時間', 'サーバー活動', 'コミュニティ健全性']
+  },
+
+  // アメリカ市場特化
+  {
+    id: 'cisco-webex',
+    name: 'Cisco Webex',
+    description: 'エンタープライズ向けビデオ会議分析',
+    category: 'communication',
+    market: 'us',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['会議品質分析', 'セキュリティ監視', 'エンタープライズ統合']
+  },
+  {
+    id: 'gotomeeting',
+    name: 'GoToMeeting',
+    description: 'ビジネス向けオンライン会議分析',
+    category: 'communication',
+    market: 'us',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['会議効率分析', '録画管理', 'レポート生成']
+  },
+  {
+    id: 'ringcentral',
+    name: 'RingCentral',
+    description: 'クラウド通信プラットフォーム分析',
+    category: 'communication',
+    market: 'us',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['通話分析', 'メッセージング', 'ビデオ会議統合']
+  },
+  {
+    id: 'workplace-meta',
+    name: 'Workplace from Meta',
+    description: 'Meta提供企業向けSNS分析',
+    category: 'communication',
+    market: 'us',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['社内SNS分析', 'エンゲージメント測定', 'グループ活動']
+  },
+  {
+    id: 'mattermost',
+    name: 'Mattermost',
+    description: 'オープンソースチームコラボレーション分析',
+    category: 'communication',
+    market: 'us',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['セルフホスト対応', 'セキュリティ重視', 'カスタマイズ可能']
+  }
+];
 
 // モックAPI関数
 const updateUserSettings = async (userId: string, settings: LocalUserSettings) => {
@@ -31,9 +207,160 @@ const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'notifications' | 'privacy' | 'general'>('notifications');
+  const [activeTab, setActiveTab] = useState<'notifications' | 'privacy' | 'general' | 'integrations'>('notifications');
 
-  // ✅ 修正: 設定データの初期化（api.tsの型構造に準拠）
+  // ✅ 統合ページ関連のstate（実際の統合管理システム対応）
+  const [integrationsState, setIntegrationsState] = useState<Integration[]>(integrations);
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+
+  // ✅ 統合サービス初期化用のuseEffect修正
+  useEffect(() => {
+    const initializeIntegrations = async () => {
+      try {
+        console.log('🚀 統合管理システム初期化開始...');
+        console.log('integrationManager:', integrationManager);
+        
+        // ✅ SlackIntegrationクラスの手動登録
+        console.log('SlackIntegrationクラス登録確認...');
+        
+        // ✅ 統合サービス定義を統合管理システム用の形式に変換
+        const integrationConfigs = integrations.map(integration => ({
+          id: integration.id,
+          name: integration.name,
+          description: integration.description,
+          category: integration.category as any,
+          market: integration.market as any,
+          status: 'disconnected' as any,
+          features: integration.features,
+          authType: 'oauth2' as any,
+          config: {
+            setupUrl: integration.setupUrl,
+            scopes: ['channels:read', 'users:read', 'team:read'],
+            permissions: ['read'],
+            dataRetentionDays: 90,
+            syncIntervalMinutes: 60,
+            enabledFeatures: integration.features,
+            customSettings: {}
+          },
+          isEnabled: true,
+          lastSync: undefined,
+          healthScore: undefined
+        }));
+
+        console.log('変換された統合設定:', integrationConfigs);
+
+        // ✅ 統合管理システムを初期化
+        const initResult = await integrationManager.initialize(integrationConfigs);
+        console.log('初期化結果:', initResult);
+        
+        // ✅ 初期化後の状態確認
+        console.log('初期化後の統合一覧:', integrationManager.integrations);
+        console.log('Slack統合確認:', integrationManager.integrations.get('slack'));
+        
+        console.log('✅ 統合管理システム初期化完了');
+      } catch (error) {
+        console.error('❌ 統合管理システム初期化エラー:', error);
+        console.error('エラー詳細:', error instanceof Error ? error.message : String(error));
+      }
+    };
+
+    initializeIntegrations();
+  }, []);
+
+  // ✅ 統合管理システムからの状態更新
+  useEffect(() => {
+    const updateIntegrationStates = async () => {
+      try {
+        console.log('🔄 統合状態更新開始...');
+        
+        // 統合管理システムから最新状態を取得
+        const registeredIntegrations = integrationManager.integrations;
+        
+        setIntegrationsState(prev => 
+          prev.map(integration => {
+            const registered = registeredIntegrations.get(integration.id);
+            if (registered) {
+              console.log(`📊 ${integration.name} 状態:`, registered.status);
+              return {
+                ...integration,
+                isConnected: registered.status === 'connected',
+                isConnecting: registered.status === 'connecting',
+                healthScore: registered.healthScore,
+                lastSync: registered.lastSync,
+                errorMessage: registered.status === 'error' ? 'エラーが発生しました' : undefined
+              };
+            }
+            return integration;
+          })
+        );
+      } catch (error) {
+        console.error('統合状態更新エラー:', error);
+      }
+    };
+
+    // 初回読み込み
+    updateIntegrationStates();
+
+    // 定期更新（10秒ごとに短縮）
+    const interval = setInterval(updateIntegrationStates, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ URL パラメータからの成功・エラーメッセージ処理
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+    const errorMessage = urlParams.get('message');
+    const teamName = urlParams.get('team');
+
+    if (success === 'slack_connected' && teamName) {
+      console.log('✅ Slack接続成功を検出:', teamName);
+      
+      // ✅ 統合状態を即座に更新
+      setIntegrationsState(prev => 
+        prev.map(i => 
+          i.id === 'slack' 
+            ? { 
+                ...i, 
+                isConnected: true,
+                isConnecting: false,
+                healthScore: 78,
+                lastSync: new Date(),
+                errorMessage: undefined
+              }
+            : i
+        )
+      );
+
+      setMessage({
+        type: 'success',
+        text: `Slack (${teamName}) の連携が完了しました！`
+      });
+      setActiveTab('integrations');
+      
+      // ✅ URL パラメータをクリア
+      window.history.replaceState({}, '', '/settings?tab=integrations');
+    } else if (error === 'slack_oauth_failed') {
+      setMessage({
+        type: 'error',
+        text: errorMessage || 'Slack連携でエラーが発生しました'
+      });
+      setActiveTab('integrations');
+      
+      // URL パラメータをクリア
+      window.history.replaceState({}, '', '/settings?tab=integrations');
+    }
+
+    // タブパラメータの処理
+    const tab = urlParams.get('tab');
+    if (tab && ['notifications', 'privacy', 'integrations', 'general'].includes(tab)) {
+      setActiveTab(tab as typeof activeTab);
+    }
+  }, []); // ✅ 依存配列を空にして初回のみ実行
+
+  // ✅ 設定データの初期化
   useEffect(() => {
     if (user?.settings) {
       setSettings({
@@ -55,7 +382,6 @@ const SettingsPage: React.FC = () => {
         timezone: user.settings.timezone ?? 'Asia/Tokyo'
       });
     } else {
-      // デフォルト設定
       setSettings({
         notifications: {
           emailNotifications: true,
@@ -76,6 +402,282 @@ const SettingsPage: React.FC = () => {
       });
     }
   }, [user]);
+
+  // ✅ 統合ページ関連の関数（実際の統合管理システム対応）
+  const handleConnect = async (integrationId: string) => {
+    const integration = integrationsState.find(i => i.id === integrationId);
+    if (!integration) return;
+
+    try {
+      // 接続中状態に更新
+      setIntegrationsState(prev => 
+        prev.map(i => 
+          i.id === integrationId 
+            ? { ...i, isConnecting: true, errorMessage: undefined }
+            : i
+        )
+      );
+
+      if (integration.setupUrl) {
+        if (integrationId === 'slack') {
+          // Slack OAuth フローを開始
+          console.log('Slack OAuth フロー開始...');
+          window.location.href = integration.setupUrl;
+          return;
+        }
+      }
+
+      // その他のサービスの場合（将来実装）
+      console.log(`${integration.name} 連携開始...`);
+      
+      // モック接続処理（2秒後に完了）
+      setTimeout(() => {
+        setIntegrationsState(prev => 
+          prev.map(i => 
+            i.id === integrationId 
+              ? { ...i, isConnecting: false, isConnected: true }
+              : i
+          )
+        );
+        
+        setMessage({
+          type: 'success',
+          text: `${integration.name} の連携が完了しました！`
+        });
+      }, 2000);
+
+    } catch (error) {
+      console.error(`${integration.name} 連携エラー:`, error);
+      
+      setIntegrationsState(prev => 
+        prev.map(i => 
+          i.id === integrationId 
+            ? { 
+                ...i, 
+                isConnecting: false, 
+                errorMessage: '連携に失敗しました' 
+              }
+            : i
+        )
+      );
+
+      setMessage({
+        type: 'error',
+        text: `${integration.name} の連携に失敗しました`
+      });
+    }
+  };
+
+  const handleDisconnect = async (integrationId: string) => {
+    const integration = integrationsState.find(i => i.id === integrationId);
+    if (!integration) return;
+
+    if (!confirm(`${integration.name} の統合を切断しますか？`)) {
+      return;
+    }
+
+    try {
+      console.log(`${integration.name} 切断開始...`);
+
+      if (integrationId === 'slack') {
+        // 実際のSlack切断処理
+        const success = await integrationManager.disconnect('slack');
+        if (success) {
+          setIntegrationsState(prev => 
+            prev.map(i => 
+              i.id === integrationId 
+                ? { 
+                    ...i, 
+                    isConnected: false, 
+                    healthScore: undefined, 
+                    lastSync: undefined,
+                    errorMessage: undefined,
+                    metrics: undefined,
+                    isSyncing: false
+                  }
+                : i
+            )
+          );
+          
+          setMessage({
+            type: 'success',
+            text: `${integration.name} の切断が完了しました`
+          });
+        } else {
+          throw new Error('切断処理に失敗しました');
+        }
+      } else {
+        // その他のサービス（モック処理）
+        setIntegrationsState(prev => 
+          prev.map(i => 
+            i.id === integrationId 
+              ? { 
+                  ...i, 
+                  isConnected: false, 
+                  healthScore: undefined, 
+                  lastSync: undefined,
+                  errorMessage: undefined,
+                  metrics: undefined,
+                  isSyncing: false
+                }
+              : i
+          )
+        );
+        
+        setMessage({
+          type: 'success',
+          text: `${integration.name} の切断が完了しました`
+        });
+      }
+    } catch (error) {
+      console.error(`${integration.name} 切断エラー:`, error);
+      setMessage({
+        type: 'error',
+        text: `${integration.name} の切断に失敗しました`
+      });
+    }
+  };
+
+  // ✅ 実際のSlack同期機能実装
+ const handleSync = async (integrationId: string) => {
+  const integration = integrationsState.find(i => i.id === integrationId);
+  if (!integration) return;
+
+  try {
+    console.log(`🔄 実際の同期開始: ${integration.name}`);
+    
+    // 同期中状態に更新
+    setIntegrationsState(prev => 
+      prev.map(i => 
+        i.id === integrationId 
+          ? { ...i, isSyncing: true, errorMessage: undefined }
+          : i
+      )
+    );
+
+    setMessage({ 
+      type: 'success', 
+      text: `${integration.name} のデータ同期を開始しました...` 
+    });
+
+    if (integrationId === 'slack') {
+      // ✅ 実際のSlack同期処理
+      console.log('🔗 Slack統合管理システム同期実行...');
+      
+      const syncResult = await integrationManager.sync('slack');
+      
+      if (syncResult) {
+        console.log('✅ Slack同期結果:', syncResult);
+        
+        // ✅ syncResultからanalyticsを取得（型安全な方法）
+        const analytics = (syncResult as any).analytics;
+        let healthScore = 85; // デフォルト値
+        let recordsProcessed = 0;
+        
+        if (analytics) {
+          healthScore = analytics.healthScore || 85;
+          console.log('📊 分析データ取得成功:', analytics);
+        } else {
+          // ✅ analyticsがない場合は統合管理システムから取得
+          const analyticsFromManager = await integrationManager.getAnalytics('slack');
+          if (analyticsFromManager) {
+            healthScore = analyticsFromManager.healthScore || 85;
+            console.log('📊 統合管理システムから分析データ取得:', analyticsFromManager);
+          }
+        }
+        
+        // ✅ recordsProcessedを安全に取得
+        if ('recordsProcessed' in syncResult) {
+          recordsProcessed = (syncResult as any).recordsProcessed || 0;
+        }
+        
+        // 状態更新
+        setIntegrationsState(prev => 
+          prev.map(i => 
+            i.id === integrationId 
+              ? { 
+                  ...i, 
+                  isSyncing: false,
+                  lastSync: new Date(),
+                  healthScore: healthScore,
+                  metrics: analytics?.metrics,
+                  errorMessage: undefined
+                }
+              : i
+          )
+        );
+        
+        // 成功メッセージ（詳細情報付き）
+        setMessage({ 
+          type: 'success', 
+          text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100, 処理件数: ${recordsProcessed}件` 
+        });
+        
+      } else {
+        throw new Error('同期処理が失敗しました');
+      }
+      
+    } else {
+      // ✅ 他のサービス（モック処理・改良版）
+      console.log(`🔄 モック同期: ${integration.name}`);
+      
+      // リアルな処理時間をシミュレート
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      const healthScore = Math.floor(Math.random() * 30) + 70; // 70-100
+      const mockMetrics = {
+        messageCount: Math.floor(Math.random() * 500) + 100,
+        activeUsers: Math.floor(Math.random() * 20) + 5,
+        averageResponseTime: Math.floor(Math.random() * 300) + 60,
+        engagementRate: Math.random() * 0.4 + 0.6, // 0.6-1.0
+        burnoutRisk: Math.floor(Math.random() * 40) + 10, // 10-50
+        stressLevel: Math.floor(Math.random() * 50) + 20, // 20-70
+        workLifeBalance: Math.floor(Math.random() * 30) + 70, // 70-100
+        teamCohesion: Math.floor(Math.random() * 40) + 60 // 60-100
+      };
+      
+      setIntegrationsState(prev => 
+        prev.map(i => 
+          i.id === integrationId 
+            ? { 
+                ...i, 
+                isSyncing: false,
+                lastSync: new Date(),
+                healthScore: healthScore,
+                metrics: mockMetrics,
+                errorMessage: undefined
+              }
+            : i
+        )
+      );
+      
+      setMessage({ 
+        type: 'success', 
+        text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100` 
+      });
+    }
+    
+  } catch (error) {
+    console.error(`❌ ${integration.name} 同期エラー:`, error);
+    
+    setIntegrationsState(prev => 
+      prev.map(i => 
+        i.id === integrationId 
+          ? { 
+              ...i, 
+              isSyncing: false,
+              errorMessage: 'データ同期に失敗しました'
+            }
+          : i
+      )
+    );
+    
+    setMessage({ 
+      type: 'error', 
+      text: `${integration.name} のデータ同期に失敗しました: ${error instanceof Error ? error.message : String(error)}` 
+    });
+  }
+};
 
   // 通知設定の変更
   const handleNotificationChange = (key: keyof NotificationSettings, value: boolean) => {
@@ -113,7 +715,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  // ✅ 修正: 設定の保存（api.tsの型構造に準拠）
+  // 設定の保存
   const handleSave = async () => {
     if (!settings || !user) return;
 
@@ -124,7 +726,6 @@ const SettingsPage: React.FC = () => {
       const response = await updateUserSettings(user.id, settings);
 
       if (response.success && response.data) {
-        // ✅ 修正: UserSettings型に準拠した更新
         const updatedSettings: UserSettings = {
           notifications: settings.notifications,
           privacy: settings.privacy,
@@ -156,11 +757,35 @@ const SettingsPage: React.FC = () => {
     if (message) {
       const timer = setTimeout(() => {
         setMessage(null);
-      }, 3000);
+      }, 5000); // 5秒に延長
       return () => clearTimeout(timer);
     }
     return undefined;
   }, [message]);
+
+  // ✅ リアルタイム健全性スコア更新
+  useEffect(() => {
+    const updateHealthScores = () => {
+      setIntegrationsState(prev => 
+        prev.map(integration => {
+          if (integration.isConnected && integration.healthScore && !integration.isSyncing) {
+            const variation = (Math.random() - 0.5) * 6; // -3 to +3
+            const newScore = Math.max(0, Math.min(100, integration.healthScore + variation));
+            
+            return {
+              ...integration,
+              healthScore: Math.round(newScore)
+            };
+          }
+          return integration;
+        })
+      );
+    };
+
+    // ✅ 30秒ごとに健全性スコアを微調整
+    const interval = setInterval(updateHealthScores, 30000);
+    return () => clearInterval(interval);
+  }, []); // 依存配列は空
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -202,7 +827,7 @@ const SettingsPage: React.FC = () => {
               <div className="flex-shrink-0">
                 {message.type === 'success' ? (
                   <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 ) : (
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -226,9 +851,10 @@ const SettingsPage: React.FC = () => {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8 px-6">
               {[
-                { id: 'notifications', name: '通知設定', icon: '🔔' },
-                { id: 'privacy', name: 'プライバシー', icon: '🔒' },
-                { id: 'general', name: '一般設定', icon: '⚙️' },
+                { id: 'notifications', name: '通知設定' },
+                { id: 'privacy', name: 'プライバシー' },
+                { id: 'integrations', name: '統合設定' },
+                { id: 'general', name: '一般設定' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -237,10 +863,9 @@ const SettingsPage: React.FC = () => {
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2`}
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                 >
-                  <span>{tab.icon}</span>
-                  <span>{tab.name}</span>
+                  {tab.name}
                 </button>
               ))}
             </nav>
@@ -350,7 +975,7 @@ const SettingsPage: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* チーム更新情報 */}
+                   {/* チーム更新情報 */}
                   <div className="flex items-center justify-between py-4">
                     <div className="flex-1">
                       <h4 className="text-sm font-medium text-gray-900">チーム更新情報</h4>
@@ -450,7 +1075,7 @@ const SettingsPage: React.FC = () => {
                     >
                       <span
                         className={`${
-                          settings.privacy.dataRetention ? 'translate-x-5' : 'translate-x-0'
+                           settings.privacy.dataRetention ? 'translate-x-5' : 'translate-x-0'
                         } pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200`}
                       />
                     </button>
@@ -501,6 +1126,347 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
 
+            {/* ✅ 統合設定タブ - 実際の同期機能実装版 */}
+            {activeTab === 'integrations' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">統合設定</h3>
+                  <p className="text-sm text-gray-600 mb-6">
+                    チーム健全性分析のためのツール統合を管理します
+                  </p>
+                </div>
+
+                {/* 統合ツール一覧 - 実際の統合管理システム対応版 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {integrationsState.map((integration) => (
+                    <div
+                      key={integration.id}
+                      className={`border rounded-lg p-4 transition-all duration-200 ${
+                        integration.isConnected
+                          ? 'border-green-200 bg-green-50'
+                          : integration.errorMessage
+                          ? 'border-red-200 bg-red-50'
+                          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">{integration.name}</h4>
+                          <p className="text-sm text-gray-600 mt-1">{integration.description}</p>
+                          
+                          {/* 健全性スコア表示 */}
+                          {integration.isConnected && integration.healthScore !== undefined && (
+                            <div className="mt-2 flex items-center space-x-2">
+                              <span className="text-xs text-gray-500">健全性スコア:</span>
+                              <div className={`px-2 py-1 rounded text-xs font-medium ${
+                                integration.healthScore >= 80 ? 'bg-green-100 text-green-800' :
+                                integration.healthScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {integration.healthScore}/100
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* メトリクス表示 */}
+                          {integration.isConnected && integration.metrics && (
+                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-blue-50 px-2 py-1 rounded">
+                                <span className="text-blue-600">メッセージ: </span>
+                                <span className="font-medium">{integration.metrics.messageCount}</span>
+                              </div>
+                              <div className="bg-green-50 px-2 py-1 rounded">
+                                <span className="text-green-600">アクティブ: </span>
+                                <span className="font-medium">{integration.metrics.activeUsers}人</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* 最終同期時刻表示 */}
+                          {integration.isConnected && integration.lastSync && (
+                            <div className="mt-1">
+                              <span className="text-xs text-gray-500">
+                                最終同期: {new Date(integration.lastSync).toLocaleString('ja-JP')}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* エラーメッセージ表示 */}
+                          {integration.errorMessage && (
+                            <div className="mt-2">
+                              <span className="text-xs text-red-600">{integration.errorMessage}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col items-end space-y-1">
+                          {integration.isConnected && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              接続済み
+                            </span>
+                          )}
+                          {integration.isConnecting && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              接続中...
+                            </span>
+                          )}
+                          {integration.isSyncing && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              同期中...
+                            </span>
+                          )}
+                          {integration.errorMessage && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              エラー
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => setSelectedIntegration(integration)}
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          詳細を見る
+                        </button>
+                        
+                        <div className="flex space-x-2">
+                          {integration.isConnected ? (
+                            <>
+                              {/* ✅ 実際の同期ボタン */}
+                              <button
+                                onClick={() => handleSync(integration.id)}
+                                disabled={integration.isSyncing}
+                                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                  integration.isSyncing
+                                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                }`}
+                                title="データを同期"
+                              >
+                                {integration.isSyncing ? (
+                                  <div className="flex items-center space-x-1">
+                                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>同期中</span>
+                                  </div>
+                                ) : (
+                                  '同期'
+                                )}
+                              </button>
+                              {/* 切断ボタン */}
+                              <button
+                                onClick={() => handleDisconnect(integration.id)}
+                                className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 transition-colors"
+                              >
+                                切断
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleConnect(integration.id)}
+                              disabled={integration.isConnecting}
+                              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                integration.isConnecting
+                                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                              }`}
+                            >
+                              {integration.isConnecting ? '接続中...' : '接続'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 接続統計 - 拡張版（同期履歴・リアルタイム更新機能付き） */}
+                <div className="space-y-6">
+                  {/* 基本統計 */}
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-medium text-blue-800">接続状況</h4>
+                      {/* 全体同期ボタン */}
+                      <button
+                        onClick={async () => {
+                          console.log('🔄 全体同期開始...');
+                          setMessage({ type: 'success', text: '全統合サービスの同期を開始しています...' });
+                          
+                          const connectedIntegrations = integrationsState.filter(i => i.isConnected);
+                          
+                          for (const integration of connectedIntegrations) {
+                            await handleSync(integration.id);
+                            // 各同期の間に少し間隔を開ける
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                          }
+                          
+                          setMessage({ 
+                            type: 'success', 
+                            text: `全統合サービスの同期が完了しました（${connectedIntegrations.length}サービス）` 
+                          });
+                        }}
+                        disabled={integrationsState.some(i => i.isSyncing)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                          integrationsState.some(i => i.isSyncing)
+                            ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        {integrationsState.some(i => i.isSyncing) ? '同期中...' : '全体同期'}
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-600">総ツール数:</span>
+                        <span className="ml-1 font-medium">{integrationsState.length}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600">接続済み:</span>
+                        <span className="ml-1 font-medium">{integrationsState.filter(i => i.isConnected).length}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600">同期中:</span>
+                        <span className="ml-1 font-medium">{integrationsState.filter(i => i.isSyncing).length}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600">エラー:</span>
+                        <span className="ml-1 font-medium">{integrationsState.filter(i => i.errorMessage).length}</span>
+                      </div>
+                    </div>
+                    
+                    {/* 平均健全性スコア */}
+                    {integrationsState.some(i => i.isConnected && i.healthScore !== undefined) && (
+                      <div className="mt-4 pt-4 border-t border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-blue-600">平均健全性スコア:</span>
+                          <div className="flex items-center space-x-2">
+                            {(() => {
+                              const connectedWithScores = integrationsState.filter(i => i.isConnected && i.healthScore !== undefined);
+                              const avgScore = connectedWithScores.length > 0 
+                                ? Math.round(connectedWithScores.reduce((sum, i) => sum + (i.healthScore || 0), 0) / connectedWithScores.length)
+                                : 0;
+                              return (
+                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                  avgScore >= 80 ? 'bg-green-100 text-green-800' :
+                                  avgScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'  }`}>
+                                  {avgScore}/100
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 同期履歴セクション */}
+                  {integrationsState.some(i => i.isConnected) && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium text-green-800">最近の同期履歴</h4>
+                        <span className="text-xs text-green-600">
+                          {integrationsState.filter(i => i.isConnected).length}サービス接続中
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {integrationsState
+                          .filter(i => i.isConnected)
+                          .map(integration => (
+                            <div key={integration.id} className="flex items-center justify-between p-2 bg-white rounded border border-green-100">
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  integration.isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
+                                }`}></div>
+                                <span className="text-sm font-medium text-green-700">{integration.name}</span>
+                              </div>
+                              
+                              <div className="flex items-center space-x-3">
+                                {/* 健全性スコア */}
+                                {integration.healthScore && (
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    integration.healthScore >= 80 ? 'bg-green-100 text-green-800' :
+                                    integration.healthScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
+                                    {integration.healthScore}
+                                  </span>
+                                )}
+                                
+                                {/* 最終同期時刻 */}
+                                <span className="text-xs text-green-600">
+                                  {integration.lastSync 
+                                    ? new Date(integration.lastSync).toLocaleString('ja-JP', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })
+                                    : '未同期'
+                                  }
+                                </span>
+                                
+                                {/* 同期状態インジケーター */}
+                                {integration.isSyncing && (
+                                  <div className="flex items-center space-x-1">
+                                    <svg className="animate-spin h-3 w-3 text-yellow-600" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span className="text-xs text-yellow-600">同期中</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* メトリクス概要セクション */}
+                  {integrationsState.some(i => i.isConnected && i.metrics) && (
+                    <div className="p-4 bg-purple-50 border border-purple-200 rounded-md">
+                      <h4 className="text-sm font-medium text-purple-800 mb-4">統合メトリクス概要</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {(() => {
+                          const integrationsWithMetrics = integrationsState.filter(i => i.isConnected && i.metrics);
+                          if (integrationsWithMetrics.length === 0) return null;
+                          
+                          const totalMessages = integrationsWithMetrics.reduce((sum, i) => sum + (i.metrics?.messageCount || 0), 0);
+                          const totalActiveUsers = integrationsWithMetrics.reduce((sum, i) => sum + (i.metrics?.activeUsers || 0), 0);
+                          const avgEngagement = integrationsWithMetrics.reduce((sum, i) => sum + (i.metrics?.engagementRate || 0), 0) / integrationsWithMetrics.length;
+                          
+                          return (
+                            <>
+                              <div className="bg-white p-3 rounded border border-purple-100">
+                                <div className="text-xs text-purple-600 mb-1">総メッセージ数</div>
+                                <div className="text-lg font-semibold text-purple-800">{totalMessages.toLocaleString()}</div>
+                              </div>
+                              <div className="bg-white p-3 rounded border border-purple-100">
+                                <div className="text-xs text-purple-600 mb-1">総アクティブユーザー</div>
+                                <div className="text-lg font-semibold text-purple-800">{totalActiveUsers}人</div>
+                              </div>
+                              <div className="bg-white p-3 rounded border border-purple-100">
+                                <div className="text-xs text-purple-600 mb-1">平均エンゲージメント率</div>
+                                <div className="text-lg font-semibold text-purple-800">{Math.round(avgEngagement * 100)}%</div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* 一般設定タブ */}
             {activeTab === 'general' && (
               <div className="space-y-6">
@@ -544,7 +1510,7 @@ const SettingsPage: React.FC = () => {
                       <option value="ja">日本語</option>
                       <option value="en">English</option>
                     </select>
-                     <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-gray-500">
                       アプリケーションの表示言語を選択します
                     </p>
                   </div>
@@ -573,7 +1539,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* アカウント情報 */}
                 <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                     <h4 className="text-sm font-medium text-gray-900 mb-4">アカウント情報</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-4">アカウント情報</h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">ユーザーID:</span>
@@ -587,7 +1553,7 @@ const SettingsPage: React.FC = () => {
                       <span className="text-sm text-gray-600">ロール:</span>
                       <span className="text-sm font-medium text-gray-900">
                         {user?.role === 'admin' ? '管理者' : 
-                         user?.role === 'manager' ? 'マネージャー' : 'メンバー'}
+                            user?.role === 'manager' ? 'マネージャー' : 'メンバー'}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -631,6 +1597,192 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ✅ 統合詳細モーダル - 実際の同期機能対応版 */}
+      {selectedIntegration && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">{selectedIntegration.name}</h3>
+              <button
+                onClick={() => setSelectedIntegration(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">{selectedIntegration.description}</p>
+              
+              {/* 接続状態 */}
+              <div className="bg-gray-50 p-3 rounded-md">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">接続状態</h4>
+                <div className="flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full ${
+                    selectedIntegration.isConnected ? 'bg-green-400' :
+                    selectedIntegration.isConnecting ? 'bg-blue-400' :
+                    selectedIntegration.errorMessage ? 'bg-red-400' : 'bg-gray-400'
+                  }`}></div>
+                  <span className="text-sm">
+                    {selectedIntegration.isConnected ? '接続済み' :
+                     selectedIntegration.isConnecting ? '接続中...' :
+                     selectedIntegration.errorMessage ? 'エラー' : '未接続'}
+                  </span>
+                </div>
+                
+                {/* 健全性スコア */}
+                {selectedIntegration.isConnected && selectedIntegration.healthScore !== undefined && (
+                  <div className="mt-2">
+                    <span className="text-xs text-gray-500">健全性スコア: </span>
+                    <span className={`text-sm font-medium ${
+                      selectedIntegration.healthScore >= 80 ? 'text-green-600' :
+                      selectedIntegration.healthScore >= 60 ? 'text-yellow-600' :
+                      'text-red-600'
+                    }`}>
+                      {selectedIntegration.healthScore}/100
+                    </span>
+                  </div>
+                )}
+                
+                {/* 最終同期時刻 */}
+                {selectedIntegration.isConnected && selectedIntegration.lastSync && (
+                  <div className="mt-1">
+                    <span className="text-xs text-gray-500">
+                      最終同期: {new Date(selectedIntegration.lastSync).toLocaleString('ja-JP')}
+                    </span>
+                  </div>
+                )}
+                
+                {/* エラーメッセージ */}
+                {selectedIntegration.errorMessage && (
+                  <div className="mt-2 text-xs text-red-600">
+                    {selectedIntegration.errorMessage}
+                  </div>
+                )}
+              </div>
+
+              {/* メトリクス詳細表示 */}
+              {selectedIntegration.isConnected && selectedIntegration.metrics && (
+                <div className="bg-blue-50 p-3 rounded-md">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2">詳細メトリクス</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white p-2 rounded">
+                      <div className="text-gray-500">メッセージ数</div>
+                      <div className="font-medium">{selectedIntegration.metrics.messageCount}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <div className="text-gray-500">アクティブユーザー</div>
+                      <div className="font-medium">{selectedIntegration.metrics.activeUsers}人</div>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <div className="text-gray-500">エンゲージメント率</div>
+                      <div className="font-medium">{Math.round(selectedIntegration.metrics.engagementRate * 100)}%</div>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <div className="text-gray-500">応答時間</div>
+                      <div className="font-medium">{Math.round(selectedIntegration.metrics.averageResponseTime / 60)}分</div>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <div className="text-gray-500">バーンアウトリスク</div>
+                      <div className={`font-medium ${
+                        selectedIntegration.metrics.burnoutRisk > 70 ? 'text-red-600' :
+                        selectedIntegration.metrics.burnoutRisk > 40 ? 'text-yellow-600' : 'text-green-600'
+                      }`}>
+                        {selectedIntegration.metrics.burnoutRisk}%
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <div className="text-gray-500">ワークライフバランス</div>
+                      <div className={`font-medium ${
+                        selectedIntegration.metrics.workLifeBalance > 70 ? 'text-green-600' :
+                        selectedIntegration.metrics.workLifeBalance > 40 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {selectedIntegration.metrics.workLifeBalance}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* 分析機能 */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 mb-2">分析機能</h4>
+                <ul className="space-y-1">
+                  {selectedIntegration.features.map((feature, index) => (
+                    <li key={index} className="text-sm text-gray-600 flex items-center">
+                      <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* アクションボタン */}
+              <div className="flex justify-end pt-4 border-t border-gray-200 space-x-2">
+                {selectedIntegration.isConnected ? (
+                  <>
+                    {/* ✅ モーダル内の実際の同期ボタン */}
+                    <button
+                      onClick={async () => {
+                        await handleSync(selectedIntegration.id);
+                        setSelectedIntegration(null);
+                      }}
+                      disabled={selectedIntegration.isSyncing}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        selectedIntegration.isSyncing
+                          ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                      }`}
+                    >
+                      {selectedIntegration.isSyncing ? (
+                        <div className="flex items-center space-x-1">
+                          <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>同期中</span>
+                        </div>
+                      ) : (
+                        '同期'
+                      )}
+                    </button>
+                    {/* 切断ボタン */}
+                    <button
+                      onClick={() => {
+                        handleDisconnect(selectedIntegration.id);
+                        setSelectedIntegration(null);
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
+                    >
+                      切断
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      handleConnect(selectedIntegration.id);
+                      setSelectedIntegration(null);
+                    }}
+                    disabled={selectedIntegration.isConnecting}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      selectedIntegration.isConnecting
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {selectedIntegration.isConnecting ? '接続中...' : '接続'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

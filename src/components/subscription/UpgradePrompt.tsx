@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Card } from '../ui/Card';
+import { Card } from '../ui/card';
 import type { SubscriptionPlan } from '../../types/subscription';
 
 interface UpgradePromptProps {

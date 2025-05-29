@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Card } from '../ui/Card';
-import { Avatar } from '../ui/Avatar';
+import { Card } from '../ui/card';
+import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import { User } from '../../types';
 
 interface OneOnOneNavigatorProps {
@@ -18,15 +18,15 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
 
   if (suggestedPairs.length === 0) {
     return (
-      <Card title="1on1ナビゲーター" className="border-l-4 border-l-success-500">
+      <Card title="1on1ナビゲーター" className="border-l-4 border-l-green-500">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-success-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <div>
-            <h4 className="font-semibold text-success-800">良好な状態です</h4>
+            <h4 className="font-semibold text-green-800">良好な状態です</h4>
             <p className="text-sm text-gray-600">
               現在、1on1が推奨されるペアは検出されていません。チーム内のコミュニケーションが活発です。
             </p>
@@ -37,16 +37,16 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
   }
 
   return (
-    <Card title="1on1ナビゲーター" className="border-l-4 border-l-primary-500">
+    <Card title="1on1ナビゲーター" className="border-l-4 border-l-blue-500">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
           <div>
-            <h4 className="font-semibold text-primary-800">1on1の実施を検討してください</h4>
+            <h4 className="font-semibold text-blue-800">1on1の実施を検討してください</h4>
             <p className="text-sm text-gray-600">
               以下のペアは最近会話が少ないようです。関係性の向上のため、1on1ミーティングを検討してみてください。
             </p>
@@ -61,9 +61,12 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
             if (!user1 || !user2) return null;
             
             return (
-              <div key={`${pair.userId1}-${pair.userId2}`} className="flex items-center gap-4 p-4 bg-primary-50 rounded-lg">
+              <div key={`${pair.userId1}-${pair.userId2}`} className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <Avatar src={user1.avatar} alt={user1.name} size="sm" />
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user1.avatar} alt={user1.name} />
+                    <AvatarFallback>{user1.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
                   <span className="font-medium text-gray-900">{user1.name}</span>
                 </div>
                 
@@ -79,7 +82,10 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
                 
                 <div className="flex items-center gap-3">
                   <span className="font-medium text-gray-900">{user2.name}</span>
-                  <Avatar src={user2.avatar} alt={user2.name} size="sm" />
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user2.avatar} alt={user2.name} />
+                    <AvatarFallback>{user2.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
                 </div>
               </div>
             );
