@@ -5,7 +5,7 @@ import { useAuth } from '@/app/contexts/AuthContext';
 import { integrationManager } from '@/lib/integrations/integration-manager';
 import { DashboardStats, TeamMember, HealthAlert } from '@/types/api';
 import { IntegrationAnalytics, AnalyticsAlert, AnalyticsInsight } from '@/types/integrations';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
