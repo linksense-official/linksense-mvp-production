@@ -1,4 +1,4 @@
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, StatsCard } from './card';
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, StatsCard } from './card';
 export { Badge } from './badge';
 export { Button } from './button';
 export { Progress } from './progress';

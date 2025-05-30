@@ -27,14 +27,16 @@
       }
     ],
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/components/*": ["./src/components/*"],
-      "@/lib/*": ["./src/lib/*"],
-      "@/types/*": ["./src/types/*"],
-      "@/app/*": ["./src/app/*"],
-      "@/contexts/*": ["./src/app/contexts/*"]
-    },
+   "paths": {
+  "@/*": ["./src/*"],
+  "@/components/*": ["./src/components/*"],
+  "@/components/ui": ["./src/components/ui/index.ts"],
+  "@/components/ui/*": ["./src/components/ui/*"],
+  "@/lib/*": ["./src/lib/*"],
+  "@/types/*": ["./src/types/*"],
+  "@/app/*": ["./src/app/*"],
+  "@/contexts/*": ["./src/app/contexts/*"]
+},
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,

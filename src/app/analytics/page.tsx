@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { integrationManager } from '@/lib/integrations/integration-manager';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
 import { Badge } from '@/components/ui/badge';
 import { 
   Users, 

@@ -1,41 +1,41 @@
 'use client';
 
-import React, { ReactNode } from 'react';
+import React from 'react';
 
 interface CardProps {
   title?: string;
   subtitle?: string;
-  children: ReactNode;
+  children: React.ReactNode;
   className?: string;
-  headerAction?: ReactNode;
-  footer?: ReactNode;
+  headerAction?: React.ReactNode;
+  footer?: React.ReactNode;
   loading?: boolean;
   error?: string;
   onClick?: () => void;
 }
 
 interface CardHeaderProps {
-  children: ReactNode;
+  children: React.ReactNode;
   className?: string;
 }
 
 interface CardTitleProps {
-  children: ReactNode;
+  children: React.ReactNode;
   className?: string;
 }
 
 interface CardDescriptionProps {
-  children: ReactNode;
+  children: React.ReactNode;
   className?: string;
 }
 
 interface CardContentProps {
-  children: ReactNode;
+  children: React.ReactNode;
   className?: string;
 }
 
 interface CardFooterProps {
-  children: ReactNode;
+  children: React.ReactNode;
   className?: string;
 }
 
@@ -144,7 +144,6 @@ export const CardContent: React.FC<CardContentProps> = ({ children, className = 
   );
 };
 
-// ✅ 追加: CardFooterコンポーネント
 export const CardFooter: React.FC<CardFooterProps> = ({ children, className = '' }) => {
   return (
     <div className={`flex items-center p-6 pt-0 ${className}`}>
@@ -160,7 +159,7 @@ export const StatsCard: React.FC<{
     value: number;
     type: 'increase' | 'decrease' | 'neutral';
   };
-  icon?: ReactNode;
+  icon?: React.ReactNode;
   className?: string;
 }> = ({ title, value, change, icon, className = '' }) => {
   const getChangeColor = (type: 'increase' | 'decrease' | 'neutral') => {
