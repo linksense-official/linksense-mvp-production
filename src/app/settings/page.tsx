@@ -7,6 +7,7 @@ import SlackIntegration from '@/lib/integrations/slack-integration';
 import TeamsIntegration from '@/lib/integrations/teams-integration'; // ✅ Teams統合追加
 import type { UserSettings, NotificationSettings, PrivacySettings } from '@/types/api';
 import type { Integration as IntegrationType, AnalyticsMetrics } from '@/types/integrations';
+import TeamsTestPanel from '@/components/TeamsTestPanel';
 
 // ✅ 統合ページで使用する型定義
 interface Integration {
@@ -64,8 +65,8 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['会議参加率分析', 'チャット活動分析', 'ファイル共有状況', 'Teams通話分析', 'チーム結束度測定'],
-    setupUrl: '/api/auth/teams', // ✅ Teams OAuth URL（将来実装）
-    icon: '🟦',
+    setupUrl: '/api/auth/teams', // ✅ Teams OAuth URL（実装済み）
+    icon: '🔷',
     priority: 2
   },
 
@@ -350,6 +351,8 @@ const SettingsPage: React.FC = () => {
     const error = urlParams.get('error');
     const errorMessage = urlParams.get('message');
     const teamName = urlParams.get('team');
+    const userName = urlParams.get('user'); // ✅ Teams用ユーザー名
+    const organization = urlParams.get('organization'); // ✅ Teams用組織名
 
     // ✅ Slack接続成功処理
     if (success === 'slack_connected' && teamName) {
@@ -378,9 +381,10 @@ const SettingsPage: React.FC = () => {
       
       window.history.replaceState({}, '', '/settings?tab=integrations');
     } 
-    // ✅ Teams接続成功処理（将来実装）
-    else if (success === 'teams_connected' && teamName) {
-      console.log('✅ Teams接続成功を検出:', teamName);
+    // ✅ Teams接続成功処理（実装完了）
+    else if (success === 'teams_connected') {
+      const displayName = userName || organization || 'Unknown';
+      console.log('✅ Teams接続成功を検出:', displayName);
       
       setIntegrationsState(prev => 
         prev.map(i => 
@@ -399,7 +403,7 @@ const SettingsPage: React.FC = () => {
 
       setMessage({
         type: 'success',
-        text: `Microsoft Teams (${teamName}) の連携が完了しました！`
+        text: `Microsoft Teams (${displayName}) の連携が完了しました！`
       });
       setActiveTab('integrations');
       
@@ -496,27 +500,10 @@ const SettingsPage: React.FC = () => {
           window.location.href = integration.setupUrl;
           return;
         }
-        // ✅ Teams OAuth フロー（将来実装）
+        // ✅ Teams OAuth フロー（実装完了）
         else if (integrationId === 'microsoft-teams') {
           console.log('🔷 Teams OAuth フロー開始...');
-          // TODO: 実際のTeams OAuth実装時にコメントアウト解除
-          // window.location.href = integration.setupUrl;
-          
-          // 現在はモック処理
-          setTimeout(() => {
-            setIntegrationsState(prev => 
-              prev.map(i => 
-                i.id === integrationId 
-                  ? { ...i, isConnecting: false, isConnected: true, healthScore: 82 }
-                  : i
-              )
-            );
-            
-            setMessage({
-              type: 'success',
-              text: `${integration.name} の連携が完了しました！（モック）`
-            });
-          }, 2000);
+          window.location.href = integration.setupUrl; // 実際のOAuth認証へリダイレクト
           return;
         }
       }
@@ -1294,13 +1281,13 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
 
-            {/* ✅ 統合設定タブ - Microsoft Teams統合対応版 */}
+            {/* ✅ 統合設定タブ - Microsoft Teams OAuth認証完全対応版 */}
             {activeTab === 'integrations' && (
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">統合設定</h3>
                   <p className="text-sm text-gray-600 mb-6">
-                    チーム健全性分析のためのツール統合を管理します（14サービス対応）
+                    チーム健全性分析のためのツール統合を管理します（13サービス対応）
                   </p>
                 </div>
 
@@ -1319,7 +1306,31 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* ✅ 統合ツール一覧 - Microsoft Teams統合対応版 */}
+                {activeTab === 'integrations' && (
+  <div className="space-y-6">
+    {/* 既存のコンテンツ */}
+    
+    {/* ✅ Teams統合追加の案内バナー */}
+    <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+      {/* 既存の案内バナーコンテンツ */}
+    </div>
+
+    {/* ✅ Teams統合テストパネル追加 */}
+    {process.env.NEXT_PUBLIC_TEAMS_DEBUG === 'true' && (
+      <TeamsTestPanel />
+    )}
+
+    {/* 既存の統合ツール一覧 */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 既存のコンテンツ */}
+    </div>
+    
+    {/* 既存の接続統計 */}
+    {/* ... */}
+  </div>
+)}
+
+                {/* ✅ 統合ツール一覧 - Microsoft Teams OAuth認証対応版 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {integrationsState
                     .sort((a, b) => (a.priority || 999) - (b.priority || 999)) // 優先度順でソート
@@ -1404,7 +1415,7 @@ const SettingsPage: React.FC = () => {
                             </span>
                           )}
                           {integration.isConnecting && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               接続中...
                             </span>
                           )}
@@ -1489,7 +1500,7 @@ const SettingsPage: React.FC = () => {
                   {/* 基本統計 */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-sm font-medium text-blue-800">接続状況（14サービス対応）</h4>
+                      <h4 className="text-sm font-medium text-blue-800">接続状況（13サービス対応）</h4>
                       {/* 全体同期ボタン */}
                       <button
                         onClick={async () => {
@@ -1808,7 +1819,7 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ✅ 統合詳細モーダル - Microsoft Teams統合対応版 */}
+      {/* ✅ 統合詳細モーダル - Microsoft Teams OAuth認証対応版 */}
       {selectedIntegration && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -1944,7 +1955,7 @@ const SettingsPage: React.FC = () => {
                 <ul className="space-y-1">
                   {selectedIntegration.features.map((feature, index) => (
                     <li key={index} className="text-sm text-gray-600 flex items-center">
-                      <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                       {feature}

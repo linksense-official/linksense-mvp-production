@@ -1,5 +1,5 @@
 {
-  "name": "LinkSense - チーム健全性分析アプリ",
+  "name": "LinkSense - チーム健全性分析",
   "short_name": "LinkSense",
   "description": "AIを活用したチームコミュニケーション分析ツール",
   "start_url": "/",
@@ -7,24 +7,6 @@
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
-  "scope": "/",
-  "lang": "ja",
-  "dir": "ltr",
-  "categories": ["business", "productivity", "social"],
-  "screenshots": [
-    {
-      "src": "/screenshots/desktop-1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "/screenshots/mobile-1.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -73,6 +55,21 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
+    }
+  ],
+  "categories": ["productivity", "business", "analytics"],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "375x667",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ]
 }

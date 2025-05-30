@@ -1,113 +1,49 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth } from '@/app/contexts/AuthContext';
-import apiClient from '@/lib/apiClient';
-import { APIResponse } from '@/types/api';
+import { HEALTH_ANALYSIS_PLANS } from '@/types/api';
 
 interface PaymentFormProps {
-  planId?: string;
-  onSuccess?: () => void;
-  onCancel?: () => void;
-}
-
-interface PaymentData {
-  cardNumber: string;
-  expiryMonth: string;
-  expiryYear: string;
-  cvc: string;
-  cardholderName: string;
+  planId: string;
+  onSuccess: () => void;
+  onCancel: () => void;
 }
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onSuccess, onCancel }) => {
-  const { user, isAuthenticated } = useAuth(); // authState削除
-  const [paymentData, setPaymentData] = useState<PaymentData>({
-    cardNumber: '',
-    expiryMonth: '',
-    expiryYear: '',
-    cvc: '',
-    cardholderName: '',
-  });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [cardholderName, setCardholderName] = useState('');
+  const [billingEmail, setBillingEmail] = useState('');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setPaymentData(prev => ({ ...prev, [name]: value }));
-    
-    // エラーをクリア
-    if (error) {
-      setError(null);
-    }
-  };
+  const plan = HEALTH_ANALYSIS_PLANS[planId];
 
-  const validateForm = (): boolean => {
-    if (!paymentData.cardNumber.replace(/\s/g, '') || paymentData.cardNumber.replace(/\s/g, '').length < 13) {
-      setError('有効なカード番号を入力してください');
-      return false;
-    }
-    if (!paymentData.expiryMonth || !paymentData.expiryYear) {
-      setError('有効期限を選択してください');
-      return false;
-    }
-    if (!paymentData.cvc || paymentData.cvc.length < 3) {
-      setError('有効なCVCを入力してください');
-      return false;
-    }
-    if (!paymentData.cardholderName.trim()) {
-      setError('カード名義人を入力してください');
-      return false;
-    }
-    return true;
-  };
+  if (!plan) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <p className="text-red-800">プラン情報が見つかりません</p>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isAuthenticated || !validateForm()) {
-      return;
-    }
+    setLoading(true);
 
+    // モック決済処理（実際の実装では決済プロバイダーのAPIを使用）
     try {
-      setLoading(true);
-      setError(null);
-
-      // 実際の決済処理（Stripe等との連携）
-      const response: APIResponse = await apiClient.post('/payment/process', {
-        planId,
-        paymentMethod: {
-          type: 'card',
-          card: {
-            number: paymentData.cardNumber.replace(/\s/g, ''),
-            expMonth: parseInt(paymentData.expiryMonth),
-            expYear: parseInt(paymentData.expiryYear),
-            cvc: paymentData.cvc,
-          },
-          billingDetails: {
-            name: paymentData.cardholderName,
-            email: user?.email,
-          },
-        },
-      });
-
-      if (response.success) {
-        onSuccess?.();
-      } else {
-        const errorMessage = typeof response.error === 'string' 
-          ? response.error 
-          : '決済処理に失敗しました';
-        setError(errorMessage);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '決済処理中にエラーが発生しました';
-      setError(errorMessage);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒の遅延でAPI呼び出しをシミュレート
+      onSuccess();
+    } catch (error) {
+      console.error('決済エラー:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // カード番号のフォーマット
   const formatCardNumber = (value: string) => {
+    // カード番号を4桁ずつスペースで区切る
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
     const matches = v.match(/\d{4,16}/g);
     const match = matches && matches[0] || '';
@@ -122,41 +58,43 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onSuccess, onCancel }
     }
   };
 
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCardNumber(e.target.value);
-    setPaymentData(prev => ({ ...prev, cardNumber: formatted }));
+  const formatExpiryDate = (value: string) => {
+    // MM/YY形式にフォーマット
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    if (v.length >= 2) {
+      return v.substring(0, 2) + '/' + v.substring(2, 4);
+    }
+    return v;
   };
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-4 py-5 sm:p-6">
-        <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-          お支払い情報
-        </h3>
+    <div className="bg-white rounded-lg shadow-lg max-w-md mx-auto">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900">決済情報</h3>
+        <p className="text-sm text-gray-600 mt-1">
+          {plan.displayName}の決済手続きを行います
+        </p>
+      </div>
 
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
-            <div className="text-sm text-red-700">{error}</div>
+      <div className="px-6 py-4">
+        {/* プラン情報 */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="font-medium text-gray-900">{plan.displayName}</span>
+            <span className="text-xl font-bold text-blue-600">
+              ¥{plan.price.toLocaleString()}/月
+            </span>
           </div>
-        )}
+          <p className="text-sm text-gray-600 mb-3">{plan.description}</p>
+          <div className="text-xs text-gray-500">
+            <p>• 14日間無料トライアル</p>
+            <p>• いつでもキャンセル可能</p>
+            <p>• 初回請求: {new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('ja-JP')}</p>
+          </div>
+        </div>
 
+        {/* 決済フォーム */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* カード名義人 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              カード名義人
-            </label>
-            <input
-              type="text"
-              name="cardholderName"
-              value={paymentData.cardholderName}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="YAMADA TARO"
-              required
-            />
-          </div>
-
           {/* カード番号 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -164,118 +102,136 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ planId, onSuccess, onCancel }
             </label>
             <input
               type="text"
-              name="cardNumber"
-              value={paymentData.cardNumber}
-              onChange={handleCardNumberChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={cardNumber}
+              onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
               placeholder="1234 5678 9012 3456"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               maxLength={19}
               required
             />
           </div>
 
-          {/* 有効期限とCVC */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* 有効期限 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                月
-              </label>
-              <select
-                name="expiryMonth"
-                value={paymentData.expiryMonth}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              >
-                <option value="">月</option>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={String(i + 1).padStart(2, '0')}>
-                    {String(i + 1).padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                年
-              </label>
-              <select
-                name="expiryYear"
-                value={paymentData.expiryYear}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              >
-                <option value="">年</option>
-                {Array.from({ length: 10 }, (_, i) => {
-                  const year = new Date().getFullYear() + i;
-                  return (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CVC
+                有効期限
               </label>
               <input
                 type="text"
-                name="cvc"
-                value={paymentData.cvc}
-                onChange={handleInputChange}
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
+                placeholder="MM/YY"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                maxLength={5}
+                required
+              />
+            </div>
+
+            {/* CVV */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                CVV
+              </label>
+              <input
+                type="text"
+                value={cvv}
+                onChange={(e) => setCvv(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="123"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 maxLength={4}
                 required
               />
             </div>
           </div>
 
+          {/* カード名義人 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              カード名義人
+            </label>
+            <input
+              type="text"
+              value={cardholderName}
+              onChange={(e) => setCardholderName(e.target.value)}
+              placeholder="TARO YAMADA"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+          </div>
+
+          {/* 請求先メールアドレス */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              請求先メールアドレス
+            </label>
+            <input
+              type="email"
+              value={billingEmail}
+              onChange={(e) => setBillingEmail(e.target.value)}
+              placeholder="billing@example.com"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+          </div>
+
           {/* セキュリティ情報 */}
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">
-                  セキュアな決済
-                </h3>
-                <div className="mt-2 text-sm text-blue-700">
-                  <p>
-                    お客様の決済情報は SSL暗号化により保護されています。
-                    カード情報は当社のサーバーに保存されません。
-                  </p>
-                </div>
-              </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm text-gray-600">
+                SSL暗号化により安全に保護されています
+              </span>
             </div>
+          </div>
+
+          {/* 利用規約同意 */}
+          <div className="flex items-start space-x-2">
+            <input
+              type="checkbox"
+              id="terms"
+              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              required
+            />
+            <label htmlFor="terms" className="text-sm text-gray-600">
+              <a href="#" className="text-blue-600 hover:underline">利用規約</a>
+              および
+              <a href="#" className="text-blue-600 hover:underline">プライバシーポリシー</a>
+              に同意します
+            </label>
           </div>
 
           {/* ボタン */}
           <div className="flex space-x-3 pt-4">
-            {onCancel && (
-              <button
-                type="button"
-                onClick={onCancel}
-                disabled={loading}
-                className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors disabled:opacity-50"
-              >
-                キャンセル
-              </button>
-            )}
             <button
-                type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+              type="button"
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              {loading ? '処理中...' : '決済を実行'}
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className={`flex-1 px-4 py-2 rounded-md text-white font-medium transition-colors ${
+                loading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>処理中...</span>
+                </div>
+              ) : (
+                `¥${plan.price.toLocaleString()}/月で開始`
+              )}
             </button>
           </div>
         </form>

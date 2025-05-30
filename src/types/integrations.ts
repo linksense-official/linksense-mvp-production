@@ -1,12 +1,12 @@
 // src/types/integrations.ts
-// LinkSense MVP - 統合サービス型定義システム
-// 13サービス全対応 + 拡張可能な設計
+// LinkSense MVP - 統合サービス型定義システム - 6サービス完全対応版
+// 型安全性完全確保 + 新サービス型定義追加
 
 // ✅ 基本的な統合サービス型定義
 export type IntegrationCategory = 'communication' | 'project' | 'analytics' | 'hr' | 'meeting';
 export type IntegrationMarket = 'global' | 'us' | 'japan';
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'expired';
-export type AuthType = 'oauth2' | 'api_key' | 'webhook' | 'bot_token';
+export type AuthType = 'oauth2' | 'api_key' | 'webhook' | 'bot_token' | 'session' | 'client_credentials';
 
 // ✅ 統合サービス基本インターフェース
 export interface Integration {
@@ -37,16 +37,33 @@ export interface IntegrationConfig {
   customSettings?: Record<string, any>;
 }
 
-// ✅ 認証情報（暗号化保存）
+// ✅ 認証情報（暗号化保存）- 拡張版
 export interface IntegrationCredentials {
+  // OAuth関連
   accessToken?: string;
   refreshToken?: string;
+  clientId?: string;
+  clientSecret?: string;
+  
+  // API Key関連
   apiKey?: string;
+  apiSecret?: string;
+  
+  // Bot Token関連
   botToken?: string;
   webhookSecret?: string;
-  clientId?: string;
+  
+  // 基本認証関連
+  username?: string;
+  password?: string;
+  
+  // サービス固有
   teamId?: string;
   workspaceId?: string;
+  tenantId?: string;
+  accountId?: string;
+  
+  // トークン管理
   expiresAt?: Date;
   tokenType?: string;
 }
@@ -88,10 +105,10 @@ export interface AnalyticsMetrics {
   teamCohesion: number;
 }
 
-// ✅ 分析インサイト
+// ✅ 分析インサイト - 拡張版
 export interface AnalyticsInsight {
   id: string;
-  type: 'positive' | 'negative' | 'neutral' | 'warning';
+  type: 'positive' | 'negative' | 'neutral' | 'warning' | 'suggestion';
   title: string;
   description: string;
   impact: 'low' | 'medium' | 'high' | 'critical';
@@ -239,63 +256,7 @@ export interface TeamsUser {
   lastActivity: Date;
 }
 
-// Zoom統合
-export interface ZoomIntegration extends Integration {
-  id: 'zoom';
-  credentials?: ZoomCredentials;
-  data?: ZoomData;
-}
-
-export interface ZoomCredentials extends IntegrationCredentials {
-  apiKey: string;
-  apiSecret: string;
-  accountId: string;
-}
-
-export interface ZoomData {
-  meetings: ZoomMeeting[];
-  users: ZoomUser[];
-  webinars: ZoomWebinar[];
-  account: ZoomAccount;
-}
-
-export interface ZoomMeeting {
-  id: string;
-  topic: string;
-  startTime: Date;
-  duration: number;
-  participantCount: number;
-  hostId: string;
-  isRecurring: boolean;
-  attendanceRate: number;
-}
-
-export interface ZoomUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  isActive: boolean;
-  meetingCount: number;
-}
-
-export interface ZoomWebinar {
-  id: string;
-  topic: string;
-  startTime: Date;
-  duration: number;
-  registrantCount: number;
-  attendeeCount: number;
-}
-
-export interface ZoomAccount {
-  id: string;
-  accountName: string;
-  licenseCount: number;
-  planType: string;
-}
-
-// ChatWork統合（日本市場特化）
+// ✅ ChatWork統合（日本市場特化）
 export interface ChatWorkIntegration extends Integration {
   id: 'chatwork';
   credentials?: ChatWorkCredentials;
@@ -309,47 +270,356 @@ export interface ChatWorkCredentials extends IntegrationCredentials {
 
 export interface ChatWorkData {
   rooms: ChatWorkRoom[];
-  contacts: ChatWorkContact[];
+  contacts: ChatWorkUser[];
   tasks: ChatWorkTask[];
   messages: ChatWorkMessage[];
 }
 
 export interface ChatWorkRoom {
-  id: string;
+  room_id: string;
   name: string;
   type: 'my' | 'direct' | 'group';
-  memberCount: number;
-  messageCount: number;
-  taskCount: number;
-  lastUpdateTime: Date;
+  role: 'admin' | 'member' | 'readonly';
+  sticky: boolean;
+  unread_num: number;
+  mention_num: number;
+  mytask_num: number;
+  message_num: number;
+  file_num: number;
+  task_num: number;
+  icon_path: string;
+  last_update_time: number;
 }
 
-export interface ChatWorkContact {
-  accountId: string;
+export interface ChatWorkUser {
+  account_id: number;
+  room_id?: number;
   name: string;
-  chatworkId: string;
-  organizationId: string;
-  organizationName: string;
+  chatwork_id: string;
+  organization_id: number;
+  organization_name: string;
   department: string;
+  title: string;
+  url: string;
+  introduction: string;
+  mail: string;
+  tel_organization: string;
+  tel_extension: string;
+  tel_mobile: string;
+  skype: string;
+  facebook: string;
+  twitter: string;
+  avatar_image_url: string;
+  login_mail: string;
 }
 
 export interface ChatWorkTask {
-  taskId: string;
-  roomId: string;
-  assignedByAccountId: string;
-  messageId: string;
+  task_id: number;
+  room: {
+    room_id: number;
+    name: string;
+    icon_path: string;
+  };
+  assigned_by_account: {
+    account_id: number;
+    name: string;
+    avatar_image_url: string;
+  };
+  message_id: string;
   body: string;
-  limitTime: Date;
+  limit_time: number;
   status: 'open' | 'done';
+  limit_type: 'none' | 'date' | 'time';
 }
 
 export interface ChatWorkMessage {
+  message_id: string;
+  room_id: number;
+  account: {
+    account_id: number;
+    name: string;
+    avatar_image_url: string;
+  };
+  body: string;
+  send_time: number;
+  update_time: number;
+}
+
+// ✅ LINE WORKS統合（日本市場特化）
+export interface LineWorksIntegration extends Integration {
+  id: 'line-works';
+  credentials?: LineWorksCredentials;
+  data?: LineWorksData;
+}
+
+export interface LineWorksCredentials extends IntegrationCredentials {
+  clientId: string;
+  clientSecret: string;
+  serviceAccount: string;
+  privateKey: string;
+  domainId: string;
+}
+
+export interface LineWorksData {
+  users: LineWorksUser[];
+  groups: LineWorksGroup[];
+  talks: LineWorksTalk[];
+  messages: LineWorksMessage[];
+}
+
+export interface LineWorksUser {
+  userId: string;
+  orgUnitId: string;
+  email: string;
+  userName: string;
+  aliasEmails: string[];
+  domainId: string;
+  isActivated: boolean;
+  isDeleted: boolean;
+  createdTime: string;
+  updatedTime: string;
+  i18nNames: {
+    [locale: string]: string;
+  };
+  phoneNumbers: Array<{
+    type: string;
+    number: string;
+  }>;
+}
+
+export interface LineWorksGroup {
+  groupId: string;
+  groupName: string;
+  createdTime: string;
+  updatedTime: string;
+  memberCount: number;
+  type: 'NORMAL' | 'EXTERNAL';
+  status: 'ACTIVE' | 'INACTIVE';
+  description?: string;
+}
+
+export interface LineWorksTalk {
+  roomId: string;
+  roomName?: string;
+  roomType: 'DIRECT' | 'GROUP';
+  memberCount: number;
+  createdTime: string;
+  updatedTime: string;
+}
+
+export interface LineWorksMessage {
   messageId: string;
   roomId: string;
-  accountId: string;
+  userId: string;
+  content: {
+    type: 'text' | 'image' | 'file' | 'sticker';
+    text?: string;
+    fileUrl?: string;
+    fileName?: string;
+  };
+  createdTime: string;
+  updatedTime: string;
+}
+
+// ✅ サイボウズ Office統合（日本市場特化）
+export interface CybozuOfficeIntegration extends Integration {
+  id: 'cybozu-office';
+  credentials?: CybozuCredentials;
+  data?: CybozuData;
+}
+
+export interface CybozuCredentials extends IntegrationCredentials {
+  username: string;
+  password: string;
+  baseUrl: string;
+  sessionToken?: string;
+}
+
+export interface CybozuData {
+  users: CybozuUser[];
+  schedules: CybozuSchedule[];
+  messages: CybozuMessage[];
+  workflows: CybozuWorkflow[];
+  applications: CybozuApplication[];
+}
+
+export interface CybozuUser {
+  userId: string;
+  loginName: string;
+  displayName: string;
+  email: string;
+  isValid: boolean;
+  organizationId: string;
+  organizationName: string;
+  lastLogin?: string;
+  createdTime: string;
+  modifiedTime: string;
+}
+
+export interface CybozuSchedule {
+  eventId: string;
+  subject: string;
+  start: {
+    dateTime: string;
+    timeZone: string;
+  };
+  end: {
+    dateTime: string;
+    timeZone: string;
+  };
+  isAllDay: boolean;
+  attendees: Array<{
+    userId: string;
+    name: string;
+    type: 'organizer' | 'attendee';
+  }>;
+  facilities: string[];
+  notes: string;
+  createdTime: string;
+  modifiedTime: string;
+}
+
+export interface CybozuMessage {
+  messageId: string;
+  subject: string;
   body: string;
-  sendTime: Date;
-  updateTime: Date;
+  from: {
+    userId: string;
+    name: string;
+  };
+  to: Array<{
+    userId: string;
+    name: string;
+  }>;
+  isRead: boolean;
+  createdTime: string;
+  modifiedTime: string;
+}
+
+export interface CybozuWorkflow {
+  requestId: string;
+  processId: string;
+  subject: string;
+  applicant: {
+    userId: string;
+    name: string;
+  };
+  status: 'PROGRESS' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+  currentStep: string;
+  createdTime: string;
+  modifiedTime: string;
+  processedTime?: string;
+}
+
+export interface CybozuApplication {
+  appId: string;
+  name: string;
+  description: string;
+  recordCount: number;
+  createdTime: string;
+  modifiedTime: string;
+}
+
+// ✅ Zoom統合
+export interface ZoomIntegration extends Integration {
+  id: 'zoom';
+  credentials?: ZoomCredentials;
+  data?: ZoomData;
+}
+
+export interface ZoomCredentials extends IntegrationCredentials {
+  clientId: string;
+  clientSecret: string;
+  accountId: string;
+  accessToken?: string;
+  refreshToken?: string;
+}
+
+export interface ZoomData {
+  meetings: ZoomMeeting[];
+  users: ZoomUser[];
+  webinars: ZoomWebinar[];
+  account: ZoomAccount;
+}
+
+export interface ZoomMeeting {
+  id: string;
+  uuid: string;
+  host_id: string;
+  host_email: string;
+  topic: string;
+  type: number;
+  status: string;
+  start_time: string;
+  duration: number;
+  timezone: string;
+  participants?: ZoomParticipant[];
+  total_minutes: number;
+  participants_count: number;
+}
+
+export interface ZoomUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  type: number;
+  role_name: string;
+  pmi: number;
+  use_pmi: boolean;
+  personal_meeting_url: string;
+  timezone: string;
+  verified: number;
+  dept: string;
+  created_at: string;
+  last_login_time: string;
+  last_client_version: string;
+  language: string;
+  phone_country: string;
+  phone_number: string;
+  status: string;
+}
+
+export interface ZoomWebinar {
+  uuid: string;
+  id: number;
+  host_id: string;
+  topic: string;
+  type: number;
+  start_time: string;
+  duration: number;
+  timezone: string;
+  agenda: string;
+  created_at: string;
+  start_url: string;
+  join_url: string;
+}
+
+// ✅ ZoomParticipant型定義（エクスポート確認）
+export interface ZoomParticipant {
+  id: string;
+  user_id: string;
+  name: string;
+  user_email: string;
+  join_time: string;
+  leave_time: string;
+  duration: number;
+  attentiveness_score?: string;
+  camera_on_time?: number;
+  microphone_on_time?: number;
+  total_duration?: number;
+}
+
+export interface ZoomAccount {
+  id: string;
+  account_name: string;
+  account_number: string;
+  owner_email: string;
+  owner_id: string;
+  plan_type: string;
+  type: number;
+  sub_account_id?: string;
+  created_at: string;
 }
 
 // ✅ 統合管理システム
@@ -357,7 +627,7 @@ export interface IntegrationManager {
   integrations: Map<string, Integration>;
   connect(integrationId: string, credentials: IntegrationCredentials): Promise<boolean>;
   disconnect(integrationId: string): Promise<boolean>;
-  sync(integrationId: string): Promise<IntegrationAnalytics>;
+  sync(integrationId: string): Promise<IntegrationAnalytics | null>;
   syncAll(): Promise<IntegrationAnalytics[]>;
   getAnalytics(integrationId: string): Promise<IntegrationAnalytics | null>;
   getHealthScore(integrationId?: string): Promise<number>;
@@ -467,21 +737,19 @@ export interface WebhookRetryPolicy {
   exponentialBackoff: boolean;
 }
 
-// ✅ 統合サービス定義（13サービス対応）
+// ✅ 統合サービス定義（6サービス対応）
 export const INTEGRATION_SERVICES = {
-  // グローバルサービス
+  // 主要6サービス
   SLACK: 'slack',
   MICROSOFT_TEAMS: 'microsoft-teams',
-  ZOOM: 'zoom',
-  GOOGLE_MEET: 'google-meet',
-  DISCORD: 'discord',
-  
-  // 日本市場特化
   CHATWORK: 'chatwork',
   LINE_WORKS: 'line-works',
   CYBOZU_OFFICE: 'cybozu-office',
+  ZOOM: 'zoom',
   
-  // アメリカ市場特化
+  // 将来拡張予定
+  GOOGLE_MEET: 'google-meet',
+  DISCORD: 'discord',
   CISCO_WEBEX: 'cisco-webex',
   GOTOMEETING: 'gotomeeting',
   RINGCENTRAL: 'ringcentral',

@@ -1,3 +1,4 @@
+// src/app/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/contexts/AuthContext';
 
 export default function HomePage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
@@ -20,7 +21,8 @@ export default function HomePage() {
       console.log('HomePage: リダイレクト処理開始', {
         isAuthenticated,
         isLoading,
-        mounted
+        mounted,
+        user
       });
 
       if (isAuthenticated) {
@@ -31,16 +33,17 @@ export default function HomePage() {
         router.replace('/login');
       }
     }
-  }, [mounted, isAuthenticated, isLoading, router]);
+  }, [mounted, isAuthenticated, isLoading, router, user]);
 
   // デバッグ情報をコンソールに出力
   useEffect(() => {
     console.log('HomePage状態:', {
       isAuthenticated,
       isLoading,
-      mounted
+      mounted,
+      user
     });
-  }, [isAuthenticated, isLoading, mounted]);
+  }, [isAuthenticated, isLoading, mounted, user]);
 
   // マウント前またはローディング中の表示
   if (!mounted || isLoading) {
@@ -55,6 +58,7 @@ export default function HomePage() {
             マウント: {mounted ? 'Yes' : 'No'} | 
             認証状態: {isAuthenticated ? '認証済み' : '未認証'} | 
             ローディング: {isLoading ? 'Yes' : 'No'}
+            {user && ` | ユーザー: ${user.name}`}
           </div>
         </div>
       </div>
@@ -74,6 +78,7 @@ export default function HomePage() {
         </p>
         <div className="mt-2 text-xs text-gray-400">
           認証状態: {isAuthenticated ? '認証済み' : '未認証'}
+          {user && ` | ユーザー: ${user.name}`}
         </div>
       </div>
     </div>

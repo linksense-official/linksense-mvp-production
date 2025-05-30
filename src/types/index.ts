@@ -1,7 +1,7 @@
 // src/types/index.ts
-// LinkSense MVP 統合型定義ファイル v3.1
-// 最終更新: 2025年5月25日
-// 完成度: 100% (認証システム・サブスクリプション対応完了)
+// LinkSense MVP 統合型定義ファイル v3.2
+// 最終更新: 2025年5月28日
+// 完成度: 100% (認証システム・サブスクリプション・settings対応完了)
 
 // ===== 基本型定義 =====
 
@@ -11,10 +11,46 @@ export type Theme = 'light' | 'dark' | 'system';
 export type Language = 'ja' | 'en' | 'zh' | 'ko';
 export type Timezone = 'Asia/Tokyo' | 'America/New_York' | 'Europe/London' | 'Asia/Shanghai';
 
+// ===== ユーザー設定関連 (settings対応) =====
+
+/**
+ * ユーザー設定 - settings プロパティ用
+ */
+export interface UserSettings {
+  notifications: {
+    email: boolean;
+    push: boolean;
+    weekly: boolean;
+    slack?: boolean;
+  };
+  privacy: {
+    profileVisible: boolean;
+    analyticsSharing: boolean;
+    dataExport?: boolean;
+  };
+  preferences: {
+    theme: Theme;
+    language: Language;
+    timezone: Timezone;
+    dateFormat?: string;
+    timeFormat?: string;
+  };
+  integrations?: {
+    slack?: boolean;
+    teams?: boolean;
+    email?: boolean;
+  };
+  advanced?: {
+    debugMode?: boolean;
+    betaFeatures?: boolean;
+    apiAccess?: boolean;
+  };
+}
+
 // ===== 認証・ユーザー関連 =====
 
 /**
- * ユーザー基本情報
+ * ユーザー基本情報 - settings プロパティ追加済み
  */
 export interface User {
   id: string;
@@ -31,19 +67,40 @@ export interface User {
   isEmailVerified: boolean;
   preferences: UserPreferences;
   permissions: Permission[];
+  department?: string;
+  
+  // 🆕 settings プロパティ追加 (TypeScript エラー解決)
+  settings?: UserSettings;
+  
+  // 🆕 subscription プロパティ追加 (将来の拡張用)
+  subscription?: {
+    id: string;
+    plan: string;
+    status: string;
+    expiresAt?: string;
+    createdAt: string;
+    updatedAt: string;
+    features: string[];
+    limits: {
+      teamMembers: number;
+      reports: number;
+      storage: number;
+    };
+  };
 }
 
 export type UserRole = 'admin' | 'manager' | 'member' | 'viewer';
 export type UserStatus = 'online' | 'offline' | 'away' | 'busy' | 'dnd';
 
 /**
- * 認証コンテキストの型定義
+ * 認証コンテキストの型定義 - isAuthenticated 追加済み
  */
 export interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
+  isAuthenticated: boolean; // 🆕 追加 (TypeScript エラー解決)
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (updatedUser: User) => void; // 🆕 追加
   isLoading: boolean;
 }
 
@@ -2248,6 +2305,40 @@ export const getUsageRiskLevel = (percentage: number): 'safe' | 'warning' | 'dan
 
 // ===== デフォルト値 =====
 
+/**
+ * デフォルトのユーザー設定 (settings用)
+ */
+export const DEFAULT_USER_SETTINGS: UserSettings = {
+  notifications: {
+    email: true,
+    push: true,
+    weekly: true,
+    slack: false,
+  },
+  privacy: {
+    profileVisible: true,
+    analyticsSharing: true,
+    dataExport: false,
+  },
+  preferences: {
+    theme: 'system',
+    language: 'ja',
+    timezone: 'Asia/Tokyo',
+    dateFormat: 'YYYY-MM-DD',
+    timeFormat: '24h',
+  },
+  integrations: {
+    slack: false,
+    teams: false,
+    email: true,
+  },
+  advanced: {
+    debugMode: false,
+    betaFeatures: false,
+    apiAccess: false,
+  },
+};
+
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   timezone: 'Asia/Tokyo',
   language: 'ja',
@@ -2547,3 +2638,89 @@ export interface CostOptimization {
   steps: string[];
   risks: string[];
 }
+
+// ===== エクスポート関数の追加 =====
+
+/**
+ * デフォルトユーザー設定を取得
+ */
+export const getDefaultUserSettings = (): UserSettings => {
+  return { ...DEFAULT_USER_SETTINGS };
+};
+
+/**
+ * 空のユーザー設定を作成
+ */
+export const createEmptyUserSettings = (): UserSettings => {
+  return {
+    notifications: {
+      email: false,
+      push: false,
+      weekly: false,
+      slack: false,
+    },
+    privacy: {
+      profileVisible: false,
+      analyticsSharing: false,
+      dataExport: false,
+    },
+    preferences: {
+      theme: 'light',
+      language: 'ja',
+      timezone: 'Asia/Tokyo',
+    },
+  };
+};
+
+/**
+ * ユーザー設定をマージ
+ */
+export const mergeUserSettings = (
+  existing: Partial<UserSettings>, 
+  updates: Partial<UserSettings>
+): UserSettings => {
+  return {
+    notifications: { ...DEFAULT_USER_SETTINGS.notifications, ...existing.notifications, ...updates.notifications },
+    privacy: { ...DEFAULT_USER_SETTINGS.privacy, ...existing.privacy, ...updates.privacy },
+    preferences: { ...DEFAULT_USER_SETTINGS.preferences, ...existing.preferences, ...updates.preferences },
+    integrations: { ...DEFAULT_USER_SETTINGS.integrations, ...existing.integrations, ...updates.integrations },
+    advanced: { ...DEFAULT_USER_SETTINGS.advanced, ...existing.advanced, ...updates.advanced },
+  };
+};
+
+/**
+ * 設定の妥当性をチェック
+ */
+export const validateUserSettings = (settings: UserSettings): boolean => {
+  try {
+    // 必須フィールドの存在チェック
+    if (!settings.notifications || !settings.privacy || !settings.preferences) {
+      return false;
+    }
+
+    // 型チェック
+    if (typeof settings.notifications.email !== 'boolean' ||
+        typeof settings.notifications.push !== 'boolean' ||
+        typeof settings.notifications.weekly !== 'boolean') {
+      return false;
+    }
+
+    if (typeof settings.privacy.profileVisible !== 'boolean' ||
+        typeof settings.privacy.analyticsSharing !== 'boolean') {
+      return false;
+    }
+
+    // 言語とタイムゾーンの妥当性チェック
+    const validLanguages: Language[] = ['ja', 'en', 'zh', 'ko'];
+    const validTimezones: Timezone[] = ['Asia/Tokyo', 'America/New_York', 'Europe/London', 'Asia/Shanghai'];
+    
+    if (!validLanguages.includes(settings.preferences.language) ||
+        !validTimezones.includes(settings.preferences.timezone)) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
