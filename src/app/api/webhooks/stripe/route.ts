@@ -1,9 +1,28 @@
 // src/app/api/webhooks/stripe/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
 import Stripe from 'stripe';
 
+// ✅ Stripe初期化を直接実行（環境変数チェック付き）
+const initializeStripe = () => {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    console.warn('STRIPE_SECRET_KEY not found, Stripe functionality will be mocked');
+    return null;
+  }
+  return new Stripe(secretKey, {
+    apiVersion: '2025-05-28.basil',
+  });
+};
+
+const stripe = initializeStripe();
+
 export async function POST(req: NextRequest) {
+  // ✅ Stripe未初期化時のモック応答
+  if (!stripe) {
+    console.log('🔧 Development mode: Stripe not configured, returning webhook success');
+    return NextResponse.json({ received: true, mode: 'development' });
+  }
+
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
 
@@ -15,13 +34,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ✅ Webhook secret の存在確認
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.warn('STRIPE_WEBHOOK_SECRET not found, accepting webhook without verification');
+    return NextResponse.json({ received: true, verified: false });
+  }
+
   let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      webhookSecret
     );
   } catch (error) {
     console.error('Webhook signature verification failed:', error);

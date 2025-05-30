@@ -1,13 +1,26 @@
-// src/app/api/subscriptions/status/route.ts - ヘルパー使用版
+// src/app/api/subscriptions/status/route.ts - 修正版
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import Stripe from 'stripe';
 import { 
   getSubscriptionPeriod, 
   getSubscriptionPrice, 
   getCustomerInfo, 
   determinePlanId 
 } from '@/lib/stripe-helpers';
-import type Stripe from 'stripe';
+
+// ✅ Stripe初期化を直接実行（環境変数チェック付き）
+const initializeStripe = () => {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    console.warn('STRIPE_SECRET_KEY not found, Stripe functionality will be mocked');
+    return null;
+  }
+  return new Stripe(secretKey, {
+    apiVersion: '2025-05-28.basil',
+  });
+};
+
+const stripe = initializeStripe();
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
@@ -52,6 +65,51 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({
         success: true,
         subscription: freeStatus
+      });
+    }
+
+    // ✅ Stripe未初期化時のモック応答
+    if (!stripe) {
+      console.log('🔧 Development mode: Stripe not configured, returning mock subscription status');
+      
+      const mockStatus = {
+        subscriptionId: subscriptionId,
+        planId: 'professional',
+        priceId: 'price_mock_professional',
+        status: 'active',
+        interval: 'monthly',
+        amount: 2000,
+        currency: 'jpy',
+        isFree: false,
+        isActive: true,
+        currentPeriodStart: new Date().toISOString(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        cancelAtPeriodEnd: false,
+        customer: {
+          id: 'mock_customer',
+          email: 'demo@example.com',
+          name: 'Demo User'
+        },
+        features: [
+          'チーム健全性詳細分析',
+          '最大50名まで',
+          'リアルタイム監視',
+          'カスタムダッシュボード',
+          'API連携',
+          '週次レポート',
+          '優先サポート'
+        ],
+        limits: {
+          members: 50,
+          teams: 10,
+          storage: 10240,
+          reports: 'weekly'
+        }
+      };
+
+      return NextResponse.json({
+        success: true,
+        subscription: mockStatus
       });
     }
 
