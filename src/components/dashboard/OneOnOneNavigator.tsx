@@ -1,8 +1,40 @@
 'use client';
 
 import React from 'react';
-import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import { User } from '../../types';
+
+const Avatar: React.FC<{ children: React.ReactNode; className?: string }> = ({ 
+  children, 
+  className = '' 
+}) => (
+  <div className={`relative flex shrink-0 overflow-hidden rounded-full ${className}`}>
+    {children}
+  </div>
+);
+
+const AvatarImage: React.FC<{ 
+  src: string; 
+  alt: string; 
+  className?: string;
+}> = ({ src, alt, className = '' }) => (
+  <img 
+    className={`aspect-square h-full w-full object-cover ${className}`} 
+    src={src} 
+    alt={alt}
+    onError={(e) => {
+      e.currentTarget.style.display = 'none';
+    }}
+  />
+);
+
+const AvatarFallback: React.FC<{ children: React.ReactNode; className?: string }> = ({ 
+  children, 
+  className = '' 
+}) => (
+  <div className={`flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-gray-600 text-sm font-medium ${className}`}>
+    {children}
+  </div>
+);
 
 const Card: React.FC<{ 
   children: React.ReactNode; 
@@ -23,7 +55,6 @@ const Card: React.FC<{
     </div>
   </div>
 );
-
 
 interface OneOnOneNavigatorProps {
   suggestedPairs: Array<{ userId1: string; userId2: string }>;
@@ -84,8 +115,12 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
               <div key={`${pair.userId1}-${pair.userId2}`} className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user1.avatar} alt={user1.name} />
-                    <AvatarFallback>{user1.name.charAt(0)}</AvatarFallback>
+                    {/* ✅ 型安全性を確保したAvatar表示 (Line 119修正) */}
+                    {user1.avatar ? (
+                      <AvatarImage src={user1.avatar} alt={user1.name} />
+                    ) : (
+                      <AvatarFallback>{user1.name.charAt(0)}</AvatarFallback>
+                    )}
                   </Avatar>
                   <span className="font-medium text-gray-900">{user1.name}</span>
                 </div>
@@ -103,8 +138,12 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
                 <div className="flex items-center gap-3">
                   <span className="font-medium text-gray-900">{user2.name}</span>
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user2.avatar} alt={user2.name} />
-                    <AvatarFallback>{user2.name.charAt(0)}</AvatarFallback>
+                    {/* ✅ 型安全性を確保したAvatar表示 (Line 138修正) */}
+                    {user2.avatar ? (
+                      <AvatarImage src={user2.avatar} alt={user2.name} />
+                    ) : (
+                      <AvatarFallback>{user2.name.charAt(0)}</AvatarFallback>
+                    )}
                   </Avatar>
                 </div>
               </div>
