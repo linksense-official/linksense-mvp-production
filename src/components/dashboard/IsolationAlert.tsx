@@ -1,8 +1,42 @@
 'use client';
 
 import React from 'react';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { User } from '../../types';
+
+// ✅ Avatar コンポーネント群を直接定義（型安全性強化）
+const Avatar: React.FC<{ children: React.ReactNode; className?: string }> = ({ 
+  children, 
+  className = '' 
+}) => (
+  <div className={`relative flex shrink-0 overflow-hidden rounded-full ${className}`}>
+    {children}
+  </div>
+);
+
+const AvatarImage: React.FC<{ 
+  src: string; 
+  alt: string; 
+  className?: string;
+}> = ({ src, alt, className = '' }) => (
+  <img 
+    className={`aspect-square h-full w-full object-cover ${className}`} 
+    src={src} 
+    alt={alt}
+    onError={(e) => {
+      // 画像読み込みエラー時のフォールバック
+      e.currentTarget.style.display = 'none';
+    }}
+  />
+);
+
+const AvatarFallback: React.FC<{ children: React.ReactNode; className?: string }> = ({ 
+  children, 
+  className = '' 
+}) => (
+  <div className={`flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-gray-600 text-sm font-medium ${className}`}>
+    {children}
+  </div>
+);
 
 // ✅ Card コンポーネント拡張定義（title対応）
 const Card: React.FC<{ 
@@ -75,8 +109,12 @@ export const IsolationAlert: React.FC<IsolationAlertProps> = ({
           {isolatedUsers.map(user => (
             <div key={user.id} className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                {/* ✅ 型安全性を確保したAvatar表示 */}
+                {user.avatar ? (
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                ) : (
+                  <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                )}
               </Avatar>
               <div>
                 <p className="font-medium text-gray-900">{user.name}</p>
