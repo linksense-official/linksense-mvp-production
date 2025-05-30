@@ -1,15 +1,15 @@
 // src/lib/stripe.ts
 import Stripe from 'stripe';
 
-// Stripe インスタンスの作成（最新APIバージョンに更新）
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-04-30.basil', // 最新バージョンに更新
+// Stripe インスタンスの作成
+export const stripe: Stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
+  apiVersion: '2025-05-28.basil',
   typescript: true,
 });
 
 // Stripe公開可能キーの取得
 export const getStripePublishableKey = (): string => {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  const key: string | undefined = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   if (!key) {
     throw new Error('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set');
   }
@@ -18,7 +18,7 @@ export const getStripePublishableKey = (): string => {
 
 // Webhookシークレットの取得
 export const getStripeWebhookSecret = (): string => {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret: string | undefined = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     throw new Error('STRIPE_WEBHOOK_SECRET is not set');
   }
@@ -28,8 +28,8 @@ export const getStripeWebhookSecret = (): string => {
 // Stripe設定の検証
 export const validateStripeConfig = (): boolean => {
   try {
-    const secretKey = process.env.STRIPE_SECRET_KEY;
-    const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const secretKey: string | undefined = process.env.STRIPE_SECRET_KEY;
+    const publishableKey: string | undefined = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     
     if (!secretKey || !publishableKey) {
       console.error('❌ Stripe APIキーが設定されていません');
@@ -48,8 +48,8 @@ export const validateStripeConfig = (): boolean => {
     }
 
     // テスト環境とプロダクション環境の整合性チェック
-    const isSecretTest = secretKey.includes('test');
-    const isPublishableTest = publishableKey.includes('test');
+    const isSecretTest: boolean = secretKey.includes('test');
+    const isPublishableTest: boolean = publishableKey.includes('test');
     
     if (isSecretTest !== isPublishableTest) {
       console.error('❌ Stripeキーの環境が一致しません（テスト/本番）');
@@ -63,7 +63,7 @@ export const validateStripeConfig = (): boolean => {
     });
 
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Stripe設定検証エラー:', error);
     return false;
   }
@@ -79,9 +79,10 @@ export const formatStripeAmount = (amount: number, currency: string = 'jpy'): st
 };
 
 // Stripe エラーハンドリング
-export const handleStripeError = (error: any): string => {
-  if (error?.type) {
-    switch (error.type) {
+export const handleStripeError = (error: unknown): string => {
+  if (error && typeof error === 'object' && 'type' in error) {
+    const stripeError = error as { type: string; message?: string };
+    switch (stripeError.type) {
       case 'StripeCardError':
         return 'カードが拒否されました。別のカードをお試しください。';
       case 'StripeRateLimitError':
@@ -95,7 +96,7 @@ export const handleStripeError = (error: any): string => {
       case 'StripeAuthenticationError':
         return '認証エラーが発生しました。';
       default:
-        return error.message || '決済処理でエラーが発生しました。';
+        return stripeError.message ?? '決済処理でエラーが発生しました。';
     }
   }
   return '予期しないエラーが発生しました。';
@@ -103,6 +104,6 @@ export const handleStripeError = (error: any): string => {
 
 // Webhook検証用
 export const constructWebhookEvent = (body: string, signature: string): Stripe.Event => {
-  const webhookSecret = getStripeWebhookSecret();
+  const webhookSecret: string = getStripeWebhookSecret();
   return stripe.webhooks.constructEvent(body, signature, webhookSecret);
 };
