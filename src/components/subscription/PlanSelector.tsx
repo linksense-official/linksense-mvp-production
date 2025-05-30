@@ -1,8 +1,29 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '../ui/card';
 import type { SubscriptionPlan } from '../../types/subscription';
+
+const Card: React.FC<{ 
+  children: React.ReactNode; 
+  className?: string;
+  title?: string;
+  subtitle?: string;
+  onClick?: () => void;
+}> = ({ children, className = '', title, subtitle, onClick }) => (
+  <div className={`bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-lg' : ''} ${className}`} onClick={onClick}>
+    {(title || subtitle) && (
+      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        {title && <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>}
+        {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
+      </div>
+    )}
+    <div className="px-6 py-4">
+      {children}
+    </div>
+  </div>
+);
+
+
 interface PlanSelectorProps {
   currentPlan: SubscriptionPlan | null;
   onPlanSelect: (plan: SubscriptionPlan) => Promise<void>;

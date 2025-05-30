@@ -1,9 +1,27 @@
 'use client';
 
 import React from 'react';
-import { Card } from '../ui/card';
-import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { User } from '../../types';
+
+// ✅ Card コンポーネント拡張定義（title対応）
+const Card: React.FC<{ 
+  children: React.ReactNode; 
+  className?: string;
+  title?: string;
+  onClick?: () => void;
+}> = ({ children, className = '', title, onClick }) => (
+  <div className={`bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-lg' : ''} ${className}`} onClick={onClick}>
+    {title && (
+      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      </div>
+    )}
+    <div className="px-6 py-4">
+      {children}
+    </div>
+  </div>
+);
 
 interface IsolationAlertProps {
   isolatedUserIds: string[];
