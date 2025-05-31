@@ -1,10 +1,11 @@
-// src/app/pricing/page.tsx
+/// src/app/pricing/page.tsx
 'use client';
 
 import React, { useState } from 'react';
 import { pricingPlans, billingIntervalConfig, isFreeplan, isRecommendedPlan } from '@/data/pricing-plans';
 import type { StripePlan, BillingInterval } from '@/types/subscription';
 import { formatPrice, generatePlanComparison, getPriceId } from '@/lib/pricing-utils';
+import { CheckCircle, ArrowRight, Star, Zap, X } from 'lucide-react';
 
 export default function PricingPage() {
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
@@ -15,7 +16,6 @@ export default function PricingPage() {
     
     const priceId = getPriceId(plan, billingInterval);
     
-    // ✅ 修正: isFreeplan関数を使用
     if (isFreeplan(plan)) {
       setIsLoading(plan.id);
       console.log('✅ 無料プラン処理開始');
@@ -33,7 +33,6 @@ export default function PricingPage() {
           throw new Error('無料プランのアクティベートに失敗しました');
         }
 
-        // 成功メッセージ
         const successMessage = `🎉 ${plan.name}プランを開始しました！
 
 ✅ ${plan.features.join('\n✅ ')}
@@ -41,7 +40,6 @@ export default function PricingPage() {
 チーム分析ページに移動します...`;
         alert(successMessage);
 
-        // ローカルストレージに保存
         localStorage.setItem('currentPlan', plan.id);
         localStorage.setItem('billingInterval', billingInterval);
         localStorage.setItem('planStartDate', new Date().toISOString());
@@ -57,7 +55,6 @@ export default function PricingPage() {
       return;
     }
 
-    // 有料プランの場合はStripe決済
     setIsLoading(plan.id);
     console.log('💳 有料プラン処理開始:', priceId);
     
@@ -105,14 +102,14 @@ export default function PricingPage() {
         {/* ヘッダー */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            料金プラン
+            シンプルで透明性のある料金プラン
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
             チームの規模と必要な機能に応じてプランをお選びください。
             年間プランなら最大17%お得になります。
           </p>
           
-          {/* ✅ 修正: 請求間隔切り替え */}
+          {/* 請求間隔切り替え */}
           <div className="flex justify-center mb-8">
             <div className="bg-white rounded-lg p-1 shadow-md border">
               {billingIntervalConfig.map((interval) => (
@@ -140,9 +137,7 @@ export default function PricingPage() {
           {billingInterval === 'yearly' && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto mb-8">
               <div className="flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
+                <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
                 <span className="text-green-800 font-medium">
                   年間プランで最大 ¥17,800 の節約！
                 </span>
@@ -167,6 +162,56 @@ export default function PricingPage() {
         {/* 機能比較表 */}
         <div className="mt-20">
           <FeatureComparisonTable plans={pricingPlans} />
+        </div>
+
+        {/* 信頼性セクション */}
+        <div className="mt-20 bg-white rounded-xl shadow-lg p-8">
+          <div className="text-center mb-12">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+              なぜLinkSenseが選ばれるのか
+            </h3>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              数百のチームが既にLinkSenseを使用してコミュニケーション効果を向上させています
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Zap className="w-8 h-8 text-blue-600" />
+              </div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                即座に開始
+              </h4>
+              <p className="text-gray-600">
+                複雑な設定は不要。数分でチーム分析を開始できます。
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                実証済みの効果
+              </h4>
+              <p className="text-gray-600">
+                平均40%のコミュニケーション改善を実現しています。
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Star className="w-8 h-8 text-purple-600" />
+              </div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                継続的サポート
+              </h4>
+              <p className="text-gray-600">
+                専門チームによる充実したサポートで安心してご利用いただけます。
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* FAQ セクション */}
@@ -195,19 +240,21 @@ function PricingCard({
 
   return (
     <div className={`relative bg-white rounded-xl shadow-lg p-8 transition-all duration-200 hover:shadow-xl ${
-      isRecommendedPlan(plan) ? 'ring-2 ring-blue-500 scale-105' : '' // ✅ 修正: isRecommendedPlan関数使用
+      isRecommendedPlan(plan) ? 'ring-2 ring-blue-500 scale-105' : ''
     }`}>
       
-      {/* バッジ */}
-      {isRecommendedPlan(plan) && ( // ✅ 修正: isRecommendedPlan関数使用
+      {/* 人気プランバッジ */}
+      {isRecommendedPlan(plan) && (
         <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-          <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-medium shadow-lg">
+          <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-medium shadow-lg flex items-center">
+            <Star className="w-4 h-4 mr-1" />
             人気プラン
           </span>
         </div>
       )}
 
-      {isFreeplan(plan) && ( // ✅ 修正: isFreeplan関数使用
+      {/* 無料プランバッジ */}
+      {isFreeplan(plan) && (
         <div className="absolute top-4 right-4">
           <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
             無料
@@ -215,7 +262,7 @@ function PricingCard({
         </div>
       )}
 
-      {/* ✅ 修正: 割引表示（年間プランかつ割引がある場合のみ） */}
+      {/* 割引バッジ */}
       {billingInterval === 'yearly' && plan.yearlyDiscount && (
         <div className="absolute top-4 right-4">
           <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">
@@ -236,14 +283,14 @@ function PricingCard({
           </span>
         </div>
         
-        {/* ✅ 修正: 年間プランの月額換算表示 */}
+        {/* 年間プランの月額換算表示 */}
         {billingInterval === 'yearly' && plan.yearlyDiscount && (
           <p className="text-sm text-gray-500 mb-1">
             月割り ¥{Math.round((plan.price * 12 * (1 - plan.yearlyDiscount)) / 12).toLocaleString()}
           </p>
         )}
         
-        {/* ✅ 修正: 年間プランの節約額表示 */}
+        {/* 年間プランの節約額表示 */}
         {billingInterval === 'yearly' && plan.yearlyDiscount && (
           <p className="text-sm text-green-600 font-medium">
             年間 ¥{(plan.price * 12 * plan.yearlyDiscount).toLocaleString()} お得
@@ -255,38 +302,34 @@ function PricingCard({
       <ul className="space-y-3 mb-8">
         {plan.features.map((feature, index) => (
           <li key={index} className="flex items-start">
-            <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
+            <CheckCircle className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
             <span className="text-gray-700 text-sm">{feature}</span>
           </li>
         ))}
       </ul>
 
-      {/* CTA ボタン */}
+      {/* CTAボタン */}
       <button
         onClick={onSelect}
         disabled={isLoading}
-        className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-          isFreeplan(plan) // ✅ 修正: isFreeplan関数使用
+        className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center ${
+          isFreeplan(plan)
             ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl'
-            : isRecommendedPlan(plan) // ✅ 修正: isRecommendedPlan関数使用
+            : isRecommendedPlan(plan)
             ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl'
             : 'bg-gray-800 text-white hover:bg-gray-900 shadow-lg hover:shadow-xl'
         }`}
       >
         {isLoading ? (
-          <div className="flex items-center justify-center">
-            <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
             処理中...
           </div>
-        ) : isFreeplan(plan) ? ( // ✅ 修正: isFreeplan関数使用
-          '無料で始める'
         ) : (
-          'プランを選択'
+          <>
+            {isFreeplan(plan) ? '無料で始める' : 'プランを選択'}
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </>
         )}
       </button>
     </div>
@@ -311,7 +354,8 @@ function FeatureComparisonTable({ plans }: { plans: StripePlan[] }) {
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="px-6 py-4 bg-gray-50 border-b">
-        <h3 className="text-xl font-bold text-gray-900">機能比較表</h3>
+        <h3 className="text-xl font-bold text-gray-900">詳細機能比較</h3>
+        <p className="text-gray-600 text-sm mt-1">各プランで利用できる機能の詳細比較表</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -330,13 +374,9 @@ function FeatureComparisonTable({ plans }: { plans: StripePlan[] }) {
                 <td className="px-6 py-4 text-center text-sm text-gray-600">
                   {typeof feature.starter === 'boolean' ? (
                     feature.starter ? (
-                      <svg className="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                     ) : (
-                      <svg className="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <X className="w-5 h-5 text-gray-300 mx-auto" />
                     )
                   ) : (
                     feature.starter
@@ -345,13 +385,9 @@ function FeatureComparisonTable({ plans }: { plans: StripePlan[] }) {
                 <td className="px-6 py-4 text-center text-sm text-gray-600">
                   {typeof feature.professional === 'boolean' ? (
                     feature.professional ? (
-                      <svg className="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                     ) : (
-                      <svg className="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <X className="w-5 h-5 text-gray-300 mx-auto" />
                     )
                   ) : (
                     feature.professional
@@ -360,13 +396,9 @@ function FeatureComparisonTable({ plans }: { plans: StripePlan[] }) {
                 <td className="px-6 py-4 text-center text-sm text-gray-600">
                   {typeof feature.enterprise === 'boolean' ? (
                     feature.enterprise ? (
-                      <svg className="w-5 h-5 text-green-500 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />
                     ) : (
-                      <svg className="w-5 h-5 text-gray-300 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <X className="w-5 h-5 text-gray-300 mx-auto" />
                     )
                   ) : (
                     feature.enterprise
@@ -381,7 +413,7 @@ function FeatureComparisonTable({ plans }: { plans: StripePlan[] }) {
   );
 }
 
-// FAQ セクションコンポーネント
+// FAQセクションコンポーネント
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
@@ -405,12 +437,19 @@ function FAQSection() {
     {
       question: 'チームメンバーの追加に追加料金はかかりますか？',
       answer: 'プランで定められた人数内であれば追加料金はかかりません。上限を超える場合は上位プランへのアップグレードが必要です。'
+    },
+    {
+      question: 'セキュリティ対策はどのようになっていますか？',
+      answer: '業界標準のSSL暗号化、定期的なセキュリティ監査、GDPR準拠のデータ保護を実施しています。Enterpriseプランではさらに高度なセキュリティ機能を提供します。'
     }
   ];
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-8">
-      <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">よくある質問</h3>
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">よくある質問</h3>
+        <p className="text-gray-600">料金プランに関するよくある質問と回答</p>
+      </div>
       <div className="space-y-4">
         {faqs.map((faq, index) => (
           <div key={index} className="border border-gray-200 rounded-lg">
@@ -419,19 +458,15 @@ function FAQSection() {
               className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition-colors"
             >
               <span className="font-medium text-gray-900">{faq.question}</span>
-              <svg
+              <ArrowRight
                 className={`w-5 h-5 text-gray-500 transition-transform ${
-                  openIndex === index ? 'rotate-180' : ''
+                  openIndex === index ? 'rotate-90' : ''
                 }`}
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
+              />
             </button>
             {openIndex === index && (
               <div className="px-6 pb-4">
-                <p className="text-gray-600">{faq.answer}</p>
+                <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
               </div>
             )}
           </div>

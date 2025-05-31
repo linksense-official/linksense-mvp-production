@@ -1,8 +1,8 @@
-// src/app/layout.tsx
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from './contexts/AuthContext'
 import Layout from '@/components/layout/Layout'
+import NextAuthProvider from '@/components/providers/nextauth-provider'
 
 export const metadata: Metadata = {
   title: 'LinkSense - チーム健全性分析',
@@ -79,12 +79,14 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-gray-50 antialiased">
-        {/* AuthProviderでアプリ全体をラップし、その中でLayoutコンポーネントを使用 */}
-        <AuthProvider>
-          <Layout>
-            {children}
-          </Layout>
-        </AuthProvider>
+        {/* NextAuthProviderで全体をラップし、既存のAuthProviderとLayoutを内包 */}
+        <NextAuthProvider>
+          <AuthProvider>
+            <Layout>
+              {children}
+            </Layout>
+          </AuthProvider>
+        </NextAuthProvider>
       </body>
     </html>
   )

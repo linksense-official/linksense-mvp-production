@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { CheckCircle, AlertTriangle, Users, Calendar } from 'lucide-react';
 import { User } from '../../types';
 
 // ✅ Avatar コンポーネント群を直接定義（型安全性強化）
@@ -33,7 +34,7 @@ const AvatarFallback: React.FC<{ children: React.ReactNode; className?: string }
   children, 
   className = '' 
 }) => (
-  <div className={`flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-gray-600 text-sm font-medium ${className}`}>
+  <div className={`flex h-full w-full items-center justify-center rounded-full bg-blue-100 text-blue-700 text-sm font-medium ${className}`}>
     {children}
   </div>
 );
@@ -45,9 +46,9 @@ const Card: React.FC<{
   title?: string;
   onClick?: () => void;
 }> = ({ children, className = '', title, onClick }) => (
-  <div className={`bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-lg' : ''} ${className}`} onClick={onClick}>
+  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow duration-200' : ''} ${className}`} onClick={onClick}>
     {title && (
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
         <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
       </div>
     )}
@@ -70,18 +71,20 @@ export const IsolationAlert: React.FC<IsolationAlertProps> = ({
 
   if (isolatedUsers.length === 0) {
     return (
-      <Card title="孤立リスクアラート" className="border-l-4 border-l-green-500">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+      <Card title="Communication Health Status" className="border-l-4 border-l-green-500">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+            <CheckCircle className="w-5 h-5 text-green-600" />
           </div>
-          <div>
-            <h4 className="font-semibold text-green-800">良好な状態です</h4>
+          <div className="flex-1">
+            <h4 className="font-semibold text-green-800 mb-1">Team Communication: Healthy</h4>
             <p className="text-sm text-gray-600">
-              現在、孤立リスクの高いメンバーは検出されていません。
+              All team members are actively engaged in communication activities.
             </p>
+          </div>
+          <div className="flex items-center gap-2 text-green-700">
+            <Users className="w-4 h-4" />
+            <span className="text-sm font-medium">{users.length} Active Members</span>
           </div>
         </div>
       </Card>
@@ -89,47 +92,67 @@ export const IsolationAlert: React.FC<IsolationAlertProps> = ({
   }
 
   return (
-    <Card title="孤立リスクアラート" className="border-l-4 border-l-yellow-500">
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L4.316 15.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
+    <Card title="Isolation Risk Detection" className="border-l-4 border-l-amber-500">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-amber-800 mb-1">Attention Required</h4>
+              <p className="text-sm text-gray-600">
+                {isolatedUsers.length} team member{isolatedUsers.length > 1 ? 's' : ''} may need support
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="font-semibold text-yellow-800">注意が必要です</h4>
-            <p className="text-sm text-gray-600">
-              以下のメンバーは最近の活動が少なく、孤立している可能性があります。
-            </p>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-amber-600">{isolatedUsers.length}</div>
+            <div className="text-xs text-gray-500 uppercase tracking-wide">At Risk</div>
           </div>
         </div>
         
         <div className="space-y-3">
           {isolatedUsers.map(user => (
-            <div key={user.id} className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
-              <Avatar className="h-8 w-8">
-                {/* ✅ 型安全性を確保したAvatar表示 */}
-                {user.avatar ? (
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                ) : (
-                  <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                )}
-              </Avatar>
-              <div>
-                <p className="font-medium text-gray-900">{user.name}</p>
-                <p className="text-sm text-gray-600">
-                  コミュニケーション頻度が低下しています
-                </p>
+            <div key={user.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-100 rounded-lg hover:bg-amber-100 transition-colors duration-200">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  {user.avatar ? (
+                    <AvatarImage src={user.avatar} alt={user.name} />
+                  ) : (
+                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                  )}
+                </Avatar>
+                <div>
+                  <p className="font-medium text-gray-900">{user.name}</p>
+                  <p className="text-sm text-gray-600">
+                    Low communication activity detected
+                  </p>
+                </div>
               </div>
+              <button className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors duration-200">
+                <Calendar className="w-4 h-4" />
+                Schedule 1:1
+              </button>
             </div>
           ))}
         </div>
         
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>推奨アクション:</strong> 1on1ミーティングの実施や、チームメンバーとの積極的なコミュニケーションを促進してください。
-          </p>
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
+              <CheckCircle className="w-3 h-3 text-white" />
+            </div>
+            <div>
+              <p className="font-medium text-blue-900 mb-1">Recommended Actions</p>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Schedule one-on-one meetings to understand individual needs</li>
+                <li>• Encourage participation in team activities and discussions</li>
+                <li>• Review workload distribution and provide necessary support</li>
+                <li>• Consider team-building activities to strengthen connections</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </Card>

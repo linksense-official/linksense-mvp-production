@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { CheckCircle, Users, MessageCircle, Calendar, ArrowRight, Clock } from 'lucide-react';
 import { User } from '../../types';
 
 const Avatar: React.FC<{ children: React.ReactNode; className?: string }> = ({ 
@@ -31,7 +32,7 @@ const AvatarFallback: React.FC<{ children: React.ReactNode; className?: string }
   children, 
   className = '' 
 }) => (
-  <div className={`flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-gray-600 text-sm font-medium ${className}`}>
+  <div className={`flex h-full w-full items-center justify-center rounded-full bg-blue-100 text-blue-700 text-sm font-medium ${className}`}>
     {children}
   </div>
 );
@@ -43,9 +44,9 @@ const Card: React.FC<{
   subtitle?: string;
   onClick?: () => void;
 }> = ({ children, className = '', title, subtitle, onClick }) => (
-  <div className={`bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-lg' : ''} ${className}`} onClick={onClick}>
+  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow duration-200' : ''} ${className}`} onClick={onClick}>
     {(title || subtitle) && (
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
         {title && <h3 className="text-lg font-semibold text-gray-900 mb-1">{title}</h3>}
         {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
       </div>
@@ -69,18 +70,20 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
 
   if (suggestedPairs.length === 0) {
     return (
-      <Card title="1on1ナビゲーター" className="border-l-4 border-l-green-500">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+      <Card title="One-on-One Navigator" className="border-l-4 border-l-green-500">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+            <CheckCircle className="w-5 h-5 text-green-600" />
           </div>
-          <div>
-            <h4 className="font-semibold text-green-800">良好な状態です</h4>
+          <div className="flex-1">
+            <h4 className="font-semibold text-green-800 mb-1">Team Connections: Strong</h4>
             <p className="text-sm text-gray-600">
-              現在、1on1が推奨されるペアは検出されていません。チーム内のコミュニケーションが活発です。
+              Team communication is healthy. No immediate one-on-one meetings required.
             </p>
+          </div>
+          <div className="flex items-center gap-2 text-green-700">
+            <Users className="w-4 h-4" />
+            <span className="text-sm font-medium">All Connected</span>
           </div>
         </div>
       </Card>
@@ -88,63 +91,82 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
   }
 
   return (
-    <Card title="1on1ナビゲーター" className="border-l-4 border-l-blue-500">
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
+    <Card title="One-on-One Navigator" subtitle={`${suggestedPairs.length} recommended meeting${suggestedPairs.length > 1 ? 's' : ''}`} className="border-l-4 border-l-blue-500">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-800 mb-1">Connection Opportunities</h4>
+              <p className="text-sm text-gray-600">
+                These team members could benefit from structured one-on-one conversations.
+              </p>
+            </div>
           </div>
-          <div>
-            <h4 className="font-semibold text-blue-800">1on1の実施を検討してください</h4>
-            <p className="text-sm text-gray-600">
-              以下のペアは最近会話が少ないようです。関係性の向上のため、1on1ミーティングを検討してみてください。
-            </p>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-blue-600">{suggestedPairs.length}</div>
+            <div className="text-xs text-gray-500 uppercase tracking-wide">Suggested</div>
           </div>
         </div>
         
         <div className="space-y-3">
-          {suggestedPairs.slice(0, 5).map((pair) => {
+          {suggestedPairs.slice(0, 5).map((pair, index) => {
             const user1 = getUserById(pair.userId1);
             const user2 = getUserById(pair.userId2);
             
             if (!user1 || !user2) return null;
             
             return (
-              <div key={`${pair.userId1}-${pair.userId2}`} className="flex items-center gap-4 p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
-                    {/* ✅ 型安全性を確保したAvatar表示 (Line 119修正) */}
-                    {user1.avatar ? (
-                      <AvatarImage src={user1.avatar} alt={user1.name} />
-                    ) : (
-                      <AvatarFallback>{user1.name.charAt(0)}</AvatarFallback>
-                    )}
-                  </Avatar>
-                  <span className="font-medium text-gray-900">{user1.name}</span>
+              <div key={`${pair.userId1}-${pair.userId2}`} className="group p-4 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {/* User 1 */}
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        {user1.avatar ? (
+                          <AvatarImage src={user1.avatar} alt={user1.name} />
+                        ) : (
+                          <AvatarFallback>{user1.name.charAt(0)}</AvatarFallback>
+                        )}
+                      </Avatar>
+                      <span className="font-medium text-gray-900">{user1.name}</span>
+                    </div>
+                    
+                    {/* Connection Indicator */}
+                    <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-blue-200">
+                      <MessageCircle className="w-3 h-3 text-blue-500" />
+                      <ArrowRight className="w-3 h-3 text-gray-400" />
+                      <MessageCircle className="w-3 h-3 text-blue-500" />
+                    </div>
+                    
+                    {/* User 2 */}
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-gray-900">{user2.name}</span>
+                      <Avatar className="h-10 w-10">
+                        {user2.avatar ? (
+                          <AvatarImage src={user2.avatar} alt={user2.name} />
+                        ) : (
+                          <AvatarFallback>{user2.name.charAt(0)}</AvatarFallback>
+                        )}
+                      </Avatar>
+                    </div>
+                  </div>
+                  
+                  {/* Action Button */}
+                  <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors duration-200 opacity-0 group-hover:opacity-100">
+                    <Calendar className="w-4 h-4" />
+                    Schedule Meeting
+                  </button>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  <span className="text-sm text-gray-500">1on1推奨</span>
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <span className="font-medium text-gray-900">{user2.name}</span>
-                  <Avatar className="h-8 w-8">
-                    {/* ✅ 型安全性を確保したAvatar表示 (Line 138修正) */}
-                    {user2.avatar ? (
-                      <AvatarImage src={user2.avatar} alt={user2.name} />
-                    ) : (
-                      <AvatarFallback>{user2.name.charAt(0)}</AvatarFallback>
-                    )}
-                  </Avatar>
+                {/* Meeting Suggestion */}
+                <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                  <Clock className="w-4 h-4" />
+                  <span>Suggested duration: 30 minutes</span>
+                  <span className="text-gray-400">•</span>
+                  <span>Priority: {index < 2 ? 'High' : index < 4 ? 'Medium' : 'Low'}</span>
                 </div>
               </div>
             );
@@ -152,17 +174,28 @@ export const OneOnOneNavigator: React.FC<OneOnOneNavigatorProps> = ({
         </div>
         
         {suggestedPairs.length > 5 && (
-          <div className="text-center py-2">
-            <p className="text-sm text-gray-500">
-              他に {suggestedPairs.length - 5} ペアの1on1が推奨されています
-            </p>
+          <div className="text-center py-3 border-t border-gray-100">
+            <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+              View {suggestedPairs.length - 5} more suggestions
+            </button>
           </div>
         )}
         
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>推奨アクション:</strong> 定期的な1on1ミーティングを設定し、チームメンバー間の理解とコラボレーションを深めてください。
-          </p>
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
+              <CheckCircle className="w-3 h-3 text-white" />
+            </div>
+            <div>
+              <p className="font-medium text-blue-900 mb-1">Best Practices for One-on-Ones</p>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Focus on relationship building and mutual understanding</li>
+                <li>• Create a safe space for open and honest communication</li>
+                <li>• Discuss both work-related topics and personal development</li>
+                <li>• Schedule regular follow-ups to maintain connection</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </Card>

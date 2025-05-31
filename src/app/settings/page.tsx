@@ -4,12 +4,34 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { integrationManager } from '@/lib/integrations/integration-manager';
 import SlackIntegration from '@/lib/integrations/slack-integration';
-import TeamsIntegration from '@/lib/integrations/teams-integration'; // ✅ Teams統合追加
+import TeamsIntegration from '@/lib/integrations/teams-integration';
 import type { UserSettings, NotificationSettings, PrivacySettings } from '@/types/api';
 import type { Integration as IntegrationType, AnalyticsMetrics } from '@/types/integrations';
 import TeamsTestPanel from '@/components/TeamsTestPanel';
+import {
+  Settings,
+  Bell,
+  Shield,
+  Globe,
+  Link,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
+  Users,
+  BarChart3,
+  Clock,
+  Zap,
+  Database,
+  ExternalLink,
+  Info,
+  X,
+  Trash2,
+  Download,
+  MessageSquare,
+  Lock 
+} from 'lucide-react';
 
-// ✅ 統合ページで使用する型定義
+// 統合ページで使用する型定義
 interface Integration {
   id: string;
   name: string;
@@ -25,11 +47,11 @@ interface Integration {
   errorMessage?: string;
   metrics?: AnalyticsMetrics;
   isSyncing?: boolean;
-  icon?: string; // ✅ アイコン追加
-  priority?: number; // ✅ 表示優先度追加
+  icon?: React.ReactNode;
+  priority?: number;
 }
 
-// ✅ 設定ページの型定義
+// 設定ページの型定義
 interface LocalUserSettings {
   notifications: NotificationSettings;
   privacy: PrivacySettings;
@@ -38,25 +60,25 @@ interface LocalUserSettings {
   timezone: string;
 }
 
-// ✅ 統合ツールのデータ（Microsoft Teams統合対応版 - 14サービス完全対応）
+// 統合ツールのデータ（日本語版）
 const integrations: Integration[] = [
   // 最優先グローバルツール（Slack & Teams）
+ {
+  id: 'slack',
+  name: 'Slack',
+  description: 'チームコミュニケーションとメッセージ分析',
+  category: 'communication',
+  market: 'global',
+  isConnected: false,
+  isConnecting: false,
+  isSyncing: false,
+  features: ['メッセージ頻度分析', '応答時間測定', 'チャンネル活動', '感情分析'],
+  setupUrl: '/api/auth/slack',
+  icon: <MessageSquare className="w-5 h-5" />,
+  priority: 1
+},
   {
-    id: 'slack',
-    name: 'Slack',
-    description: 'チームコミュニケーションとメッセージ分析',
-    category: 'communication',
-    market: 'global',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['メッセージ頻度分析', '応答時間測定', 'チャンネル活性度', '感情分析'],
-    setupUrl: '/api/auth/slack',
-    icon: '💬',
-    priority: 1
-  },
-  {
-    id: 'microsoft-teams', // ✅ Teams統合追加
+    id: 'microsoft-teams',
     name: 'Microsoft Teams',
     description: 'Microsoft 365統合コミュニケーション分析',
     category: 'communication',
@@ -64,42 +86,42 @@ const integrations: Integration[] = [
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
-    features: ['会議参加率分析', 'チャット活動分析', 'ファイル共有状況', 'Teams通話分析', 'チーム結束度測定'],
-    setupUrl: '/api/auth/teams', // ✅ Teams OAuth URL（実装済み）
-    icon: '🔷',
+    features: ['会議参加分析', 'チャット活動分析', 'ファイル共有インサイト', 'Teams通話分析', 'チーム結束度測定'],
+    setupUrl: '/api/auth/teams',
+    icon: <Users className="w-5 h-5" />,
     priority: 2
   },
 
-  // 日本市場特化（Microsoft Teamsの後に配置）
+  // 日本市場特化
   {
     id: 'chatwork',
     name: 'ChatWork',
-    description: '日本企業向けビジネスチャット分析',
+    description: '日本のビジネスチャットプラットフォーム分析',
     category: 'communication',
     market: 'japan',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
-    features: ['タスク管理連携', 'メッセージ分析', 'ファイル共有状況'],
-    icon: '💼',
+    features: ['タスク管理統合', 'メッセージ分析', 'ファイル共有状況'],
+    icon: <BarChart3 className="w-5 h-5" />,
     priority: 3
   },
-  {
+   {
     id: 'line-works',
     name: 'LINE WORKS',
-    description: 'LINE系ビジネスコミュニケーション分析',
+    description: 'LINEビジネスコミュニケーション分析',
     category: 'communication',
     market: 'japan',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
-    features: ['トーク分析', 'カレンダー連携', 'アドレス帳活用'],
-    icon: '💚',
+    features: ['トーク分析', 'カレンダー統合', 'アドレス帳活用'],
+    icon: <MessageSquare className="w-5 h-5" />,
     priority: 4
   },
   {
     id: 'cybozu-office',
-    name: 'サイボウズ Office',
+    name: 'Cybozu Office',
     description: 'サイボウズグループウェア分析',
     category: 'communication',
     market: 'japan',
@@ -107,7 +129,7 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['スケジュール分析', 'ワークフロー効率', 'ファイル管理'],
-    icon: '🏢',
+    icon: <Database className="w-5 h-5" />,
     priority: 5
   },
 
@@ -121,8 +143,8 @@ const integrations: Integration[] = [
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
-    features: ['会議参加率', '発言時間', 'カメラON率', '会議満足度'],
-    icon: '📹',
+    features: ['会議参加率', '発言時間', 'カメラ使用率', '会議満足度'],
+    icon: <Zap className="w-5 h-5" />,
     priority: 6
   },
   {
@@ -134,21 +156,21 @@ const integrations: Integration[] = [
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
-    features: ['会議時間分析', '参加者エンゲージメント', 'Google Calendar連携'],
-    icon: '🟢',
+    features: ['会議時間分析', '参加者エンゲージメント', 'Googleカレンダー統合'],
+    icon: <Globe className="w-5 h-5" />,
     priority: 7
   },
   {
     id: 'discord',
     name: 'Discord',
-    description: 'ゲーム・クリエイティブチーム向け分析',
+    description: 'ゲーミングとクリエイティブチーム分析',
     category: 'communication',
     market: 'global',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
     features: ['ボイスチャット時間', 'サーバー活動', 'コミュニティ健全性'],
-    icon: '🎮',
+    icon: <Users className="w-5 h-5" />,
     priority: 8
   },
 
@@ -156,53 +178,53 @@ const integrations: Integration[] = [
   {
     id: 'cisco-webex',
     name: 'Cisco Webex',
-    description: 'エンタープライズ向けビデオ会議分析',
+    description: 'エンタープライズビデオ会議分析',
     category: 'communication',
     market: 'us',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
     features: ['会議品質分析', 'セキュリティ監視', 'エンタープライズ統合'],
-    icon: '🔒',
+    icon: <Shield className="w-5 h-5" />,
     priority: 9
   },
   {
     id: 'gotomeeting',
     name: 'GoToMeeting',
-    description: 'ビジネス向けオンライン会議分析',
+    description: 'ビジネスオンライン会議分析',
     category: 'communication',
     market: 'us',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
     features: ['会議効率分析', '録画管理', 'レポート生成'],
-    icon: '📊',
+    icon: <BarChart3 className="w-5 h-5" />,
     priority: 10
   },
   {
     id: 'ringcentral',
     name: 'RingCentral',
-    description: 'クラウド通信プラットフォーム分析',
+    description: 'クラウドコミュニケーションプラットフォーム分析',
     category: 'communication',
     market: 'us',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
     features: ['通話分析', 'メッセージング', 'ビデオ会議統合'],
-    icon: '☎️',
+    icon: <Database className="w-5 h-5" />,
     priority: 11
   },
   {
     id: 'workplace-meta',
     name: 'Workplace from Meta',
-    description: 'Meta提供企業向けSNS分析',
+    description: 'Metaエンタープライズソーシャルプラットフォーム分析',
     category: 'communication',
     market: 'us',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
-    features: ['社内SNS分析', 'エンゲージメント測定', 'グループ活動'],
-    icon: '📘',
+    features: ['エンタープライズソーシャル分析', 'エンゲージメント測定', 'グループ活動'],
+    icon: <Users className="w-5 h-5" />,
     priority: 12
   },
   {
@@ -215,7 +237,7 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['セルフホスト対応', 'セキュリティ重視', 'カスタマイズ可能'],
-    icon: '🔓',
+    icon: <Shield className="w-5 h-5" />,
     priority: 13
   }
 ];
@@ -238,26 +260,23 @@ const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'notifications' | 'privacy' | 'general' | 'integrations'>('notifications');
+  const [activeTab, setActiveTab] = useState<'notifications' | 'privacy' | 'security' | 'general' | 'integrations'>('notifications');
 
-  // ✅ 統合ページ関連のstate（Microsoft Teams統合対応）
+  // 統合ページ関連のstate
   const [integrationsState, setIntegrationsState] = useState<Integration[]>(integrations);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
 
-  // ✅ 統合サービス初期化用のuseEffect修正（Teams統合対応）
+  // 統合サービス初期化用のuseEffect
   useEffect(() => {
     const initializeIntegrations = async () => {
       try {
-        console.log('🚀 統合管理システム初期化開始（Teams統合対応）...');
+        console.log('🚀 統合管理システムの初期化を開始...');
         console.log('integrationManager:', integrationManager);
         
-        // ✅ SlackIntegrationクラスの手動登録
-        console.log('SlackIntegrationクラス登録確認...');
+        console.log('SlackIntegration クラス登録確認...');
+        console.log('🔷 TeamsIntegration クラス登録確認...');
         
-        // ✅ TeamsIntegrationクラスの手動登録
-        console.log('🔷 TeamsIntegrationクラス登録確認...');
-        
-        // ✅ 統合サービス定義を統合管理システム用の形式に変換
+        // 統合サービス定義を統合管理システム用の形式に変換
         const integrationConfigs = integrations.map(integration => ({
           id: integration.id,
           name: integration.name,
@@ -285,16 +304,14 @@ const SettingsPage: React.FC = () => {
 
         console.log('変換された統合設定（Teams含む）:', integrationConfigs);
 
-        // ✅ 統合管理システムを初期化
         const initResult = await integrationManager.initialize(integrationConfigs);
         console.log('初期化結果:', initResult);
         
-        // ✅ 初期化後の状態確認
-        console.log('初期化後の統合一覧:', integrationManager.integrations);
+        console.log('初期化後の統合リスト:', integrationManager.integrations);
         console.log('Slack統合確認:', integrationManager.integrations.get('slack'));
         console.log('🔷 Teams統合確認:', integrationManager.integrations.get('microsoft-teams'));
         
-        console.log('✅ 統合管理システム初期化完了（Teams統合対応）');
+        console.log('✅ 統合管理システムの初期化が完了しました');
       } catch (error) {
         console.error('❌ 統合管理システム初期化エラー:', error);
         console.error('エラー詳細:', error instanceof Error ? error.message : String(error));
@@ -304,20 +321,19 @@ const SettingsPage: React.FC = () => {
     initializeIntegrations();
   }, []);
 
-  // ✅ 統合管理システムからの状態更新（Teams統合対応）
+  // 統合管理システムからの状態更新
   useEffect(() => {
     const updateIntegrationStates = async () => {
       try {
-        console.log('🔄 統合状態更新開始（Teams統合対応）...');
+        console.log('🔄 統合状態の更新を開始...');
         
-        // 統合管理システムから最新状態を取得
         const registeredIntegrations = integrationManager.integrations;
         
         setIntegrationsState(prev => 
           prev.map(integration => {
             const registered = registeredIntegrations.get(integration.id);
             if (registered) {
-              console.log(`📊 ${integration.name} 状態:`, registered.status);
+              console.log(`📊 ${integration.name} ステータス:`, registered.status);
               return {
                 ...integration,
                 isConnected: registered.status === 'connected',
@@ -335,26 +351,21 @@ const SettingsPage: React.FC = () => {
       }
     };
 
-    // 初回読み込み
     updateIntegrationStates();
-
-    // 定期更新（10秒ごとに短縮）
     const interval = setInterval(updateIntegrationStates, 10000);
-
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ URL パラメータからの成功・エラーメッセージ処理（Teams統合対応）
+  // URL パラメータからの成功・エラーメッセージ処理
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
     const error = urlParams.get('error');
     const errorMessage = urlParams.get('message');
     const teamName = urlParams.get('team');
-    const userName = urlParams.get('user'); // ✅ Teams用ユーザー名
-    const organization = urlParams.get('organization'); // ✅ Teams用組織名
+    const userName = urlParams.get('user');
+    const organization = urlParams.get('organization');
 
-    // ✅ Slack接続成功処理
     if (success === 'slack_connected' && teamName) {
       console.log('✅ Slack接続成功を検出:', teamName);
       
@@ -375,15 +386,14 @@ const SettingsPage: React.FC = () => {
 
       setMessage({
         type: 'success',
-        text: `Slack (${teamName}) の連携が完了しました！`
+        text: `Slack (${teamName}) の統合が正常に完了しました！`
       });
       setActiveTab('integrations');
       
       window.history.replaceState({}, '', '/settings?tab=integrations');
     } 
-    // ✅ Teams接続成功処理（実装完了）
     else if (success === 'teams_connected') {
-      const displayName = userName || organization || 'Unknown';
+      const displayName = userName || organization || '不明';
       console.log('✅ Teams接続成功を検出:', displayName);
       
       setIntegrationsState(prev => 
@@ -403,17 +413,16 @@ const SettingsPage: React.FC = () => {
 
       setMessage({
         type: 'success',
-        text: `Microsoft Teams (${displayName}) の連携が完了しました！`
+        text: `Microsoft Teams (${displayName}) の統合が正常に完了しました！`
       });
       setActiveTab('integrations');
       
       window.history.replaceState({}, '', '/settings?tab=integrations');
     }
-    // ✅ エラー処理
     else if (error === 'slack_oauth_failed') {
       setMessage({
         type: 'error',
-        text: errorMessage || 'Slack連携でエラーが発生しました'
+        text: errorMessage || 'Slack統合に失敗しました'
       });
       setActiveTab('integrations');
       
@@ -421,21 +430,20 @@ const SettingsPage: React.FC = () => {
     } else if (error === 'teams_oauth_failed') {
       setMessage({
         type: 'error',
-        text: errorMessage || 'Microsoft Teams連携でエラーが発生しました'
+        text: errorMessage || 'Microsoft Teams統合に失敗しました'
       });
       setActiveTab('integrations');
       
       window.history.replaceState({}, '', '/settings?tab=integrations');
     }
 
-    // タブパラメータの処理
     const tab = urlParams.get('tab');
-    if (tab && ['notifications', 'privacy', 'integrations', 'general'].includes(tab)) {
-      setActiveTab(tab as typeof activeTab);
-    }
+if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].includes(tab)) {
+  setActiveTab(tab as typeof activeTab);
+}
   }, []);
 
-  // ✅ 設定データの初期化
+  // 設定データの初期化
   useEffect(() => {
     if (user?.settings) {
       setSettings({
@@ -478,13 +486,12 @@ const SettingsPage: React.FC = () => {
     }
   }, [user]);
 
-  // ✅ 統合ページ関連の関数（Microsoft Teams統合対応）
+  // 統合ページ関連の関数
   const handleConnect = async (integrationId: string) => {
     const integration = integrationsState.find(i => i.id === integrationId);
     if (!integration) return;
 
     try {
-      // 接続中状態に更新
       setIntegrationsState(prev => 
         prev.map(i => 
           i.id === integrationId 
@@ -494,25 +501,22 @@ const SettingsPage: React.FC = () => {
       );
 
       if (integration.setupUrl) {
-        // ✅ Slack OAuth フロー
         if (integrationId === 'slack') {
-          console.log('Slack OAuth フロー開始...');
+          console.log('Slack OAuth フローを開始...');
           window.location.href = integration.setupUrl;
           return;
         }
-        // ✅ Teams OAuth フロー（実装完了）
         else if (integrationId === 'microsoft-teams') {
-          console.log('🔷 Teams OAuth フロー開始...');
-          window.location.href = integration.setupUrl; // 実際のOAuth認証へリダイレクト
+          console.log('🔷 Teams OAuth フローを開始...');
+          window.location.href = integration.setupUrl;
           return;
         }
       }
 
-      // その他のサービスの場合（モック処理）
-      console.log(`${integration.name} 連携開始...`);
+      console.log(`${integration.name} 統合を開始...`);
       
       setTimeout(() => {
-        const healthScore = Math.floor(Math.random() * 30) + 70; // 70-100
+        const healthScore = Math.floor(Math.random() * 30) + 70;
         setIntegrationsState(prev => 
           prev.map(i => 
             i.id === integrationId 
@@ -523,12 +527,12 @@ const SettingsPage: React.FC = () => {
         
         setMessage({
           type: 'success',
-          text: `${integration.name} の連携が完了しました！`
+          text: `${integration.name} の統合が正常に完了しました！`
         });
       }, 2000);
 
     } catch (error) {
-      console.error(`${integration.name} 連携エラー:`, error);
+      console.error(`${integration.name} 統合エラー:`, error);
       
       setIntegrationsState(prev => 
         prev.map(i => 
@@ -536,7 +540,7 @@ const SettingsPage: React.FC = () => {
             ? { 
                 ...i, 
                 isConnecting: false, 
-                errorMessage: '連携に失敗しました' 
+                errorMessage: '統合に失敗しました' 
               }
             : i
         )
@@ -544,7 +548,7 @@ const SettingsPage: React.FC = () => {
 
       setMessage({
         type: 'error',
-        text: `${integration.name} の連携に失敗しました`
+        text: `${integration.name} の統合に失敗しました`
       });
     }
   };
@@ -558,9 +562,8 @@ const SettingsPage: React.FC = () => {
     }
 
     try {
-      console.log(`${integration.name} 切断開始...`);
+      console.log(`${integration.name} の切断を開始...`);
 
-      // ✅ Slack切断処理
       if (integrationId === 'slack') {
         const success = await integrationManager.disconnect('slack');
         if (success) {
@@ -585,10 +588,9 @@ const SettingsPage: React.FC = () => {
             text: `${integration.name} の切断が完了しました`
           });
         } else {
-          throw new Error('切断処理に失敗しました');
+          throw new Error('切断に失敗しました');
         }
       } 
-      // ✅ Teams切断処理
       else if (integrationId === 'microsoft-teams') {
         const success = await integrationManager.disconnect('microsoft-teams');
         if (success) {
@@ -613,11 +615,10 @@ const SettingsPage: React.FC = () => {
             text: `${integration.name} の切断が完了しました`
           });
         } else {
-          throw new Error('切断処理に失敗しました');
+          throw new Error('切断に失敗しました');
         }
       } 
       else {
-        // その他のサービス（モック処理）
         setIntegrationsState(prev => 
           prev.map(i => 
             i.id === integrationId 
@@ -648,55 +649,144 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  // ✅ 実際のSlack・Teams同期機能実装
- const handleSync = async (integrationId: string) => {
-  const integration = integrationsState.find(i => i.id === integrationId);
-  if (!integration) return;
+  const handleSync = async (integrationId: string) => {
+    const integration = integrationsState.find(i => i.id === integrationId);
+    if (!integration) return;
 
-  try {
-    console.log(`🔄 実際の同期開始: ${integration.name}`);
-    
-    // 同期中状態に更新
-    setIntegrationsState(prev => 
-      prev.map(i => 
-        i.id === integrationId 
-          ? { ...i, isSyncing: true, errorMessage: undefined }
-          : i
-      )
-    );
-
-    setMessage({ 
-      type: 'success', 
-      text: `${integration.name} のデータ同期を開始しました...` 
-    });
-
-    // ✅ Slack同期処理
-    if (integrationId === 'slack') {
-      console.log('🔗 Slack統合管理システム同期実行...');
+    try {
+      console.log(`🔄 実際の同期を開始: ${integration.name}`);
       
-      const syncResult = await integrationManager.sync('slack');
-      
-      if (syncResult) {
-        console.log('✅ Slack同期結果:', syncResult);
+      setIntegrationsState(prev => 
+        prev.map(i => 
+          i.id === integrationId 
+            ? { ...i, isSyncing: true, errorMessage: undefined }
+            : i
+        )
+      );
+
+      setMessage({ 
+        type: 'success', 
+        text: `${integration.name} のデータ同期を開始しています...` 
+      });
+
+      if (integrationId === 'slack') {
+        console.log('🔗 Slack統合管理システム同期実行...');
         
-        const analytics = (syncResult as any).analytics;
-        let healthScore = 85;
-        let recordsProcessed = 0;
+        const syncResult = await integrationManager.sync('slack');
         
-        if (analytics) {
-          healthScore = analytics.healthScore || 85;
-          console.log('📊 分析データ取得成功:', analytics);
-        } else {
-          const analyticsFromManager = await integrationManager.getAnalytics('slack');
-          if (analyticsFromManager) {
-            healthScore = analyticsFromManager.healthScore || 85;
-            console.log('📊 統合管理システムから分析データ取得:', analyticsFromManager);
+        if (syncResult) {
+          console.log('✅ Slack同期結果:', syncResult);
+          
+          const analytics = (syncResult as any).analytics;
+          let healthScore = 85;
+          let recordsProcessed = 0;
+          
+          if (analytics) {
+            healthScore = analytics.healthScore || 85;
+            console.log('📊 分析データの取得に成功:', analytics);
+          } else {
+            const analyticsFromManager = await integrationManager.getAnalytics('slack');
+            if (analyticsFromManager) {
+              healthScore = analyticsFromManager.healthScore || 85;
+              console.log('📊 統合マネージャーから分析データを取得:', analyticsFromManager);
+            }
           }
+          
+          if ('recordsProcessed' in syncResult) {
+            recordsProcessed = (syncResult as any).recordsProcessed || 0;
+          }
+          
+          setIntegrationsState(prev => 
+            prev.map(i => 
+              i.id === integrationId 
+                ? { 
+                    ...i, 
+                    isSyncing: false,
+                    lastSync: new Date(),
+                    healthScore: healthScore,
+                    metrics: analytics?.metrics,
+                    errorMessage: undefined
+                  }
+                : i
+            )
+          );
+          
+          setMessage({ 
+            type: 'success', 
+            text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100、処理レコード数: ${recordsProcessed}` 
+          });
+          
+        } else {
+          throw new Error('同期に失敗しました');
         }
+      }
+      else if (integrationId === 'microsoft-teams') {
+        console.log('🔷 Teams統合管理システム同期実行...');
         
-        if ('recordsProcessed' in syncResult) {
-          recordsProcessed = (syncResult as any).recordsProcessed || 0;
+        const syncResult = await integrationManager.sync('microsoft-teams');
+        
+        if (syncResult) {
+          console.log('✅ Teams同期結果:', syncResult);
+          
+          const analytics = (syncResult as any).analytics;
+          let healthScore = 82;
+          let recordsProcessed = 0;
+          
+          if (analytics) {
+            healthScore = analytics.healthScore || 82;
+            console.log('📊 Teams分析データの取得に成功:', analytics);
+          } else {
+            const analyticsFromManager = await integrationManager.getAnalytics('microsoft-teams');
+            if (analyticsFromManager) {
+              healthScore = analyticsFromManager.healthScore || 82;
+              console.log('📊 統合マネージャーからTeams分析データを取得:', analyticsFromManager);
+            }
+          }
+          
+          if ('recordsProcessed' in syncResult) {
+            recordsProcessed = (syncResult as any).recordsProcessed || 0;
+          }
+          
+          setIntegrationsState(prev => 
+            prev.map(i => 
+              i.id === integrationId 
+                ? { 
+                    ...i, 
+                    isSyncing: false,
+                    lastSync: new Date(),
+                    healthScore: healthScore,
+                    metrics: analytics?.metrics,
+                    errorMessage: undefined
+                  }
+                : i
+            )
+          );
+          
+          setMessage({ 
+            type: 'success', 
+            text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100、処理レコード数: ${recordsProcessed}` 
+          });
+          
+        } else {
+          throw new Error('Teams同期に失敗しました');
         }
+      }
+      else {
+        console.log(`🔄 モック同期: ${integration.name}`);
+        
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        const healthScore = Math.floor(Math.random() * 30) + 70;
+        const mockMetrics = {
+          messageCount: Math.floor(Math.random() * 500) + 100,
+          activeUsers: Math.floor(Math.random() * 20) + 5,
+          averageResponseTime: Math.floor(Math.random() * 300) + 60,
+          engagementRate: Math.random() * 0.4 + 0.6,
+          burnoutRisk: Math.floor(Math.random() * 40) + 10,
+          stressLevel: Math.floor(Math.random() * 50) + 20,
+          workLifeBalance: Math.floor(Math.random() * 30) + 70,
+          teamCohesion: Math.floor(Math.random() * 40) + 60
+        };
         
         setIntegrationsState(prev => 
           prev.map(i => 
@@ -706,7 +796,7 @@ const SettingsPage: React.FC = () => {
                   isSyncing: false,
                   lastSync: new Date(),
                   healthScore: healthScore,
-                  metrics: analytics?.metrics,
+                  metrics: mockMetrics,
                   errorMessage: undefined
                 }
               : i
@@ -715,82 +805,12 @@ const SettingsPage: React.FC = () => {
         
         setMessage({ 
           type: 'success', 
-          text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100, 処理件数: ${recordsProcessed}件` 
+          text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100` 
         });
-        
-      } else {
-        throw new Error('同期処理が失敗しました');
       }
-    }
-    // ✅ Teams同期処理
-    else if (integrationId === 'microsoft-teams') {
-      console.log('🔷 Teams統合管理システム同期実行...');
       
-      const syncResult = await integrationManager.sync('microsoft-teams');
-      
-      if (syncResult) {
-        console.log('✅ Teams同期結果:', syncResult);
-        
-        const analytics = (syncResult as any).analytics;
-        let healthScore = 82;
-        let recordsProcessed = 0;
-        
-        if (analytics) {
-          healthScore = analytics.healthScore || 82;
-          console.log('📊 Teams分析データ取得成功:', analytics);
-        } else {
-          const analyticsFromManager = await integrationManager.getAnalytics('microsoft-teams');
-          if (analyticsFromManager) {
-            healthScore = analyticsFromManager.healthScore || 82;
-            console.log('📊 統合管理システムからTeams分析データ取得:', analyticsFromManager);
-          }
-        }
-        
-        if ('recordsProcessed' in syncResult) {
-          recordsProcessed = (syncResult as any).recordsProcessed || 0;
-        }
-        
-        setIntegrationsState(prev => 
-          prev.map(i => 
-            i.id === integrationId 
-              ? { 
-                  ...i, 
-                  isSyncing: false,
-                  lastSync: new Date(),
-                  healthScore: healthScore,
-                  metrics: analytics?.metrics,
-                  errorMessage: undefined
-                }
-              : i
-          )
-        );
-        
-        setMessage({ 
-          type: 'success', 
-          text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100, 処理件数: ${recordsProcessed}件` 
-        });
-        
-      } else {
-        throw new Error('Teams同期処理が失敗しました');
-      }
-    }
-    else {
-      // ✅ 他のサービス（モック処理・改良版）
-      console.log(`🔄 モック同期: ${integration.name}`);
-      
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      const healthScore = Math.floor(Math.random() * 30) + 70; // 70-100
-      const mockMetrics = {
-        messageCount: Math.floor(Math.random() * 500) + 100,
-        activeUsers: Math.floor(Math.random() * 20) + 5,
-        averageResponseTime: Math.floor(Math.random() * 300) + 60,
-        engagementRate: Math.random() * 0.4 + 0.6, // 0.6-1.0
-           burnoutRisk: Math.floor(Math.random() * 40) + 10, // 10-50
-        stressLevel: Math.floor(Math.random() * 50) + 20, // 20-70
-        workLifeBalance: Math.floor(Math.random() * 30) + 70, // 70-100
-        teamCohesion: Math.floor(Math.random() * 40) + 60 // 60-100
-      };
+    } catch (error) {
+      console.error(`❌ ${integration.name} 同期エラー:`, error);
       
       setIntegrationsState(prev => 
         prev.map(i => 
@@ -798,42 +818,18 @@ const SettingsPage: React.FC = () => {
             ? { 
                 ...i, 
                 isSyncing: false,
-                lastSync: new Date(),
-                healthScore: healthScore,
-                metrics: mockMetrics,
-                errorMessage: undefined
+                errorMessage: 'データ同期に失敗しました'
               }
             : i
         )
       );
       
       setMessage({ 
-        type: 'success', 
-        text: `${integration.name} のデータ同期が完了しました！健全性スコア: ${healthScore}/100` 
+        type: 'error', 
+        text: `${integration.name} のデータ同期に失敗しました: ${error instanceof Error ? error.message : String(error)}` 
       });
     }
-    
-  } catch (error) {
-    console.error(`❌ ${integration.name} 同期エラー:`, error);
-    
-    setIntegrationsState(prev => 
-      prev.map(i => 
-        i.id === integrationId 
-          ? { 
-              ...i, 
-              isSyncing: false,
-              errorMessage: 'データ同期に失敗しました'
-            }
-          : i
-      )
-    );
-    
-    setMessage({ 
-      type: 'error', 
-      text: `${integration.name} のデータ同期に失敗しました: ${error instanceof Error ? error.message : String(error)}` 
-    });
-  }
-};
+  };
 
   // 通知設定の変更
   const handleNotificationChange = (key: keyof NotificationSettings, value: boolean) => {
@@ -908,7 +904,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  // メッセージの自動消去
+   // メッセージの自動消去
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => {
@@ -919,11 +915,11 @@ const SettingsPage: React.FC = () => {
     return undefined;
   }, [message]);
 
-  // ✅ リアルタイム健全性スコア更新（Teams統合対応）
+  // リアルタイム健全性スコア更新
   useEffect(() => {
     const updateHealthScores = () => {
-      setIntegrationsState(prev => 
-        prev.map(integration => {
+      setIntegrationsState(prev =>
+          prev.map(integration => {
           if (integration.isConnected && integration.healthScore && !integration.isSyncing) {
             const variation = (Math.random() - 0.5) * 6; // -3 to +3
             const newScore = Math.max(0, Math.min(100, integration.healthScore + variation));
@@ -945,7 +941,10 @@ const SettingsPage: React.FC = () => {
   if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="flex items-center space-x-3">
+          <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="text-lg font-medium text-gray-900">読み込み中...</span>
+        </div>
       </div>
     );
   }
@@ -954,6 +953,7 @@ const SettingsPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
+          <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900">設定を読み込み中...</h2>
         </div>
       </div>
@@ -965,29 +965,28 @@ const SettingsPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ヘッダー */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">設定</h1>
-          <p className="mt-2 text-gray-600">
-            チーム健全性分析ツールの各種設定を管理します
+          <div className="flex items-center space-x-3 mb-4">
+            <Settings className="h-8 w-8 text-blue-600" />
+            <h1 className="text-3xl font-bold text-gray-900">設定</h1>
+          </div>
+          <p className="text-gray-600">
+            チーム健全性分析ツールの設定と統合を管理
           </p>
         </div>
 
         {/* メッセージ表示 */}
         {message && (
-          <div className={`mb-6 p-4 rounded-md ${
+          <div className={`mb-6 p-4 rounded-md border ${
             message.type === 'success' 
-              ? 'bg-green-50 border border-green-200' 
-              : 'bg-red-50 border border-red-200'
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-red-50 border-red-200'
           }`}>
             <div className="flex">
               <div className="flex-shrink-0">
                 {message.type === 'success' ? (
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
+                  <CheckCircle className="h-5 w-5 text-green-400" />
                 ) : (
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
                 )}
               </div>
               <div className="ml-3">
@@ -1001,16 +1000,17 @@ const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white shadow-sm rounded-lg border border-gray-200">
           {/* タブナビゲーション */}
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8 px-6">
               {[
-                { id: 'notifications', name: '通知設定' },
-                { id: 'privacy', name: 'プライバシー' },
-                { id: 'integrations', name: '統合設定' },
-                { id: 'general', name: '一般設定' },
-              ].map((tab) => (
+  { id: 'notifications', name: '通知', icon: Bell },
+  { id: 'privacy', name: 'プライバシー', icon: Shield },
+  { id: 'security', name: 'セキュリティ', icon: Lock },
+  { id: 'integrations', name: '統合', icon: Link },
+  { id: 'general', name: '一般', icon: Globe },
+].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
@@ -1018,9 +1018,10 @@ const SettingsPage: React.FC = () => {
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors duration-200`}
                 >
-                  {tab.name}
+                  <tab.icon className="w-4 h-4" />
+                  <span>{tab.name}</span>
                 </button>
               ))}
             </nav>
@@ -1031,20 +1032,25 @@ const SettingsPage: React.FC = () => {
             {activeTab === 'notifications' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">通知設定</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">通知設定</h3>
                   <p className="text-sm text-gray-600 mb-6">
-                    チーム健全性に関する通知の受信設定を管理します
+                    チーム健全性インサイトに関する通知の受け取り方法を設定
                   </p>
                 </div>
 
                 <div className="space-y-4">
                   {/* メール通知 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">メール通知</h4>
-                      <p className="text-sm text-gray-500">
-                        重要なアラートや更新情報をメールで受信します
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Bell className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">メール通知</h4>
+                        <p className="text-sm text-gray-500">
+                          重要なアラートと更新をメールで受信
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1063,11 +1069,16 @@ const SettingsPage: React.FC = () => {
 
                   {/* プッシュ通知 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">プッシュ通知</h4>
-                      <p className="text-sm text-gray-500">
-                        ブラウザでリアルタイム通知を受信します
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <Zap className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">プッシュ通知</h4>
+                        <p className="text-sm text-gray-500">
+                          ブラウザでリアルタイム通知を受信
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1086,11 +1097,16 @@ const SettingsPage: React.FC = () => {
 
                   {/* 週次レポート */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">週次レポート</h4>
-                      <p className="text-sm text-gray-500">
-                        チーム健全性の週次サマリーレポートを受信します
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <BarChart3 className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">週次レポート</h4>
+                        <p className="text-sm text-gray-500">
+                          毎週チーム健全性サマリーレポートを受信
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1109,11 +1125,16 @@ const SettingsPage: React.FC = () => {
 
                   {/* 緊急アラート */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">緊急アラート</h4>
-                      <p className="text-sm text-gray-500">
-                        バーンアウトリスクなどの緊急アラートを即座に受信します
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">緊急アラート</h4>
+                        <p className="text-sm text-gray-500">
+                          バーンアウトリスクと重要な問題の即座の通知
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1130,13 +1151,18 @@ const SettingsPage: React.FC = () => {
                     </button>
                   </div>
 
-                   {/* チーム更新情報 */}
+                  {/* チーム更新情報 */}
                   <div className="flex items-center justify-between py-4">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">チーム更新情報</h4>
-                      <p className="text-sm text-gray-500">
-                        チームメンバーの追加・削除などの更新情報を受信します
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <Users className="w-4 h-4 text-yellow-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">チーム更新情報</h4>
+                        <p className="text-sm text-gray-500">
+                          チームメンバーの追加、削除、変更に関する通知
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1160,20 +1186,25 @@ const SettingsPage: React.FC = () => {
             {activeTab === 'privacy' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">プライバシー設定</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">プライバシーとデータ設定</h3>
                   <p className="text-sm text-gray-600 mb-6">
-                    データの共有とプライバシーに関する設定を管理します
+                    データの共有と管理方法を制御
                   </p>
                 </div>
 
                 <div className="space-y-4">
                   {/* 分析データの共有 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">分析データの共有</h4>
-                      <p className="text-sm text-gray-500">
-                        サービス改善のため、匿名化された分析データの共有を許可します
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <BarChart3 className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">分析データの共有</h4>
+                        <p className="text-sm text-gray-500">
+                          サービス改善のための匿名化された分析データの共有を許可
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1192,11 +1223,16 @@ const SettingsPage: React.FC = () => {
 
                   {/* データの匿名化 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">データの匿名化</h4>
-                      <p className="text-sm text-gray-500">
-                        レポートや分析で個人を特定できないよう、データを匿名化します
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <Shield className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">データの匿名化</h4>
+                        <p className="text-sm text-gray-500">
+                          レポートと分析で個人識別子を匿名化
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1215,11 +1251,16 @@ const SettingsPage: React.FC = () => {
 
                   {/* データ保持期間の設定 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">データ保持期間の設定</h4>
-                      <p className="text-sm text-gray-500">
-                        プランに応じたデータ保持期間の設定を有効にします
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">データ保持設定</h4>
+                        <p className="text-sm text-gray-500">
+                          プランベースのデータ保持期間設定を有効化
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1238,11 +1279,16 @@ const SettingsPage: React.FC = () => {
 
                   {/* データエクスポート */}
                   <div className="flex items-center justify-between py-4">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">データエクスポート</h4>
-                      <p className="text-sm text-gray-500">
-                        チーム健全性データのエクスポート機能を有効にします
-                      </p>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <Download className="w-4 h-4 text-yellow-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">データエクスポート</h4>
+                        <p className="text-sm text-gray-500">
+                          チーム健全性データのエクスポート機能を有効化
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1262,78 +1308,64 @@ const SettingsPage: React.FC = () => {
 
                 {/* データ削除セクション */}
                 <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-md">
-                  <h4 className="text-sm font-medium text-red-800 mb-2">データの削除</h4>
-                  <p className="text-sm text-red-600 mb-4">
-                    アカウントに関連するすべてのデータを完全に削除します。この操作は取り消せません。
-                  </p>
-                  <button
-                    type="button"
-                    className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
-                    onClick={() => {
-                      if (confirm('本当にすべてのデータを削除しますか？この操作は取り消せません。')) {
-                        alert('データ削除機能は開発中です');
-                      }
-                    }}
-                  >
-                    すべてのデータを削除
-                  </button>
+                  <div className="flex items-start space-x-3">
+                    <Trash2 className="w-5 h-5 text-red-600 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-medium text-red-800 mb-2">データ削除</h4>
+                      <p className="text-sm text-red-600 mb-4">
+                        アカウントに関連するすべてのデータを完全に削除します。この操作は元に戻せません。
+                      </p>
+                      <button
+                        type="button"
+                        className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
+                        onClick={() => {
+                          if (confirm('すべてのデータを削除してもよろしいですか？この操作は元に戻せません。')) {
+                            alert('データ削除機能は開発中です');
+                          }
+                        }}
+                      >
+                        すべてのデータを削除
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* ✅ 統合設定タブ - Microsoft Teams OAuth認証完全対応版 */}
+            {/* 統合設定タブ - 日本語版 */}
             {activeTab === 'integrations' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">統合設定</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">統合管理</h3>
                   <p className="text-sm text-gray-600 mb-6">
-                    チーム健全性分析のためのツール統合を管理します（13サービス対応）
+                    チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（13サービス対応）
                   </p>
                 </div>
 
-                {/* ✅ Teams統合追加の案内バナー */}
+                {/* Microsoft Teams 新機能案内バナー */}
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <span className="text-2xl">🔷</span>
+                      <Users className="w-5 h-5 text-blue-600" />
                     </div>
                     <div className="ml-3">
-                      <h4 className="text-sm font-medium text-blue-800">Microsoft Teams統合が追加されました！</h4>
+                      <h4 className="text-sm font-medium text-blue-800">Microsoft Teams統合が利用可能になりました！</h4>
                       <p className="text-sm text-blue-600 mt-1">
-                        Microsoft 365環境でのチーム健全性分析が可能になりました。会議参加率やチャット活動の詳細分析をご利用いただけます。
+                        Microsoft 365環境向けの高度なチーム健全性分析。会議参加、チャット活動、コラボレーションパターンを分析します。
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {activeTab === 'integrations' && (
-  <div className="space-y-6">
-    {/* 既存のコンテンツ */}
-    
-    {/* ✅ Teams統合追加の案内バナー */}
-    <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-      {/* 既存の案内バナーコンテンツ */}
-    </div>
+                {/* Teams統合テストパネル */}
+                {process.env.NEXT_PUBLIC_TEAMS_DEBUG === 'true' && (
+                  <TeamsTestPanel />
+                )}
 
-    {/* ✅ Teams統合テストパネル追加 */}
-    {process.env.NEXT_PUBLIC_TEAMS_DEBUG === 'true' && (
-      <TeamsTestPanel />
-    )}
-
-    {/* 既存の統合ツール一覧 */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* 既存のコンテンツ */}
-    </div>
-    
-    {/* 既存の接続統計 */}
-    {/* ... */}
-  </div>
-)}
-
-                {/* ✅ 統合ツール一覧 - Microsoft Teams OAuth認証対応版 */}
+                {/* 統合ツール一覧 - 日本語版 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {integrationsState
-                    .sort((a, b) => (a.priority || 999) - (b.priority || 999)) // 優先度順でソート
+                    .sort((a, b) => (a.priority || 999) - (b.priority || 999))
                     .map((integration) => (
                     <div
                       key={integration.id}
@@ -1343,21 +1375,18 @@ const SettingsPage: React.FC = () => {
                           : integration.errorMessage
                           ? 'border-red-200 bg-red-50'
                           : integration.id === 'microsoft-teams'
-                          ? 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:shadow-sm' // ✅ Teams強調
+                          ? 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:shadow-sm'
                           : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                       }`}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-1">
-                            {integration.icon && (
-                              <span className="text-lg">{integration.icon}</span>
-                            )}
+                            {integration.icon}
                             <h4 className="font-medium text-gray-900">{integration.name}</h4>
-                            {/* ✅ Teams新機能バッジ */}
                             {integration.id === 'microsoft-teams' && (
                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                NEW
+                                新機能
                               </span>
                             )}
                           </div>
@@ -1386,23 +1415,25 @@ const SettingsPage: React.FC = () => {
                               </div>
                               <div className="bg-green-50 px-2 py-1 rounded">
                                 <span className="text-green-600">アクティブ: </span>
-                                <span className="font-medium">{integration.metrics.activeUsers}人</span>
+                                <span className="font-medium">{integration.metrics.activeUsers} ユーザー</span>
                               </div>
                             </div>
                           )}
                           
                           {/* 最終同期時刻表示 */}
                           {integration.isConnected && integration.lastSync && (
-                            <div className="mt-1">
+                            <div className="mt-1 flex items-center space-x-1">
+                              <Clock className="w-3 h-3 text-gray-400" />
                               <span className="text-xs text-gray-500">
-                                最終同期: {new Date(integration.lastSync).toLocaleString('ja-JP')}
+                                最終同期: {new Date(integration.lastSync).toLocaleString()}
                               </span>
                             </div>
                           )}
                           
                           {/* エラーメッセージ表示 */}
                           {integration.errorMessage && (
-                            <div className="mt-2">
+                            <div className="mt-2 flex items-center space-x-1">
+                              <AlertTriangle className="w-3 h-3 text-red-500" />
                               <span className="text-xs text-red-600">{integration.errorMessage}</span>
                             </div>
                           )}
@@ -1410,22 +1441,26 @@ const SettingsPage: React.FC = () => {
                         
                         <div className="flex flex-col items-end space-y-1">
                           {integration.isConnected && (
-                               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <CheckCircle className="w-3 h-3 mr-1" />
                               接続済み
                             </span>
                           )}
                           {integration.isConnecting && (
-                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                               接続中...
                             </span>
                           )}
                           {integration.isSyncing && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                               同期中...
                             </span>
                           )}
                           {integration.errorMessage && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
                               エラー
                             </span>
                           )}
@@ -1435,58 +1470,68 @@ const SettingsPage: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <button
                           onClick={() => setSelectedIntegration(integration)}
-                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1"
                         >
-                          詳細を見る
+                          <Info className="w-3 h-3" />
+                          <span>詳細を表示</span>
                         </button>
                         
                         <div className="flex space-x-2">
                           {integration.isConnected ? (
-                            <>
-                              {/* ✅ 実際の同期ボタン（Teams対応） */}
+                            <React.Fragment>
                               <button
                                 onClick={() => handleSync(integration.id)}
                                 disabled={integration.isSyncing}
                                 className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                                   integration.isSyncing
-                                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                   ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                     : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                 }`}
                                 title="データを同期"
                               >
                                 {integration.isSyncing ? (
                                   <div className="flex items-center space-x-1">
-                                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <span>同期中</span>
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                     <span>同期中</span>
                                   </div>
                                 ) : (
-                                  '同期'
+                                  <div className="flex items-center space-x-1">
+                                    <RefreshCw className="w-3 h-3" />
+                                    <span>同期</span>
+                                  </div>
                                 )}
                               </button>
-                              {/* 切断ボタン */}
                               <button
                                 onClick={() => handleDisconnect(integration.id)}
-                                className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 transition-colors"
+                                className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 transition-colors flex items-center space-x-1"
                               >
-                                切断
+                                <X className="w-3 h-3" />
+                                <span>切断</span>
                               </button>
-                            </>
+                            </React.Fragment>
                           ) : (
                             <button
                               onClick={() => handleConnect(integration.id)}
                               disabled={integration.isConnecting}
-                              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
                                 integration.isConnecting
                                   ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                   : integration.id === 'microsoft-teams'
-                                  ? 'bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-300' // ✅ Teams強調
+                                  ? 'bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-300'
                                   : 'bg-blue-600 text-white hover:bg-blue-700'
                               }`}
                             >
-                              {integration.isConnecting ? '接続中...' : '接続'}
+                              {integration.isConnecting ? (
+                                <>
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                  <span>接続中...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>接続</span>
+                                </>
+                              )}
                             </button>
                           )}
                         </div>
@@ -1495,17 +1540,19 @@ const SettingsPage: React.FC = () => {
                   ))}
                 </div>
 
-                {/* ✅ 接続統計 - Teams統合対応版 */}
+                {/* 接続統計 - 日本語版 */}
                 <div className="space-y-6">
                   {/* 基本統計 */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-sm font-medium text-blue-800">接続状況（13サービス対応）</h4>
-                      {/* 全体同期ボタン */}
+                      <h4 className="text-sm font-medium text-blue-800 flex items-center space-x-2">
+                        <BarChart3 className="w-4 h-4" />
+                        <span>接続ステータス（13サービス対応）</span>
+                      </h4>
                       <button
                         onClick={async () => {
-                          console.log('🔄 全体同期開始（Teams統合対応）...');
-                          setMessage({ type: 'success', text: '全統合サービスの同期を開始しています...' });
+                          console.log('🔄 グローバル同期を開始...');
+                          setMessage({ type: 'success', text: '接続されているすべてのサービスの同期を開始しています...' });
                           
                           const connectedIntegrations = integrationsState.filter(i => i.isConnected);
                           
@@ -1516,36 +1563,50 @@ const SettingsPage: React.FC = () => {
                           
                           setMessage({ 
                             type: 'success', 
-                            text: `全統合サービスの同期が完了しました（${connectedIntegrations.length}サービス）` 
+                            text: `グローバル同期が完了しました（${connectedIntegrations.length} サービス）` 
                           });
                         }}
                         disabled={integrationsState.some(i => i.isSyncing)}
-                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
                           integrationsState.some(i => i.isSyncing)
                             ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                             : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                       >
-                        {integrationsState.some(i => i.isSyncing) ? '同期中...' : '全体同期'}
+                        {integrationsState.some(i => i.isSyncing) ? (
+                          <>
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>同期中...</span>
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3 h-3" />
+                            <span>全て同期</span>
+                          </>
+                        )}
                       </button>
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-blue-600">総ツール数:</span>
-                        <span className="ml-1 font-medium">{integrationsState.length}</span>
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-4 h-4 text-blue-600" />
+                        <span className="text-blue-600">総サービス数:</span>
+                        <span className="font-medium">{integrationsState.length}</span>
                       </div>
-                      <div>
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
                         <span className="text-blue-600">接続済み:</span>
-                        <span className="ml-1 font-medium">{integrationsState.filter(i => i.isConnected).length}</span>
+                        <span className="font-medium">{integrationsState.filter(i => i.isConnected).length}</span>
                       </div>
-                      <div>
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="w-4 h-4 text-yellow-600" />
                         <span className="text-blue-600">同期中:</span>
-                        <span className="ml-1 font-medium">{integrationsState.filter(i => i.isSyncing).length}</span>
+                        <span className="font-medium">{integrationsState.filter(i => i.isSyncing).length}</span>
                       </div>
-                      <div>
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
                         <span className="text-blue-600">エラー:</span>
-                        <span className="ml-1 font-medium">{integrationsState.filter(i => i.errorMessage).length}</span>
+                        <span className="font-medium">{integrationsState.filter(i => i.errorMessage).length}</span>
                       </div>
                     </div>
                     
@@ -1553,7 +1614,10 @@ const SettingsPage: React.FC = () => {
                     {integrationsState.some(i => i.isConnected && i.healthScore !== undefined) && (
                       <div className="mt-4 pt-4 border-t border-blue-200">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-blue-600">平均健全性スコア:</span>
+                          <span className="text-sm text-blue-600 flex items-center space-x-2">
+                            <BarChart3 className="w-4 h-4" />
+                            <span>平均健全性スコア:</span>
+                          </span>
                           <div className="flex items-center space-x-2">
                             {(() => {
                               const connectedWithScores = integrationsState.filter(i => i.isConnected && i.healthScore !== undefined);
@@ -1564,7 +1628,8 @@ const SettingsPage: React.FC = () => {
                                 <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                                   avgScore >= 80 ? 'bg-green-100 text-green-800' :
                                   avgScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-red-100 text-red-800'  }`}>
+                                  'bg-red-100 text-red-800'
+                                }`}>
                                   {avgScore}/100
                                 </div>
                               );
@@ -1579,9 +1644,13 @@ const SettingsPage: React.FC = () => {
                   {integrationsState.some(i => i.isConnected) && (
                     <div className="p-4 bg-green-50 border border-green-200 rounded-md">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-sm font-medium text-green-800">最近の同期履歴</h4>
-                        <span className="text-xs text-green-600">
-                          {integrationsState.filter(i => i.isConnected).length}サービス接続中
+                        <h4 className="text-sm font-medium text-green-800 flex items-center space-x-2">
+                          <Clock className="w-4 h-4" />
+                          <span>最近の同期履歴</span>
+                        </h4>
+                        <span className="text-xs text-green-600 flex items-center space-x-1">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>{integrationsState.filter(i => i.isConnected).length} サービス接続済み</span>
                         </span>
                       </div>
                       
@@ -1595,14 +1664,11 @@ const SettingsPage: React.FC = () => {
                                   integration.isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
                                 }`}></div>
                                 <div className="flex items-center space-x-2">
-                                  {integration.icon && (
-                                    <span className="text-sm">{integration.icon}</span>
-                                  )}
+                                  {integration.icon}
                                   <span className="text-sm font-medium text-green-700">{integration.name}</span>
-                                  {/* ✅ Teams新機能バッジ */}
                                   {integration.id === 'microsoft-teams' && (
                                     <span className="inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                      NEW
+                                      新機能
                                     </span>
                                   )}
                                 </div>
@@ -1621,25 +1687,25 @@ const SettingsPage: React.FC = () => {
                                 )}
                                 
                                 {/* 最終同期時刻 */}
-                                <span className="text-xs text-green-600">
-                                  {integration.lastSync 
-                                    ? new Date(integration.lastSync).toLocaleString('ja-JP', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })
-                                    : '未同期'
-                                  }
+                                <span className="text-xs text-green-600 flex items-center space-x-1">
+                                  <Clock className="w-3 h-3" />
+                                  <span>
+                                    {integration.lastSync 
+                                      ? new Date(integration.lastSync).toLocaleString('ja-JP', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })
+                                      : '未同期'
+                                    }
+                                  </span>
                                 </span>
                                 
                                 {/* 同期状態インジケーター */}
                                 {integration.isSyncing && (
                                   <div className="flex items-center space-x-1">
-                                    <svg className="animate-spin h-3 w-3 text-yellow-600" fill="none" viewBox="0 0 24 24">
-                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
+                                    <RefreshCw className="w-3 h-3 animate-spin text-yellow-600" />
                                     <span className="text-xs text-yellow-600">同期中</span>
                                   </div>
                                 )}
@@ -1653,7 +1719,10 @@ const SettingsPage: React.FC = () => {
                   {/* メトリクス概要セクション */}
                   {integrationsState.some(i => i.isConnected && i.metrics) && (
                     <div className="p-4 bg-purple-50 border border-purple-200 rounded-md">
-                      <h4 className="text-sm font-medium text-purple-800 mb-4">統合メトリクス概要</h4>
+                      <h4 className="text-sm font-medium text-purple-800 mb-4 flex items-center space-x-2">
+                        <BarChart3 className="w-4 h-4" />
+                        <span>統合メトリクス概要</span>
+                      </h4>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {(() => {
@@ -1667,15 +1736,24 @@ const SettingsPage: React.FC = () => {
                           return (
                             <>
                               <div className="bg-white p-3 rounded border border-purple-100">
-                                <div className="text-xs text-purple-600 mb-1">総メッセージ数</div>
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <MessageSquare className="w-4 h-4 text-purple-600" />
+                                  <div className="text-xs text-purple-600">総メッセージ数</div>
+                                </div>
                                 <div className="text-lg font-semibold text-purple-800">{totalMessages.toLocaleString()}</div>
                               </div>
                               <div className="bg-white p-3 rounded border border-purple-100">
-                                <div className="text-xs text-purple-600 mb-1">総アクティブユーザー</div>
-                                <div className="text-lg font-semibold text-purple-800">{totalActiveUsers}人</div>
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <Users className="w-4 h-4 text-purple-600" />
+                                  <div className="text-xs text-purple-600">総アクティブユーザー</div>
+                                </div>
+                                <div className="text-lg font-semibold text-purple-800">{totalActiveUsers} ユーザー</div>
                               </div>
                               <div className="bg-white p-3 rounded border border-purple-100">
-                                <div className="text-xs text-purple-600 mb-1">平均エンゲージメント率</div>
+                                <div className="flex items-center space-x-2 mb-1">
+                                  <Zap className="w-4 h-4 text-purple-600" />
+                                  <div className="text-xs text-purple-600">平均エンゲージメント</div>
+                                </div>
                                 <div className="text-lg font-semibold text-purple-800">{Math.round(avgEngagement * 100)}%</div>
                               </div>
                             </>
@@ -1688,63 +1766,153 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
 
+           {/* セキュリティ設定タブ */}
+{activeTab === 'security' && (
+  <div className="space-y-6">
+    <div>
+      <h3 className="text-lg font-medium text-gray-900 mb-2">セキュリティ設定</h3>
+      <p className="text-sm text-gray-600 mb-6">
+        アカウントのセキュリティを強化するための設定
+      </p>
+    </div>
+
+    {/* セキュリティダッシュボードリンク */}
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+      <div className="flex items-start space-x-4">
+        <div className="flex-shrink-0">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <Shield className="w-5 h-5 text-blue-600" />
+          </div>
+        </div>
+        <div className="flex-1">
+          <h4 className="text-lg font-medium text-blue-900 mb-2">セキュリティダッシュボード</h4>
+          <p className="text-sm text-blue-700 mb-4">
+            ログイン履歴、異常検知、セキュリティアラートを監視・管理します。
+          </p>
+          
+          <button
+            onClick={() => window.open('/security', '_blank')}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+          >
+            <Shield className="w-4 h-4 mr-2" />
+            セキュリティダッシュボードを開く
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* 2要素認証設定 */}
+    <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+      <div className="flex items-start space-x-4">
+        <div className="flex-shrink-0">
+          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+            <Lock className="w-5 h-5 text-green-600" />
+          </div>
+        </div>
+        <div className="flex-1">
+          <h4 className="text-lg font-medium text-green-900 mb-2">2要素認証</h4>
+          <p className="text-sm text-green-700 mb-4">
+            パスワードに加えて認証アプリのコードを使用することで、アカウントのセキュリティを大幅に向上させます。
+          </p>
+          
+          <button
+            onClick={() => window.open('/settings/2fa', '_blank')}
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            2要素認証を設定
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* パスワードリセット */}
+    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+      <div className="flex items-start space-x-4">
+        <div className="flex-shrink-0">
+          <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+            <RefreshCw className="w-5 h-5 text-yellow-600" />
+          </div>
+        </div>
+        <div className="flex-1">
+          <h4 className="text-lg font-medium text-yellow-900 mb-2">パスワード管理</h4>
+          <p className="text-sm text-yellow-700 mb-4">
+            パスワードの変更やリセットを安全に行います。
+          </p>
+          
+          <button
+            onClick={() => window.open('/reset-password', '_blank')}
+            className="inline-flex items-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            パスワードをリセット
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
             {/* 一般設定タブ */}
             {activeTab === 'general' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">一般設定</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">一般設定</h3>
                   <p className="text-sm text-gray-600 mb-6">
-                    アプリケーションの表示や動作に関する設定を管理します
+                    アプリケーションの表示と動作設定を構成
                   </p>
                 </div>
 
                 <div className="space-y-6">
                   {/* テーマ設定 */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      テーマ
+                    <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-2">
+                      <Globe className="w-4 h-4" />
+                      <span>テーマ</span>
                     </label>
                     <select
                       value={settings.theme}
                       onChange={(e) => handleGeneralChange('theme', e.target.value)}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                      className="mt-1 w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
                       <option value="light">ライトテーマ</option>
                       <option value="dark">ダークテーマ</option>
                       <option value="system">システム設定に従う</option>
                     </select>
                     <p className="mt-1 text-sm text-gray-500">
-                      アプリケーションの表示テーマを選択します
+                      お好みのアプリケーションテーマを選択
                     </p>
                   </div>
 
                   {/* 言語設定 */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      言語
+                    <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-2">
+                      <Globe className="w-4 h-4" />
+                      <span>言語</span>
                     </label>
                     <select
                       value={settings.language}
                       onChange={(e) => handleGeneralChange('language', e.target.value)}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                      className="mt-1 w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
-                      <option value="ja">日本語</option>
+                      <option value="ja">日本語 (Japanese)</option>
                       <option value="en">English</option>
                     </select>
                     <p className="mt-1 text-sm text-gray-500">
-                      アプリケーションの表示言語を選択します
+                      お好みのアプリケーション言語を選択
                     </p>
                   </div>
 
                   {/* タイムゾーン設定 */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      タイムゾーン
+                    <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 mb-2">
+                      <Clock className="w-4 h-4" />
+                      <span>タイムゾーン</span>
                     </label>
                     <select
                       value={settings.timezone}
                       onChange={(e) => handleGeneralChange('timezone', e.target.value)}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                      className="mt-1 w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
                       <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
                       <option value="UTC">UTC</option>
@@ -1753,35 +1921,38 @@ const SettingsPage: React.FC = () => {
                       <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
                     </select>
                     <p className="mt-1 text-sm text-gray-500">
-                      レポートや通知の時刻表示に使用するタイムゾーンを選択します
+                      レポートと通知のタイムスタンプに使用されるタイムゾーン
                     </p>
                   </div>
                 </div>
 
                 {/* アカウント情報 */}
                 <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-900 mb-4">アカウント情報</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
+                  <h4 className="text-sm font-medium text-gray-900 mb-4 flex items-center space-x-2">
+                    <Users className="w-4 h-4" />
+                    <span>アカウント情報</span>
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">ユーザーID:</span>
                       <span className="text-sm font-medium text-gray-900">{user?.id}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">メールアドレス:</span>
                       <span className="text-sm font-medium text-gray-900">{user?.email}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">ロール:</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">役割:</span>
                       <span className="text-sm font-medium text-gray-900">
                         {user?.role === 'admin' ? '管理者' : 
                             user?.role === 'manager' ? 'マネージャー' : 'メンバー'}
                       </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">部署:</span>
                       <span className="text-sm font-medium text-gray-900">{user?.department || '未設定'}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">登録日:</span>
                       <span className="text-sm font-medium text-gray-900">
                         {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '不明'}
@@ -1807,10 +1978,7 @@ const SettingsPage: React.FC = () => {
                 } text-white px-6 py-2 rounded-md font-medium transition-colors flex items-center space-x-2`}
               >
                 {saving && (
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
                 )}
                 <span>{saving ? '保存中...' : '設定を保存'}</span>
               </button>
@@ -1819,20 +1987,17 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ✅ 統合詳細モーダル - Microsoft Teams OAuth認証対応版 */}
+      {/* 統合詳細モーダル */}
       {selectedIntegration && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
-                {selectedIntegration.icon && (
-                  <span className="text-xl">{selectedIntegration.icon}</span>
-                )}
+                {selectedIntegration.icon}
                 <h3 className="text-lg font-medium text-gray-900">{selectedIntegration.name}</h3>
-                {/* ✅ Teams新機能バッジ */}
                 {selectedIntegration.id === 'microsoft-teams' && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    NEW
+                    新機能
                   </span>
                 )}
               </div>
@@ -1840,28 +2005,27 @@ const SettingsPage: React.FC = () => {
                 onClick={() => setSelectedIntegration(null)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
 
             <div className="space-y-4">
               <p className="text-sm text-gray-600">{selectedIntegration.description}</p>
               
-              {/* ✅ Teams特別説明 */}
               {selectedIntegration.id === 'microsoft-teams' && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">🔷 Microsoft Teams統合の特徴</h4>
+                  <h4 className="text-sm font-medium text-blue-900 mb-1 flex items-center space-x-1">
+                    <Users className="w-4 h-4" />
+                    <span>Microsoft Teams統合機能</span>
+                  </h4>
                   <p className="text-xs text-blue-700">
-                    Microsoft 365環境に最適化された分析機能を提供します。会議の質、チーム結束度、コラボレーション効率を詳細に分析できます。
+                    Microsoft 365環境向けに最適化された分析機能。
                   </p>
                 </div>
               )}
               
-              {/* 接続状態 */}
               <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">接続状態</h4>
+                <h4 className="text-sm font-medium text-gray-900 mb-2">接続ステータス</h4>
                 <div className="flex items-center space-x-2">
                   <div className={`w-3 h-3 rounded-full ${
                     selectedIntegration.isConnected ? 'bg-green-400' :
@@ -1875,7 +2039,6 @@ const SettingsPage: React.FC = () => {
                   </span>
                 </div>
                 
-                {/* 健全性スコア */}
                 {selectedIntegration.isConnected && selectedIntegration.healthScore !== undefined && (
                   <div className="mt-2">
                     <span className="text-xs text-gray-500">健全性スコア: </span>
@@ -1889,81 +2052,78 @@ const SettingsPage: React.FC = () => {
                   </div>
                 )}
                 
-                {/* 最終同期時刻 */}
                 {selectedIntegration.isConnected && selectedIntegration.lastSync && (
-                  <div className="mt-1">
+                  <div className="mt-1 flex items-center space-x-1">
+                    <Clock className="w-3 h-3 text-gray-400" />
                     <span className="text-xs text-gray-500">
-                      最終同期: {new Date(selectedIntegration.lastSync).toLocaleString('ja-JP')}
+                      最終同期: {selectedIntegration.lastSync.toLocaleString('ja-JP')}
                     </span>
                   </div>
                 )}
                 
-                {/* エラーメッセージ */}
                 {selectedIntegration.errorMessage && (
-                  <div className="mt-2 text-xs text-red-600">
-                    {selectedIntegration.errorMessage}
+                  <div className="mt-2 flex items-center space-x-1">
+                    <AlertTriangle className="w-3 h-3 text-red-500" />
+                    <span className="text-xs text-red-600">
+                      {selectedIntegration.errorMessage}
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* メトリクス詳細表示 */}
               {selectedIntegration.isConnected && selectedIntegration.metrics && (
                 <div className="bg-blue-50 p-3 rounded-md">
                   <h4 className="text-sm font-medium text-blue-900 mb-2">詳細メトリクス</h4>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-white p-2 rounded">
-                      <div className="text-gray-500">メッセージ数</div>
-                      <div className="font-medium">{selectedIntegration.metrics.messageCount}</div>
+                      <div className="text-gray-500">メッセージ</div>
+                      <div className="font-medium">{selectedIntegration.metrics.messageCount || 0}</div>
                     </div>
                     <div className="bg-white p-2 rounded">
                       <div className="text-gray-500">アクティブユーザー</div>
-                      <div className="font-medium">{selectedIntegration.metrics.activeUsers}人</div>
+                      <div className="font-medium">{selectedIntegration.metrics.activeUsers || 0} ユーザー</div>
                     </div>
                     <div className="bg-white p-2 rounded">
                       <div className="text-gray-500">エンゲージメント率</div>
-                      <div className="font-medium">{Math.round(selectedIntegration.metrics.engagementRate * 100)}%</div>
+                      <div className="font-medium">{Math.round((selectedIntegration.metrics.engagementRate || 0) * 100)}%</div>
                     </div>
                     <div className="bg-white p-2 rounded">
                       <div className="text-gray-500">応答時間</div>
-                      <div className="font-medium">{Math.round(selectedIntegration.metrics.averageResponseTime / 60)}分</div>
+                      <div className="font-medium">{Math.round((selectedIntegration.metrics.averageResponseTime || 0) / 60)}分</div>
                     </div>
                     <div className="bg-white p-2 rounded">
                       <div className="text-gray-500">バーンアウトリスク</div>
                       <div className={`font-medium ${
-                        selectedIntegration.metrics.burnoutRisk > 70 ? 'text-red-600' :
-                        selectedIntegration.metrics.burnoutRisk > 40 ? 'text-yellow-600' : 'text-green-600'
+                        (selectedIntegration.metrics.burnoutRisk || 0) > 70 ? 'text-red-600' :
+                        (selectedIntegration.metrics.burnoutRisk || 0) > 40 ? 'text-yellow-600' : 'text-green-600'
                       }`}>
-                        {selectedIntegration.metrics.burnoutRisk}%
+                        {selectedIntegration.metrics.burnoutRisk || 0}%
                       </div>
                     </div>
                     <div className="bg-white p-2 rounded">
                       <div className="text-gray-500">ワークライフバランス</div>
                       <div className={`font-medium ${
-                        selectedIntegration.metrics.workLifeBalance > 70 ? 'text-green-600' :
-                        selectedIntegration.metrics.workLifeBalance > 40 ? 'text-yellow-600' : 'text-red-600'
+                        (selectedIntegration.metrics.workLifeBalance || 0) > 70 ? 'text-green-600' :
+                        (selectedIntegration.metrics.workLifeBalance || 0) > 40 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
-                        {selectedIntegration.metrics.workLifeBalance}%
+                        {selectedIntegration.metrics.workLifeBalance || 0}%
                       </div>
                     </div>
                   </div>
                 </div>
               )}
               
-                 {/* 分析機能 */}
               <div>
                 <h4 className="text-sm font-medium text-gray-900 mb-2">分析機能</h4>
                 <ul className="space-y-1">
                   {selectedIntegration.features.map((feature, index) => (
                     <li key={index} className="text-sm text-gray-600 flex items-center">
-                        <svg className="h-4 w-4 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
                       {feature}
-                      {/* ✅ Teams特別機能マーク */}
                       {selectedIntegration.id === 'microsoft-teams' && 
-                       (feature.includes('会議参加率') || feature.includes('Teams通話') || feature.includes('チーム結束度')) && (
+                       (feature.includes('会議参加') || feature.includes('Teams通話') || feature.includes('チーム結束度')) && (
                         <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          強化
+                          強化済み
                         </span>
                       )}
                     </li>
@@ -1971,44 +2131,42 @@ const SettingsPage: React.FC = () => {
                 </ul>
               </div>
 
-              {/* アクションボタン */}
               <div className="flex justify-end pt-4 border-t border-gray-200 space-x-2">
                 {selectedIntegration.isConnected ? (
                   <>
-                    {/* ✅ モーダル内の実際の同期ボタン（Teams対応） */}
                     <button
                       onClick={async () => {
                         await handleSync(selectedIntegration.id);
                         setSelectedIntegration(null);
                       }}
                       disabled={selectedIntegration.isSyncing}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
                         selectedIntegration.isSyncing
                           ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                       }`}
                     >
                       {selectedIntegration.isSyncing ? (
-                        <div className="flex items-center space-x-1">
-                          <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
+                        <>
+                          <RefreshCw className="w-3 h-3 animate-spin" />
                           <span>同期中</span>
-                        </div>
+                        </>
                       ) : (
-                        '同期'
+                        <>
+                          <RefreshCw className="w-3 h-3" />
+                          <span>同期</span>
+                        </>
                       )}
                     </button>
-                    {/* 切断ボタン */}
                     <button
                       onClick={() => {
                         handleDisconnect(selectedIntegration.id);
                         setSelectedIntegration(null);
                       }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
+                      className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors flex items-center space-x-1"
                     >
-                      切断
+                      <X className="w-3 h-3" />
+                      <span>切断</span>
                     </button>
                   </>
                 ) : (
@@ -2018,15 +2176,25 @@ const SettingsPage: React.FC = () => {
                       setSelectedIntegration(null);
                     }}
                     disabled={selectedIntegration.isConnecting}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
                       selectedIntegration.isConnecting
                         ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                         : selectedIntegration.id === 'microsoft-teams'
-                        ? 'bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-300' // ✅ Teams強調
+                        ? 'bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-300'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    {selectedIntegration.isConnecting ? '接続中...' : '接続'}
+                    {selectedIntegration.isConnecting ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span>接続中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="w-3 h-3" />
+                        <span>接続</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>

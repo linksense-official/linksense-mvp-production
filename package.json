@@ -1,15 +1,111 @@
 {
   "name": "linksense-mvp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "LinkSense MVP - リモートワーク特化型チーム健全性分析SaaS",
+  "homepage": "https://linksense-mvp.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/linksense-mvp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/linksense-mvp/issues"
+  },
+  "author": "LinkSense Team",
+  "license": "MIT",
+  "keywords": [
+    "saas",
+    "team-management",
+    "oauth",
+    "authentication",
+    "nextauth",
+    "social-login",
+    "security",
+    "2fa",
+    "remote-work",
+    "analytics",
+    "nextjs",
+    "typescript",
+    "stripe",
+    "prisma",
+    "vercel"
+  ],
+  "engines": {
+    "node": ">=18.17.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "build:android": "npx cap add android && npx cap copy && npx cap open android",
-    "build:ios": "npx cap add ios && npx cap copy && npx cap open ios",
-    "build:pwa": "next build && next export",
+    "lint:fix": "next lint --fix",
+    
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false --passWithNoTests",
+    "test:social-login": "jest src/tests/auth/social-login.test.tsx",
+    "test:auth": "jest src/tests/auth/",
+    "test:security": "jest src/tests/security/",
+    "test:integration": "jest src/tests/integration/",
+    
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch",
+    
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "db:seed": "node prisma/seed.js",
+    
+    "build:analyze": "ANALYZE=true npm run build",
+    "build:production": "NODE_ENV=production npm run build",
+    "build:staging": "NODE_ENV=staging npm run build",
+    
+    "deploy:vercel": "vercel --prod",
+    "deploy:preview": "vercel",
+    "deploy:staging": "vercel --target staging",
+    
+    "security:audit": "npm audit",
+    "security:audit:fix": "npm audit fix",
+    "security:check": "npm run typecheck && npm run lint && npm run test:ci",
+    
+    "health:check": "node scripts/health-check.js",
+    "health:db": "node scripts/db-health.js",
+    "health:oauth": "node scripts/oauth-health.js",
+    
+    "logs:vercel": "vercel logs",
+    "logs:production": "vercel logs --prod",
+    
+    "clean": "rm -rf .next && rm -rf node_modules/.cache",
+    "clean:all": "rm -rf .next && rm -rf node_modules && npm install",
+    
+    "postinstall": "prisma generate",
+    "prebuild": "npm run typecheck && npm run lint",
+    "prestart": "npm run db:generate",
+    
+    "env:validate": "node scripts/validate-env.js",
+    "env:example": "node scripts/generate-env-example.js",
+    "env:backup": "cp .env.local .env.local.backup.$(date +%Y%m%d_%H%M%S)",
+    
+    "setup:production": "npm run env:validate && npm run db:migrate:deploy && npm run build:production",
+    "setup:development": "npm install && npm run db:push && npm run db:seed",
+    
+    "maintenance:start": "node scripts/maintenance-mode.js --enable",
+    "maintenance:stop": "node scripts/maintenance-mode.js --disable",
+    
+    "metrics:collect": "node scripts/collect-metrics.js",
+    "metrics:report": "node scripts/generate-metrics-report.js",
+    
+    "backup:db": "node scripts/backup-database.js",
+    "backup:env": "node scripts/backup-env.js",
+    
     "ngrok": "node scripts/start-ngrok.js",
     "ngrok:simple": "node scripts/simple-ngrok.js",
     "ngrok:latest": "node scripts/ngrok-latest.js",
@@ -26,28 +122,41 @@
     "clean:ngrok": "npm run ngrok:kill && timeout /t 2 /nobreak && npm run ngrok:latest",
     "check:ngrok": "node scripts/check-ngrok.js",
     "tunnel:status": "curl -s http://localhost:4040/api/tunnels || echo 'ngrok not running'",
-    "env:show": "type .env.local || echo 'No .env.local file'",
-    "env:backup": "copy .env.local .env.local.backup",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "typecheck": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    
+    "build:android": "npx cap add android && npx cap copy && npx cap open android",
+    "build:ios": "npx cap add ios && npx cap copy && npx cap open ios",
+    "build:pwa": "next build"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
-    "localtunnel": "^1.8.3",
+    "@next-auth/prisma-adapter": "^1.0.7",
+    "@prisma/client": "^6.8.2",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "bcryptjs": "^3.0.2",
+    "crypto-js": "^4.2.0",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.511.0",
     "next": "^15.3.2",
     "next-auth": "^4.24.11",
-    "next-pwa": "^5.6.0",
-    "ngrok": "^5.0.0-beta.2",
-    "open": "^8.4.0",
+    "otplib": "^12.0.1",
+    "prisma": "^6.8.2",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "stripe": "^18.1.1"
+    "resend": "^4.5.1",
+    "stripe": "^18.1.1",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/crypto-js": "^4.2.2",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^20.17.51",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
@@ -55,49 +164,33 @@
     "autoprefixer": "^10.4.16",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.3.2",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-security": "^2.1.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.0.0-beta.3",
+    "localtunnel": "^1.8.3",
+    "next-pwa": "^5.6.0",
+    "ngrok": "^5.0.0-beta.2",
+    "open": "^8.4.0",
     "postcss": "^8.4.31",
     "prettier": "^3.0.0",
     "tailwindcss": "^3.4.0",
+    "terser-webpack-plugin": "^5.3.9",
+    "ts-jest": "^29.3.4",
     "typescript": "^5.0.0",
-    "webpack": "^5.99.9"
+    "webpack": "^5.99.9",
+    "webpack-bundle-analyzer": "^4.10.1"
   },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/linksense-mvp.git"
-  },
-  "keywords": [
-    "saas",
-    "team-management",
-    "slack-integration",
-    "remote-work",
-    "analytics",
-    "nextjs",
-    "typescript",
-    "stripe",
-    "ngrok",
-    "tunnel",
-    "webhook"
-  ],
-  "author": "LinkSense Team",
-  "license": "MIT",
-  "description": "LinkSense MVP - リモートワーク特化型チーム健全性分析SaaS",
-  "homepage": "https://linksense-mvp.vercel.app",
-  "bugs": {
-    "url": "https://github.com/your-username/linksense-mvp/issues"
-  },
-  "funding": {
-    "type": "individual",
-    "url": "https://github.com/sponsors/your-username"
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "browserslist": {
     "production": [
       ">0.2%",
       "not dead",
-      "not op_mini all"
+      "not op_mini all",
+      "not ie <= 11"
     ],
     "development": [
       "last 1 chrome version",
@@ -111,6 +204,57 @@
     "singleQuote": true,
     "printWidth": 80,
     "tabWidth": 2,
-    "useTabs": false
+    "useTabs": false,
+    "endOfLine": "lf",
+    "arrowParens": "avoid",
+    "bracketSpacing": true,
+    "bracketSameLine": false
+  },
+  "eslintConfig": {
+    "extends": [
+      "next/core-web-vitals",
+      "prettier"
+    ],
+    "plugins": [
+      "security"
+    ],
+    "rules": {
+      "security/detect-object-injection": "warn",
+      "security/detect-non-literal-regexp": "warn",
+      "security/detect-unsafe-regex": "error",
+      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/no-explicit-any": "warn"
+    }
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.js"
+    ],
+    "moduleNameMapping": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx,ts,tsx}",
+      "!src/**/*.d.ts",
+      "!src/types/**/*"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    }
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/your-username"
+  },
+  "volta": {
+    "node": "18.17.0",
+    "npm": "9.6.7"
   }
 }

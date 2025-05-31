@@ -14,44 +14,48 @@ import {
   CheckCircle, 
   Info,
   RefreshCw,
-  Zap,
   Database,
   Activity,
-  Heart
+  Heart,
+  BarChart3,
+  Shield,
+  Clock,
+  TrendingDown,
+  Zap
 } from 'lucide-react';
 
-// ✅ 不足型定義追加
+// 型定義
 interface DashboardStats {
-  [key: string]: any; // 全プロパティ許可
+  [key: string]: any;
 }
 
 interface TeamMember {
-  [key: string]: any; // 全プロパティ許可
+  [key: string]: any;
 }
 
 interface HealthAlert {
-  [key: string]: any; // 全プロパティ許可
+  [key: string]: any;
 }
 
 interface IntegrationAnalytics {
-  [key: string]: any; // 全プロパティ許可
+  [key: string]: any;
 }
 
 interface AnalyticsAlert {
-  [key: string]: any; // 全プロパティ許可
+  [key: string]: any;
 }
 
 interface AnalyticsInsight {
-  [key: string]: any; // 全プロパティ許可
+  [key: string]: any;
 }
 
 interface RealTimeData {
-  [key: string]: any; // 全プロパティ許可
+  [key: string]: any;
 }
 
-// ✅ UIコンポーネント直接定義
+// UIコンポーネント定義
 const Card: React.FC<{ children: React.ReactNode; className?: string; onClick?: () => void }> = ({ children, className = '', onClick }) => (
-  <div className={`bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-lg' : ''} ${className}`} onClick={onClick}>
+  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow duration-200' : ''} ${className}`} onClick={onClick}>
     {children}
   </div>
 );
@@ -63,7 +67,7 @@ const CardHeader: React.FC<{ children: React.ReactNode; className?: string }> = 
 );
 
 const CardTitle: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <h3 className={`text-lg font-semibold leading-none tracking-tight ${className}`}>
+  <h3 className={`text-lg font-semibold leading-none tracking-tight text-gray-900 ${className}`}>
     {children}
   </h3>
 );
@@ -81,9 +85,9 @@ const CardContent: React.FC<{ children: React.ReactNode; className?: string }> =
 );
 
 const Progress: React.FC<{ value: number; className?: string }> = ({ value, className = '' }) => (
-  <div className={`relative h-4 w-full overflow-hidden rounded-full bg-gray-200 ${className}`}>
+  <div className={`relative h-3 w-full overflow-hidden rounded-full bg-gray-200 ${className}`}>
     <div
-      className="h-full bg-blue-600 transition-all duration-300"
+      className="h-full bg-blue-600 transition-all duration-300 ease-in-out"
       style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
     />
   </div>
@@ -115,20 +119,18 @@ interface RealTimeData {
 class RealDataDashboardService {
   static async fetchRealDashboard(): Promise<{ dashboardData: RealTimeData | null, dataSourceInfo: DataSourceInfo }> {
     try {
-      console.log('📊 実際のSlackワークスペースからダッシュボードデータを取得中...');
+      console.log('📊 統合ワークスペースからダッシュボードデータを取得中...');
       
-      // 実際のSlackワークスペースからデータ取得を試行
       const slackUsers = await this.fetchActualSlackUsers();
       const slackAnalytics = await this.fetchActualSlackAnalytics();
       
       if (slackUsers.length === 0) {
-        // 実際のSlackワークスペースが空の場合
-        console.log('✅ 実際のSlackワークスペース確認完了: データなし');
+        console.log('✅ ワークスペース接続確認完了: データが利用できません');
         return {
           dashboardData: null,
           dataSourceInfo: {
             isRealData: true,
-            source: '実際のSlackワークスペース',
+            source: '統合Slackワークスペース',
             lastUpdated: new Date().toISOString(),
             connectionStatus: 'connected',
             recordCount: 0
@@ -136,27 +138,26 @@ class RealDataDashboardService {
         };
       }
       
-      // 実際のSlackデータからダッシュボードデータを生成
       const realDashboardData = await this.convertSlackDataToDashboard(slackUsers, slackAnalytics);
       
-      console.log('✅ 実際のSlackワークスペースからダッシュボードデータ取得完了');
+      console.log('✅ ダッシュボードデータの取得が完了しました');
       return {
         dashboardData: realDashboardData,
         dataSourceInfo: {
           isRealData: true,
-          source: '実際のSlackワークスペース',
+          source: '統合Slackワークスペース',
           lastUpdated: new Date().toISOString(),
           connectionStatus: 'connected',
           recordCount: slackUsers.length
         }
       };
     } catch (error) {
-      console.error('❌ 実際のSlackワークスペースからのデータ取得エラー:', error);
+      console.error('❌ ワークスペースデータ取得エラー:', error);
       return {
         dashboardData: null,
         dataSourceInfo: {
           isRealData: true,
-          source: '実際のSlackワークスペース',
+          source: '統合Slackワークスペース',
           lastUpdated: new Date().toISOString(),
           connectionStatus: 'error',
           recordCount: 0
@@ -167,36 +168,31 @@ class RealDataDashboardService {
   
   static async fetchActualSlackUsers(): Promise<any[]> {
     try {
-      // 実際のSlack統合からユーザー取得
       const slackIntegrations = Array.from(integrationManager.integrations.values())
         .filter(integration => integration.id === 'slack');
       
       if (slackIntegrations.length > 0 && slackIntegrations[0].status === 'connected') {
-        // 実際のSlack APIからユーザー取得（現在は空配列を返す）
-        // 実際のワークスペースが空の場合やアクセス権限がない場合
         return [];
       }
       
       return [];
     } catch (error) {
-      console.error('❌ 実際のSlackユーザー取得エラー:', error);
+      console.error('❌ Slackユーザー取得エラー:', error);
       return [];
     }
   }
   
   static async fetchActualSlackAnalytics(): Promise<IntegrationAnalytics | null> {
     try {
-      // 実際のSlack統合から分析データ取得
       const analytics = await integrationManager.getAnalytics('slack');
       return analytics;
     } catch (error) {
-      console.error('❌ 実際のSlack分析データ取得エラー:', error);
+      console.error('❌ Slack分析データ取得エラー:', error);
       return null;
     }
   }
   
   static async convertSlackDataToDashboard(slackUsers: any[], analytics: IntegrationAnalytics | null): Promise<RealTimeData> {
-    // 実際のSlackデータからダッシュボードデータを生成
     const healthScore = analytics ? await integrationManager.getHealthScore('slack') : 75;
     
     const dashboardStats: DashboardStats = {
@@ -220,7 +216,7 @@ class RealDataDashboardService {
     
     const teamMembers: TeamMember[] = slackUsers.map((user, index) => ({
       id: `slack-user-${user.id || index}`,
-      name: user.real_name || user.name || `Slackユーザー${index + 1}`,
+      name: user.real_name || user.name || `チームメンバー ${index + 1}`,
       role: 'チームメンバー',
       joinDate: new Date().toISOString().split('T')[0],
       avatar: user.profile?.image_72 || '/api/placeholder/40/40',
@@ -249,7 +245,7 @@ class RealDataDashboardService {
       insights,
       dataSourceInfo: {
         isRealData: true,
-        source: '実際のSlackワークスペース',
+        source: '統合Slackワークスペース',
         lastUpdated: new Date().toISOString(),
         connectionStatus: 'connected',
         recordCount: slackUsers.length
@@ -307,7 +303,7 @@ class RealDataDashboardService {
       title: alert.title,
       description: alert.message,
       memberId: alert.userId || 'unknown',
-      memberName: 'Slackユーザー',
+      memberName: 'チームメンバー',
       department: 'エンジニアリング',
       createdAt: alert.createdAt.toISOString(),
       status: 'active',
@@ -341,44 +337,42 @@ class RealDataDashboardService {
   }
 }
 
-// 修正されたDashboardService
+// ダッシュボードサービス
 class DashboardService {
   static async fetchDashboard(): Promise<{ dashboardData: RealTimeData | null, dataSourceInfo: DataSourceInfo }> {
     const { dashboardData, dataSourceInfo } = await RealDataDashboardService.fetchRealDashboard();
     
     if (dashboardData) {
-      // 実データがある場合
       return { dashboardData, dataSourceInfo };
     } else {
-      // 実データが0の場合（モックデータなし）
       return { dashboardData: null, dataSourceInfo };
     }
   }
 }
 
-// DataSourceIndicatorコンポーネント
+// データソース表示コンポーネント
 const DataSourceIndicator: React.FC<{ dataSourceInfo: DataSourceInfo }> = ({ dataSourceInfo }) => {
   const getIndicatorConfig = () => {
     if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'connected') {
       return {
-        color: 'bg-green-100 text-green-800 border-green-200',
-        icon: '✅',
-        text: '実際のSlackワークスペースに接続済み',
-        description: `${dataSourceInfo.recordCount}件のデータを取得`
+        color: 'bg-green-50 text-green-800 border-green-200',
+        icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+        text: '統合ワークスペースに接続済み',
+        description: `${dataSourceInfo.recordCount} 件のレコードが同期されています`
       };
     } else if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'error') {
       return {
-        color: 'bg-red-100 text-red-800 border-red-200',
-        icon: '❌',
-        text: 'Slackワークスペース接続エラー',
-        description: 'データ取得に失敗しました'
+        color: 'bg-red-50 text-red-800 border-red-200',
+        icon: <AlertTriangle className="h-4 w-4 text-red-600" />,
+        text: 'ワークスペース接続エラー',
+        description: 'ワークスペースからのデータ取得に失敗しました'
       };
     } else {
       return {
-        color: 'bg-gray-100 text-gray-800 border-gray-200',
-        icon: '📋',
-        text: 'Slackワークスペース未接続',
-        description: 'Slack統合を設定してください'
+        color: 'bg-gray-50 text-gray-800 border-gray-200',
+        icon: <Database className="h-4 w-4 text-gray-600" />,
+        text: 'ワークスペース未接続',
+        description: 'ワークスペース統合を設定してください'
       };
     }
   };
@@ -387,13 +381,12 @@ const DataSourceIndicator: React.FC<{ dataSourceInfo: DataSourceInfo }> = ({ dat
 
   return (
     <Alert className={`mb-6 ${config.color}`}>
-      <Info className="h-4 w-4" />
+      {config.icon}
       <AlertTitle className="flex items-center gap-2">
-        <span>{config.icon}</span>
         {config.text}
       </AlertTitle>
       <AlertDescription>
-        {config.description} • 最終更新: {new Date(dataSourceInfo.lastUpdated).toLocaleString('ja-JP')}
+        {config.description} • 最終更新: {new Date(dataSourceInfo.lastUpdated).toLocaleString()}
       </AlertDescription>
     </Alert>
   );
@@ -411,7 +404,7 @@ const DashboardPage: React.FC = () => {
   const fetchRealTimeData = async () => {
     try {
       setError(null);
-      console.log('📊 ダッシュボードデータ取得開始...');
+      console.log('📊 ダッシュボードデータの取得を開始...');
       
       const { dashboardData, dataSourceInfo } = await DashboardService.fetchDashboard();
       
@@ -420,9 +413,9 @@ const DashboardPage: React.FC = () => {
       setLoading(false);
       
       if (dashboardData) {
-        console.log('✅ ダッシュボードデータ取得完了:', dashboardData.teamMembers.length, '件');
+        console.log('✅ ダッシュボードデータの取得完了:', dashboardData.teamMembers.length, '件のレコード');
       } else {
-        console.log('✅ ダッシュボードデータ確認完了: データなし');
+        console.log('✅ ダッシュボードデータの確認完了: データが利用できません');
       }
       
     } catch (err) {
@@ -430,7 +423,7 @@ const DashboardPage: React.FC = () => {
       setError('ダッシュボードデータの取得に失敗しました');
       setDataSourceInfo({
         isRealData: true,
-        source: '実際のSlackワークスペース',
+        source: '統合ワークスペース',
         lastUpdated: new Date().toISOString(),
         connectionStatus: 'error',
         recordCount: 0
@@ -450,8 +443,8 @@ const DashboardPage: React.FC = () => {
         setLoading(true);
         await fetchRealTimeData();
       } catch (err) {
-        console.error('ダッシュボードデータ取得エラー:', err);
-        setError('データの取得に失敗しました');
+        console.error('ダッシュボードデータ読み込みエラー:', err);
+        setError('データの読み込みに失敗しました');
         setLoading(false);
       }
     };
@@ -474,7 +467,7 @@ const DashboardPage: React.FC = () => {
   // 手動同期機能
   const handleManualSync = async () => {
     setRefreshing(true);
-    console.log('🔄 手動同期開始...');
+    console.log('🔄 手動同期を開始...');
     await fetchRealTimeData();
     setRefreshing(false);
   };
@@ -487,24 +480,14 @@ const DashboardPage: React.FC = () => {
     return 'text-red-600';
   };
 
-  // アラートの重要度色を取得
-  const getAlertSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'bg-red-100 text-red-800 border-red-200';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-blue-100 text-blue-800 border-blue-200';
-    }
-  };
-
   if (loading && !data && !dataSourceInfo) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-lg font-medium">ダッシュボードデータを読み込み中...</p>
+          <p className="text-lg font-medium text-gray-900">ダッシュボードデータを読み込み中...</p>
           <p className="text-sm text-gray-600 mt-2">
-            実際のSlackワークスペースを確認しています
+            ワークスペース接続を確認中
           </p>
         </div>
       </div>
@@ -541,6 +524,9 @@ const DashboardPage: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 チーム健全性ダッシュボード
               </h1>
+              <p className="text-gray-600">
+                統合されたコミュニケーションプラットフォームからのリアルタイム洞察
+              </p>
             </div>
             <Button 
               variant="outline" 
@@ -560,11 +546,12 @@ const DashboardPage: React.FC = () => {
           <div className="text-center py-16">
             <Database className="mx-auto h-24 w-24 text-gray-400 mb-6" />
             <h3 className="text-2xl font-semibold text-gray-900 mb-4">
-              Slackワークスペースにダッシュボードデータがありません
+              ダッシュボードデータがありません
             </h3>
             <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-              あなたのSlackワークスペースには現在ダッシュボード用のデータが存在しないか、
-              アクセス権限がありません。Slack統合を確認するか、チームメンバーの活動をお待ちください。
+              統合されたワークスペースに現在ダッシュボードデータが利用できないか、
+              アクセス権限が制限されている可能性があります。ワークスペース統合を
+              確認するか、チームメンバーの活動をお待ちください。
             </p>
             <div className="space-y-4">
               <Button 
@@ -573,10 +560,10 @@ const DashboardPage: React.FC = () => {
                 className="flex items-center gap-2"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                🔄 再同期
+                データを同期
               </Button>
               <p className="text-sm text-gray-500">
-                Slackワークスペースとの接続を確認し、最新データを取得します
+                ワークスペース接続を確認し、最新データを取得します
               </p>
             </div>
           </div>
@@ -608,10 +595,10 @@ const DashboardPage: React.FC = () => {
             </h1>
             <div className="flex items-center gap-4 text-sm text-gray-600">
               <div className="flex items-center gap-2">
-                <Database className="h-4 w-4 text-green-600" />
-                <span className="text-green-600 font-medium">実際のSlackワークスペースに基づく分析</span>
+                <Shield className="h-4 w-4 text-green-600" />
+                <span className="text-green-600 font-medium">ライブワークスペース分析</span>
               </div>
-              <span>最終更新: {new Date(dataSourceInfo?.lastUpdated || '').toLocaleString('ja-JP')}</span>
+              <span>最終更新: {new Date(dataSourceInfo?.lastUpdated || '').toLocaleString()}</span>
             </div>
           </div>
           <Button 
@@ -634,15 +621,15 @@ const DashboardPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">チーム健全性スコア</CardTitle>
-              <Heart className="h-4 w-4 text-muted-foreground" />
+              <Heart className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${getHealthScoreColor(dashboardStats.averageHealthScore)}`}>
                 {dashboardStats.averageHealthScore}/100
               </div>
-              <Progress value={dashboardStats.averageHealthScore} className="mt-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                実際のSlackワークスペース基準
+              <Progress value={dashboardStats.averageHealthScore} className="mt-3" />
+              <p className="text-xs text-gray-500 mt-2">
+                統合ワークスペースデータに基づく
               </p>
             </CardContent>
           </Card>
@@ -651,14 +638,15 @@ const DashboardPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">アクティブメンバー</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Users className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
-                {dashboardStats.activeMembers}/{dashboardStats.totalMembers}
+                {dashboardStats.activeMembers}
+                <span className="text-sm font-normal text-gray-500">/{dashboardStats.totalMembers}</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                実際のSlackアクティビティ
+              <p className="text-xs text-gray-500 mt-2">
+                実際のワークスペース活動
               </p>
             </CardContent>
           </Card>
@@ -666,15 +654,15 @@ const DashboardPage: React.FC = () => {
           {/* リスクメンバー */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">要注意メンバー</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">注意が必要なメンバー</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {dashboardStats.atRiskMembers}人
+              <div className="text-2xl font-bold text-amber-600">
+                {dashboardStats.atRiskMembers}
               </div>
-              <p className="text-xs text-muted-foreground">
-                実データ分析
+              <p className="text-xs text-gray-500 mt-2">
+                注意が必要
               </p>
             </CardContent>
           </Card>
@@ -683,15 +671,15 @@ const DashboardPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">チーム満足度</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <Activity className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${getHealthScoreColor(dashboardStats.teamSatisfaction)}`}>
                 {dashboardStats.teamSatisfaction}/100
               </div>
-              <Progress value={dashboardStats.teamSatisfaction} className="mt-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                実データ基準
+              <Progress value={dashboardStats.teamSatisfaction} className="mt-3" />
+              <p className="text-xs text-gray-500 mt-2">
+                エンゲージメント指標
               </p>
             </CardContent>
           </Card>
@@ -704,7 +692,7 @@ const DashboardPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>最新のアラート</CardTitle>
                 <CardDescription>
-                  実際のSlackワークスペースデータに基づくアラートと推奨事項
+                  ワークスペースデータに基づくリアルタイムアラートと推奨事項
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -731,9 +719,18 @@ const DashboardPage: React.FC = () => {
                         <AlertDescription>
                           {alert.description}
                           <div className="flex items-center mt-2 text-xs space-x-4 text-gray-500">
-                            <span>👤 {alert.memberName}</span>
-                            <span>🏢 {alert.department}</span>
-                            <span>📅 {new Date(alert.createdAt).toLocaleDateString('ja-JP')}</span>
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {alert.memberName}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Database className="h-3 w-3" />
+                              {alert.department}
+                            </span>
+                              <span className="flex items-center gap-1">
+                               <Clock className="h-3 w-3" />
+                              {new Date(alert.createdAt).toLocaleDateString()}
+                            </span>
                           </div>
                         </AlertDescription>
                       </Alert>
@@ -741,10 +738,10 @@ const DashboardPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <CheckCircle className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">アラートはありません</h3>
+                    <CheckCircle className="mx-auto h-12 w-12 text-green-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">アクティブなアラートはありません</h3>
                     <p className="mt-1 text-sm text-gray-500">
-                      現在、緊急のアラートはありません。
+                      すべてのシステムが正常に動作しています。緊急の対応は必要ありません。
                     </p>
                   </div>
                 )}
@@ -758,7 +755,7 @@ const DashboardPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>部署別健全性</CardTitle>
                 <CardDescription>
-                  実データ分析
+                  部署ごとのパフォーマンス
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -767,12 +764,15 @@ const DashboardPage: React.FC = () => {
                     <div key={dept.department} className="flex items-center justify-between">
                       <div className="flex-1">
                         <h4 className="text-sm font-medium text-gray-900">{dept.department}</h4>
-                        <p className="text-xs text-gray-500">{dept.memberCount}人</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {dept.memberCount} メンバー
+                        </p>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         <div className="w-20 bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full ${
+                            className={`h-2 rounded-full transition-all duration-300 ${
                               dept.averageScore >= 80 ? 'bg-green-600' :
                               dept.averageScore >= 60 ? 'bg-yellow-600' :
                               dept.averageScore >= 40 ? 'bg-orange-600' : 'bg-red-600'
@@ -793,57 +793,66 @@ const DashboardPage: React.FC = () => {
             {/* トレンド */}
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>先月比トレンド</CardTitle>
+                <CardTitle>パフォーマンストレンド</CardTitle>
                 <CardDescription>
-                  実データトレンド
+                  月次比較変化
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">健全性スコア</span>
+                    <span className="text-sm text-gray-600 flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      健全性スコア
+                    </span>
                     <div className="flex items-center">
                       {dashboardStats.trends.healthScoreChange >= 0 ? (
                         <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
                       ) : (
-                        <TrendingUp className="w-4 h-4 text-red-500 mr-1 rotate-180" />
+                        <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                       )}
                       <span className={`text-sm font-medium ${
                         dashboardStats.trends.healthScoreChange >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {dashboardStats.trends.healthScoreChange > 0 ? '+' : ''}{dashboardStats.trends.healthScoreChange}
+                        {dashboardStats.trends.healthScoreChange > 0 ? '+' : ''}{dashboardStats.trends.healthScoreChange}%
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">エンゲージメント</span>
+                    <span className="text-sm text-gray-600 flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      エンゲージメント
+                    </span>
                     <div className="flex items-center">
                       {dashboardStats.trends.engagementChange >= 0 ? (
                         <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
                       ) : (
-                        <TrendingUp className="w-4 h-4 text-red-500 mr-1 rotate-180" />
+                        <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
                       )}
                       <span className={`text-sm font-medium ${
                         dashboardStats.trends.engagementChange >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {dashboardStats.trends.engagementChange > 0 ? '+' : ''}{dashboardStats.trends.engagementChange}
+                        {dashboardStats.trends.engagementChange > 0 ? '+' : ''}{dashboardStats.trends.engagementChange}%
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">ストレスレベル</span>
+                    <span className="text-sm text-gray-600 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      ストレスレベル
+                    </span>
                     <div className="flex items-center">
                       {dashboardStats.trends.stressChange <= 0 ? (
-                        <TrendingUp className="w-4 h-4 text-green-500 mr-1 rotate-180" />
+                        <TrendingDown className="w-4 h-4 text-green-500 mr-1" />
                       ) : (
                         <TrendingUp className="w-4 h-4 text-red-500 mr-1" />
                       )}
                       <span className={`text-sm font-medium ${
                         dashboardStats.trends.stressChange <= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {dashboardStats.trends.stressChange > 0 ? '+' : ''}{dashboardStats.trends.stressChange}
+                        {dashboardStats.trends.stressChange > 0 ? '+' : ''}{dashboardStats.trends.stressChange}%
                       </span>
                     </div>
                   </div>
@@ -857,31 +866,34 @@ const DashboardPage: React.FC = () => {
         {insights.length > 0 && (
           <Card className="mt-8">
             <CardHeader>
-              <CardTitle>AIインサイト</CardTitle>
+              <CardTitle>AI駆動インサイト</CardTitle>
               <CardDescription>
-                実際のSlackワークスペースデータから生成された改善提案
+                ワークスペースデータ分析から生成された実行可能な推奨事項
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {insights.map((insight) => (
-                  <div key={insight.id} className="p-4 border rounded-lg">
+                  <div key={insight.id} className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors duration-200">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">{insight.title}</h4>
-                      <Badge variant={
-                        insight.impact === 'high' ? 'destructive' : 
-                        insight.impact === 'medium' ? 'default' : 'secondary'
-                      }>
-                        {insight.impact === 'high' ? '高影響' : 
-                         insight.impact === 'medium' ? '中影響' : '低影響'}
-                      </Badge>
+                      <h4 className="font-medium text-gray-900">{insight.title}</h4>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={
+                          insight.impact === 'high' ? 'destructive' : 
+                          insight.impact === 'medium' ? 'default' : 'secondary'
+                        }>
+                          {insight.impact === 'high' ? '高インパクト' : 
+                           insight.impact === 'medium' ? '中インパクト' : '低インパクト'}
+                        </Badge>
+                        {insight.actionable && (
+                          <Badge variant="outline" className="text-green-700 border-green-300">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            実行可能
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-gray-600">{insight.description}</p>
-                    {insight.actionable && (
-                      <Badge variant="outline" className="mt-2">
-                        実行可能
-                      </Badge>
-                    )}
                   </div>
                 ))}
               </div>
@@ -892,9 +904,9 @@ const DashboardPage: React.FC = () => {
         {/* チームメンバー一覧 */}
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>チームメンバー健全性</CardTitle>
+            <CardTitle>チームメンバー健全性概要</CardTitle>
             <CardDescription>
-              実際のSlackワークスペースアクティビティに基づくメンバー分析
+              ワークスペース活動分析に基づく個人の健全性指標
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -925,12 +937,12 @@ const DashboardPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {teamMembers.map((member) => (
-                      <tr key={member.id} className="hover:bg-gray-50">
+                      <tr key={member.id} className="hover:bg-gray-50 transition-colors duration-150">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                                <span className="text-sm font-medium text-gray-700">
+                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <span className="text-sm font-medium text-blue-700">
                                   {member.name.charAt(0)}
                                 </span>
                               </div>
@@ -942,23 +954,38 @@ const DashboardPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {member.department || '未設定'}
+                          <div className="flex items-center gap-1">
+                            <Database className="h-3 w-3" />
+                            {member.department || '未割り当て'}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {member.healthMetrics ? (
-                            <span className={`text-sm font-medium ${getHealthScoreColor(member.healthMetrics.overallScore)}`}>
-                              {member.healthMetrics.overallScore}/100
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${getHealthScoreColor(member.healthMetrics.overallScore)}`}>
+                                {member.healthMetrics.overallScore}/100
+                              </span>
+                              <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                                    member.healthMetrics.overallScore >= 80 ? 'bg-green-600' :
+                                    member.healthMetrics.overallScore >= 60 ? 'bg-yellow-600' :
+                                    member.healthMetrics.overallScore >= 40 ? 'bg-orange-600' : 'bg-red-600'
+                                  }`}
+                                  style={{ width: `${member.healthMetrics.overallScore}%` }}
+                                ></div>
+                              </div>
+                            </div>
                           ) : (
                             <span className="text-sm text-gray-400">データなし</span>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {member.healthMetrics ? (
-                            <div className="flex items-center">
-                              <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 bg-gray-200 rounded-full h-1.5">
                                 <div
-                                  className={`h-2 rounded-full ${
+                                  className={`h-1.5 rounded-full transition-all duration-300 ${
                                     member.healthMetrics.stressLevel >= 80 ? 'bg-red-600' :
                                     member.healthMetrics.stressLevel >= 60 ? 'bg-orange-600' :
                                     member.healthMetrics.stressLevel >= 40 ? 'bg-yellow-600' : 'bg-green-600'
@@ -978,8 +1005,8 @@ const DashboardPage: React.FC = () => {
                               member.healthMetrics.burnoutRisk === 'high' ? 'destructive' :
                               member.healthMetrics.burnoutRisk === 'medium' ? 'default' : 'secondary'
                             }>
-                              {member.healthMetrics.burnoutRisk === 'high' ? '高' :
-                               member.healthMetrics.burnoutRisk === 'medium' ? '中' : '低'}
+                              {member.healthMetrics.burnoutRisk === 'high' ? '高リスク' :
+                               member.healthMetrics.burnoutRisk === 'medium' ? '中リスク' : '低リスク'}
                             </Badge>
                           ) : (
                             <span className="text-sm text-gray-400">データなし</span>
@@ -987,9 +1014,12 @@ const DashboardPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {member.healthMetrics ? (
-                            new Date(member.healthMetrics.lastUpdated).toLocaleDateString('ja-JP')
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(member.healthMetrics.lastUpdated).toLocaleDateString()}
+                            </div>
                           ) : (
-                            '未更新'
+                            '更新されていません'
                           )}
                         </td>
                       </tr>
@@ -1000,9 +1030,9 @@ const DashboardPage: React.FC = () => {
             ) : (
               <div className="text-center py-8">
                 <Users className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">チームメンバーがいません</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">チームメンバーが見つかりません</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Slackワークスペースにアクセス可能なメンバーがいません。
+                  統合ワークスペースでアクセス可能なメンバーが見つかりませんでした。
                 </p>
               </div>
             )}
