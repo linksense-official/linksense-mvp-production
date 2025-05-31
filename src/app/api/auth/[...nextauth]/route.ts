@@ -115,16 +115,16 @@ async function recordLoginHistory(
       }),
     };
 
-    await prisma.loginHistory.create({
-      data: {
-        userId,
-        ipAddress: ipAddress || 'unknown',
-        userAgent: userAgent || 'unknown',
-        success,
-        reason: provider ? `${reason} (${provider})` : reason,
-        metadata: enhancedMetadata,
-      }
-    });
+   await prisma.loginHistory.create({
+  data: {
+    userId,
+    ipAddress: ipAddress || 'unknown',
+    userAgent: userAgent || 'unknown',
+    success,
+    reason: provider ? `${reason} (${provider})` : reason,
+    metadata: enhancedMetadata ? JSON.stringify(enhancedMetadata) : null,
+  }
+});
 
     // 本番環境では重要なログイン失敗を外部監視システムに通知
     if (isProduction && !success && ['アカウントがロックされています', '認証システムエラー'].some(r => reason?.includes(r))) {
@@ -160,11 +160,11 @@ async function updateLastLogin(userId: string, ipAddress: string, metadata?: Rec
         lastLoginIp: ipAddress,
         loginAttempts: 0, // 成功時はリセット
         ...(isProduction && {
-          lastLoginMetadata: {
-            ...metadata,
-            environment: 'production',
-            vercelRegion: process.env.VERCEL_REGION,
-          },
+          lastLoginMetadata: JSON.stringify({
+  ...metadata,
+  environment: 'production',
+  vercelRegion: process.env.VERCEL_REGION,
+}),
         }),
       }
     });
@@ -208,90 +208,59 @@ async function incrementLoginAttempts(email: string, ipAddress: string) {
   }
 }
 
-// ソーシャルログイン用のユーザー作成・更新（本番環境最適化版）
-async function handleSocialUser(
-  email: string,
-  name: string,
-  provider: string,
-  providerId: string,
-  ipAddress: string,
-  userAgent: string,
-  account: Account | null,
-  profile?: Profile
-): Promise<ExtendedUser | null> {
-  try {
-    // 既存ユーザーを確認
-    let user = await prisma.user.findUnique({
-      where: { email },
-      include: { accounts: true }
-    });
+// カスタムPrismaAdapter（アカウント連携対応版）
+function createCustomPrismaAdapter() {
+  const adapter = PrismaAdapter(prisma);
+  
+  return {
+    ...adapter,
+    async linkAccount(account: any) {
+      try {
+        // 既存のアカウント連携チェック
+        const existingAccount = await prisma.account.findUnique({
+          where: {
+            provider_providerAccountId: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            },
+          },
+        });
 
-    const socialMetadata = {
-      provider,
-      providerId,
-      profileData: isProduction ? undefined : profile, // 開発環境のみプロファイル保存
-      accountData: {
-        type: account?.type,
-        scope: account?.scope,
-        tokenType: account?.token_type,
-      },
-    };
+        if (existingAccount) {
+          console.log('アカウント既に連携済み:', account.provider);
+          return existingAccount;
+        }
 
-    if (user) {
-      // 既存ユーザーの場合、プロバイダー情報を確認・更新
-      const existingAccount = user.accounts.find(
-        (acc: any) => acc.provider === provider
-      );
+        // 新しいアカウント連携を作成
+        const newAccount = await prisma.account.create({
+          data: {
+            userId: account.userId,
+            type: account.type,
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+            refresh_token: account.refresh_token,
+            access_token: account.access_token,
+            expires_at: account.expires_at,
+            token_type: account.token_type,
+            scope: account.scope,
+            id_token: account.id_token,
+            session_state: account.session_state,
+            ext_expires_in: account.ext_expires_in,
+          },
+        });
 
-      if (!existingAccount) {
-        // 新しいプロバイダーでのログインの場合、アカウント連携を記録
-        await recordLoginHistory(
-          user.id,
-          ipAddress,
-          userAgent,
-          true,
-          '新しいプロバイダーでログイン',
-          provider,
-          socialMetadata
-        );
+        console.log('新しいアカウント連携作成:', account.provider);
+        return newAccount;
+      } catch (error) {
+        console.error('アカウント連携エラー:', error);
+        throw error;
       }
-
-      await updateLastLogin(user.id, ipAddress, socialMetadata);
-      await recordLoginHistory(user.id, ipAddress, userAgent, true, 'ソーシャルログイン成功', provider, socialMetadata);
-
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name || name,
-        company: user.company || undefined,
-        twoFactorEnabled: user.twoFactorEnabled || false,
-        requiresTwoFactor: false, // ソーシャルログインでは2FAスキップ
-        provider,
-        providerId
-      };
-    } else {
-      // 新規ユーザーの場合は、ユーザー作成はPrismaAdapterに任せる
-      await recordLoginHistory('new-user', ipAddress, userAgent, true, '新規ソーシャルユーザー作成', provider, socialMetadata);
-      
-      return {
-        id: 'temp-id', // PrismaAdapterが実際のIDを設定
-        email,
-        name,
-        twoFactorEnabled: false,
-        requiresTwoFactor: false,
-        provider,
-        providerId
-      };
-    }
-  } catch (error) {
-    console.error('ソーシャルユーザー処理エラー:', error);
-    await recordLoginHistory('unknown', ipAddress, userAgent, false, 'ソーシャルログインエラー', provider);
-    return null;
-  }
+    },
+  };
 }
 
 const handler = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter: createCustomPrismaAdapter(),
   
   // 本番環境用セキュリティ設定
   ...productionSecurityConfig,
@@ -301,6 +270,7 @@ const handler = NextAuth({
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
           prompt: "consent",
@@ -332,6 +302,7 @@ const handler = NextAuth({
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
           scope: "read:user user:email",
@@ -346,11 +317,11 @@ const handler = NextAuth({
         return {
           id: profile.id.toString(),
           name: profile.name || profile.login,
-          email: profile.email,
+          email: profile.email || '',
           image: profile.avatar_url,
           // 本番環境では追加検証
           ...(isProduction && {
-            company: profile.company,
+            company: profile.company || undefined,
             verified: profile.verified,
           }),
         };
@@ -362,6 +333,7 @@ const handler = NextAuth({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
       tenantId: process.env.AZURE_AD_TENANT_ID!,
+      allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
           scope: "openid email profile",
@@ -554,7 +526,12 @@ const handler = NextAuth({
   },
 
   callbacks: {
-    async jwt({ token, user, account, trigger }) {
+    async jwt({ token, user, account, trigger }: {
+      token: JWT;
+      user?: User | ExtendedUser;
+      account?: Account | null;
+      trigger?: 'signIn' | 'signUp' | 'update';
+    }) {
       if (user) {
         token.id = user.id;
         token.company = (user as ExtendedUser).company;
@@ -584,7 +561,10 @@ const handler = NextAuth({
       return token;
     },
 
-    async session({ session, token }) {
+    async session({ session, token }: {
+      session: Session;
+      token: JWT;
+    }) {
       if (token && session.user) {
         // 基本プロパティ
         session.user.id = token.id as string;
@@ -605,77 +585,39 @@ const handler = NextAuth({
       return session;
     },
 
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account, profile }: {
+      user: User | ExtendedUser;
+      account?: Account | null;
+      profile?: Profile;
+    }) {
       try {
-        const ipAddress = 'unknown'; // リクエストコンテキストから取得
-        const userAgent = 'unknown';
-
         // 2FA検証が必要な場合は、通常のサインインを一時停止
         if ((user as ExtendedUser).requiresTwoFactor) {
-          return false; // 2FA画面にリダイレクトするため
+          return false;
         }
 
-        // ソーシャルログインの場合
+        // ソーシャルログインの場合は常に許可
         if (account && ['google', 'github', 'azure-ad'].includes(account.provider)) {
-          // メールアドレスが確認されているかチェック
           if (!user.email) {
             console.error('ソーシャルログイン: メールアドレスが取得できません');
             return false;
           }
 
-          // 本番環境では追加のセキュリティチェック
-          if (isProduction) {
-            // ドメイン制限チェック（オプション）
-            const allowedDomains = process.env.ALLOWED_EMAIL_DOMAINS?.split(',') || [];
-            if (allowedDomains.length > 0) {
-              const emailDomain = user.email.split('@')[1];
-              if (!allowedDomains.includes(emailDomain)) {
-                console.warn('DOMAIN_RESTRICTION:', { email: user.email, domain: emailDomain });
-                return false;
-              }
-            }
-          }
-
-          // プロバイダー固有の処理
-          let providerName = account.provider;
-          if (account.provider === 'azure-ad') {
-            providerName = 'microsoft';
-          }
-
-          // ソーシャルユーザー処理
-          const socialUser = await handleSocialUser(
-            user.email,
-            user.name || user.email,
-            providerName,
-            account.providerAccountId,
-            ipAddress,
-            userAgent,
-            account,
-            profile
-          );
-
-          return socialUser !== null;
+          console.log(`ソーシャルログイン許可: ${user.email} - ${account.provider}`);
+          return true;
         }
 
         return true;
       } catch (error) {
         console.error('サインインコールバックエラー:', error);
-        
-        // 本番環境ではセキュリティアラート
-        if (isProduction) {
-          console.error('SIGNIN_CALLBACK_ERROR:', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            user: user.email,
-            provider: account?.provider,
-            timestamp: new Date().toISOString(),
-          });
-        }
-        
         return false;
       }
     },
 
-    async redirect({ url, baseUrl }) {
+    async redirect({ url, baseUrl }: {
+      url: string;
+      baseUrl: string;
+    }) {
       // 本番環境ではより厳格なリダイレクト制御
       if (isProduction) {
         const allowedUrls = [
@@ -715,7 +657,11 @@ const handler = NextAuth({
   },
 
   events: {
-    async signIn({ user, account, isNewUser }) {
+    async signIn({ user, account, isNewUser }: {
+      user: User;
+      account?: Account | null;
+      isNewUser?: boolean;
+    }) {
       const provider = account?.provider || 'unknown';
       console.log(`ユーザー ${user.email} が ${provider} でログインしました`);
       
@@ -751,7 +697,7 @@ const handler = NextAuth({
       }
     },
 
-    async signOut({ token }) {
+    async signOut({ token }: { token?: JWT }) {
       if (token?.id) {
         try {
           const provider = token.provider as string || 'unknown';
@@ -762,10 +708,10 @@ const handler = NextAuth({
               userAgent: 'unknown',
               success: true,
               reason: `ログアウト (${provider})`,
-              metadata: {
+              metadata: JSON.stringify({
                 environment: process.env.NODE_ENV,
                 sessionDuration: Date.now() - (token.issuedAt as number || 0),
-              },
+              }),
             }
           });
 
@@ -783,7 +729,7 @@ const handler = NextAuth({
       }
     },
 
-    async createUser({ user }) {
+    async createUser({ user }: { user: User }) {
       console.log(`新規ユーザーが作成されました: ${user.email}`);
       
       try {
@@ -812,7 +758,10 @@ const handler = NextAuth({
       }
     },
 
-    async linkAccount({ user, account }) {
+    async linkAccount({ user, account }: {
+      user: User;
+      account: Account;
+    }) {
       console.log(`アカウント連携: ${user.email} - ${account.provider}`);
       
       try {
@@ -838,8 +787,8 @@ const handler = NextAuth({
         }
       } catch (error) {
         console.error('アカウント連携履歴記録エラー:', error);
-        
-        // 本番環境ではアカウント連携エラーもアラート
+          
+          // 本番環境ではアカウント連携エラーもアラート
         if (isProduction) {
           console.error('ACCOUNT_LINK_ERROR:', {
             userId: user.id,
@@ -852,7 +801,10 @@ const handler = NextAuth({
       }
     },
 
-    async session({ session, token }) {
+    async session({ session, token }: {
+      session: Session;
+      token: JWT;
+    }) {
       // 本番環境ではセッション更新を監視
       if (isProduction && token?.id) {
         console.debug('SESSION_UPDATED:', {
@@ -875,13 +827,13 @@ const handler = NextAuth({
     
     // ログ設定
     logger: {
-      error(code, metadata) {
+      error(code: string, metadata?: any) {
         console.error('NEXTAUTH_ERROR:', { code, metadata, timestamp: new Date().toISOString() });
       },
-      warn(code) {
+      warn(code: string) {
         console.warn('NEXTAUTH_WARNING:', { code, timestamp: new Date().toISOString() });
       },
-      debug(code, metadata) {
+      debug(code: string, metadata?: any) {
         // 本番環境では debug ログは出力しない
       },
     },
@@ -893,7 +845,7 @@ const handler = NextAuth({
       logo: '/logo.png',
     },
   }),
-});
+} as any);
 
 export { handler as GET, handler as POST };
 

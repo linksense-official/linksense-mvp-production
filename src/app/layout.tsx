@@ -53,10 +53,12 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="LinkSense" />
         
-        {/* 認証システム用のセキュリティヘッダー */}
+        {/* セキュリティヘッダーをコメントアウト（HTTPヘッダーで設定） */}
+        {/* 
         <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
         <meta httpEquiv="X-Frame-Options" content="DENY" />
         <meta httpEquiv="X-XSS-Protection" content="1; mode=block" />
+        */}
         <meta name="referrer" content="strict-origin-when-cross-origin" />
         
         {/* Service Worker登録スクリプト */}
@@ -79,7 +81,6 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-gray-50 antialiased">
-        {/* NextAuthProviderで全体をラップし、既存のAuthProviderとLayoutを内包 */}
         <NextAuthProvider>
           <AuthProvider>
             <Layout>

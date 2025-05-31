@@ -20,6 +20,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
+  ext_expires_in    Int? 
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -50,6 +51,7 @@ model User {
   backupCodes           String?   // JSON配列として保存
   lastLoginAt           DateTime?
   lastLoginIp           String?
+  lastLoginMetadata     String?   // JSON形式のメタデータ
   loginAttempts         Int       @default(0)
   lockedUntil           DateTime?
   
@@ -96,7 +98,7 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Phase 7.0 新規テーブル: ログイン履歴
+// Phase 8.0-5-2 修正版: ログイン履歴（メタデータフィールド追加）
 model LoginHistory {
   id        String   @id @default(cuid())
   userId    String
@@ -104,6 +106,7 @@ model LoginHistory {
   userAgent String?
   success   Boolean
   reason    String?  // 失敗理由
+  metadata  String?  // JSON形式のメタデータ（String型に変更）
   createdAt DateTime @default(now())
   
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
