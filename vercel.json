@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "linksense-mvp",
   "alias": ["linksense-mvp.vercel.app"],
   "regions": ["iad1"],
   "framework": "nextjs",
@@ -121,12 +120,8 @@
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/cron/metrics",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/security-scan",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 12 * * *"
     }
   ]
 }
