@@ -1,6 +1,6 @@
 // src/lib/integrations/integration-manager.ts
-// LinkSense MVP - 統合管理システム中核 - Teams統合対応版
-// 14サービス全対応 + Microsoft Teams統合 + リアルタイム分析 + 非同期対応
+// LinkSense MVP - 統合管理システム中核 - 本番版
+// 8サービス完全対応 + リアルタイム分析 + 非同期処理
 
 import BaseIntegration, { IntegrationFactory, IntegrationRegistry } from './base-integration';
 import type {
@@ -20,12 +20,13 @@ import type {
   IntegrationServiceId
 } from '@/types/integrations';
 
-// ✅ 定数の実際のインポート（type importではなく通常のimport）
 const INTEGRATION_SERVICES = {
   SLACK: 'slack',
   MICROSOFT_TEAMS: 'microsoft-teams',
   CHATWORK: 'chatwork',
   LINE_WORKS: 'line-works',
+  DISCORD: 'discord',
+  GOOGLE_MEET: 'google-meet',
   CYBOZU_OFFICE: 'cybozu-office',
   ZOOM: 'zoom'
 } as const;
@@ -37,7 +38,6 @@ const DEFAULT_ALERT_THRESHOLDS: AlertThresholds = {
   inactivityWarning: 7 // 7日間
 };
 
-// ✅ 修正されたIntegrationManagerインターフェース - 非同期対応
 interface ModifiedIntegrationManager {
   integrations: Map<string, Integration>;
   connect(integrationId: string, credentials: any): Promise<boolean>;
@@ -50,7 +50,6 @@ interface ModifiedIntegrationManager {
   getAlerts(severity?: string): Promise<AnalyticsAlert[]>;
 }
 
-// ✅ 統合管理システムメインクラス - Teams統合対応版
 export class IntegrationManager implements ModifiedIntegrationManager {
   private static instance: IntegrationManager;
   private registry: IntegrationRegistry;
@@ -59,7 +58,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
   private analytics = new Map<string, IntegrationAnalytics>();
   private eventListeners = new Map<string, Function[]>();
 
-  // integrations プロパティを追加（インターフェース要件）
   public integrations = new Map<string, Integration>();
 
   private constructor() {
@@ -68,9 +66,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     this.initializeEventSystem();
   }
 
-  /**
-   * シングルトンインスタンス取得
-   */
   static getInstance(): IntegrationManager {
     if (!this.instance) {
       this.instance = new IntegrationManager();
@@ -78,37 +73,27 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     return this.instance;
   }
 
-  // ✅ 統合サービス管理
-
-  /**
-   * 統合サービス初期化 - Teams統合対応版
-   */
   async initialize(integrations: Integration[]): Promise<boolean> {
     try {
-      console.log('統合管理システム初期化開始...');
+      console.log('統合管理システムの初期化を開始...');
 
-      // 既存の統合をクリア
       this.registry.clear();
       this.integrations.clear();
       this.clearSyncIntervals();
 
-      // 統合サービスを登録・初期化
       for (const integrationConfig of integrations) {
-        // integrationsマップに追加
         this.integrations.set(integrationConfig.id, integrationConfig);
 
         const integration = IntegrationFactory.create(integrationConfig);
         if (integration) {
           this.registry.add(integration);
           
-          // 接続済みの場合は初期化
           if (integrationConfig.status === 'connected') {
             await integration.initialize();
           }
         }
       }
 
-      // 自動同期開始
       this.startAutoSync();
 
       console.log(`統合管理システム初期化完了: ${this.registry.size()}サービス`);
@@ -121,9 +106,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  /**
-   * 統合サービス接続 - Teams統合対応版
-   */
   async connect(integrationId: string, credentials: any): Promise<boolean> {
     try {
       const integration = this.registry.get(integrationId);
@@ -137,14 +119,10 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       const success = await integration.connect(credentials);
       
       if (success) {
-        // integrations マップも更新
         const integrationData = integration.getIntegration();
         this.integrations.set(integrationId, integrationData);
 
-        // 初期同期実行
         await this.sync(integrationId);
-        
-        // 自動同期開始
         this.startSyncInterval(integrationId);
         
         console.log(`統合サービス接続成功: ${integrationId}`);
@@ -162,9 +140,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  /**
-   * 統合サービス切断 - Teams統合対応版
-   */
   async disconnect(integrationId: string): Promise<boolean> {
     try {
       const integration = this.registry.get(integrationId);
@@ -175,18 +150,15 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       console.log(`統合サービス切断開始: ${integrationId}`);
       this.emit('disconnecting', { integrationId });
 
-      // 自動同期停止
       this.stopSyncInterval(integrationId);
 
       const success = await integration.disconnect();
       
       if (success) {
-        // integrations マップも更新
         const integrationData = integration.getIntegration();
         integrationData.status = 'disconnected';
         this.integrations.set(integrationId, integrationData);
 
-        // 分析データクリア
         this.analytics.delete(integrationId);
         
         console.log(`統合サービス切断成功: ${integrationId}`);
@@ -201,127 +173,125 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  // ✅ データ同期管理 - Teams統合対応版
-
-  /**
-   * 単一統合サービス同期 - Teams統合対応版
-   */
- async sync(integrationId: string): Promise<IntegrationAnalytics | null> {
-  try {
-    console.log(`🔍 同期開始: ${integrationId}`);
-    console.log('📋 登録済み統合一覧:', Array.from(this.registry.getAll().map(i => i.getIntegration().id)));
-    
-    let integration = this.registry.get(integrationId);
-    
-    // ✅ 統合サービスが見つからない場合の動的作成処理
-    if (!integration) {
-      console.error(`❌ 統合サービス '${integrationId}' が見つかりません`);
+  async sync(integrationId: string): Promise<IntegrationAnalytics | null> {
+    try {
+      console.log(`同期開始: ${integrationId}`);
+      console.log('登録済み統合サービス:', Array.from(this.registry.getAll().map(i => i.getIntegration().id)));
       
-      // ✅ 各サービスの動的作成（型安全版）
-      const integrationConfig = this.integrations.get(integrationId);
-      if (integrationConfig) {
+      let integration = this.registry.get(integrationId);
+      
+      if (!integration) {
+        console.warn(`統合サービス '${integrationId}' がレジストリに見つかりません - 動的作成を試行`);
+        
+        const integrationConfig = this.integrations.get(integrationId);
+        if (!integrationConfig) {
+          console.error(`統合設定が見つかりません: ${integrationId}`);
+          return null;
+        }
+
         try {
-          let IntegrationClass: any;
           let integrationInstance: BaseIntegration;
 
           switch (integrationId) {
             case 'slack':
-              console.log('🔧 Slack統合を動的に作成中...');
-              const SlackIntegrationModule = await import('./slack-integration');
-              IntegrationClass = SlackIntegrationModule.default || SlackIntegrationModule.SlackIntegration;
-              integrationInstance = new IntegrationClass(integrationConfig);
+              console.log('Slack統合を動的に作成中...');
+              const { default: SlackIntegration } = await import('./slack-integration');
+              integrationInstance = new SlackIntegration(integrationConfig);
               break;
 
             case 'microsoft-teams':
-              console.log('🔧 Microsoft Teams統合を動的に作成中...');
-              const TeamsIntegrationModule = await import('./teams-integration');
-              IntegrationClass = TeamsIntegrationModule.default || TeamsIntegrationModule.TeamsIntegration;
-              integrationInstance = new IntegrationClass(integrationConfig);
+              console.log('Microsoft Teams統合を動的に作成中...');
+              const { default: TeamsIntegration } = await import('./teams-integration');
+              integrationInstance = new TeamsIntegration(integrationConfig);
               break;
 
             case 'chatwork':
-              console.log('🔧 ChatWork統合を動的に作成中...');
-              const ChatWorkIntegrationModule = await import('./chatwork-integration');
-              IntegrationClass = ChatWorkIntegrationModule.default || ChatWorkIntegrationModule.ChatWorkIntegration;
-              integrationInstance = new IntegrationClass(integrationConfig);
+              console.log('ChatWork統合を動的に作成中...');
+              const { default: ChatWorkIntegration } = await import('./chatwork-integration');
+              integrationInstance = new ChatWorkIntegration(integrationConfig);
               break;
 
             case 'line-works':
-              console.log('🔧 LINE WORKS統合を動的に作成中...');
-              const LineWorksIntegrationModule = await import('./line-works-integration');
-              IntegrationClass = LineWorksIntegrationModule.default || LineWorksIntegrationModule.LineWorksIntegration;
-              integrationInstance = new IntegrationClass(integrationConfig);
+              console.log('LINE WORKS統合を動的に作成中...');
+              const { default: LineWorksIntegration } = await import('./line-works-integration');
+              integrationInstance = new LineWorksIntegration(integrationConfig);
+              break;
+
+            case 'discord':
+              console.log('Discord統合を動的に作成中...');
+              const { default: DiscordIntegration } = await import('./discord-integration');
+              integrationInstance = new DiscordIntegration(integrationConfig);
+              break;
+
+            case 'google-meet':
+              console.log('Google Meet統合を動的に作成中...');
+              const { default: GoogleMeetIntegration } = await import('./google-meet-integration');
+              integrationInstance = new GoogleMeetIntegration(integrationConfig);
               break;
 
             case 'cybozu-office':
-              console.log('🔧 サイボウズ Office統合を動的に作成中...');
-              const CybozuIntegrationModule = await import('./cybozu-office-integration');
-              IntegrationClass = CybozuIntegrationModule.default || CybozuIntegrationModule.CybozuOfficeIntegration;
-              integrationInstance = new IntegrationClass(integrationConfig);
+              console.log('サイボウズ Office統合を動的に作成中...');
+              const { default: CybozuIntegration } = await import('./cybozu-office-integration');
+              integrationInstance = new CybozuIntegration(integrationConfig);
               break;
 
             case 'zoom':
-              console.log('🔧 Zoom統合を動的に作成中...');
-              const ZoomIntegrationModule = await import('./zoom-integration');
-              IntegrationClass = ZoomIntegrationModule.default || ZoomIntegrationModule.ZoomIntegration;
-              integrationInstance = new IntegrationClass(integrationConfig);
+              console.log('Zoom統合を動的に作成中...');
+              const { default: ZoomIntegration } = await import('./zoom-integration');
+              integrationInstance = new ZoomIntegration(integrationConfig);
               break;
 
             default:
-              console.error(`❌ 未対応の統合サービス: ${integrationId}`);
+              console.error(`未対応の統合サービス: ${integrationId}`);
               return null;
           }
 
           this.registry.add(integrationInstance);
-          console.log(`✅ ${integrationId}統合を動的に追加しました`);
+          console.log(`${integrationId}統合を動的に追加しました`);
           integration = this.registry.get(integrationId);
         } catch (importError) {
-          console.error(`❌ ${integrationId}統合動的作成エラー:`, importError);
+          console.error(`${integrationId}統合動的作成エラー:`, importError);
+          return null;
+        }
+        
+        if (!integration) {
+          console.error(`${integrationId}統合の作成に失敗しました`);
           return null;
         }
       }
-      
-      if (!integration) {
+
+      if (!integration.isEnabled()) {
+        console.log(`統合サービス無効のため同期スキップ: ${integrationId}`);
         return null;
       }
-    }
 
-    // 以下、既存の同期処理継続...
-    if (!integration.isEnabled()) {
-      console.log(`⚠️ 統合サービス無効のため同期スキップ: ${integrationId}`);
-      return null;
-    }
+      console.log(`データ同期開始: ${integrationId}`);
+      this.emit('sync_started', { integrationId });
 
-    console.log(`🔄 データ同期開始: ${integrationId}`);
-    this.emit('sync_started', { integrationId });
+      const syncResult = await integration.sync();
+      
+      if (syncResult.success) {
+        const analytics = await this.getAnalytics(integrationId);
+        if (analytics) {
+          this.analytics.set(integrationId, analytics);
+        }
 
-    const syncResult = await integration.sync();
-    
-    if (syncResult.success) {
-      const analytics = await this.getAnalytics(integrationId);
-      if (analytics) {
-        this.analytics.set(integrationId, analytics);
+        console.log(`データ同期成功: ${integrationId} (${syncResult.recordsProcessed}件処理)`);
+        this.emit('sync_completed', { integrationId, syncResult });
+
+        return analytics;
+      } else {
+        console.error(`データ同期失敗: ${integrationId}`, syncResult.errors);
+        this.emit('sync_failed', { integrationId, errors: syncResult.errors });
+        return null;
       }
-
-      console.log(`✅ データ同期成功: ${integrationId} (${syncResult.recordsProcessed}件処理)`);
-      this.emit('sync_completed', { integrationId, syncResult });
-
-      return analytics;
-    } else {
-      console.error(`❌ データ同期失敗: ${integrationId}`, syncResult.errors);
-      this.emit('sync_failed', { integrationId, errors: syncResult.errors });
+    } catch (error) {
+      console.error(`データ同期エラー [${integrationId}]:`, error);
+      this.emit('sync_error', { integrationId, error: error instanceof Error ? error.message : String(error) });
       return null;
     }
-  } catch (error) {
-    console.error(`❌ データ同期エラー [${integrationId}]:`, error);
-    this.emit('sync_error', { integrationId, error: error instanceof Error ? error.message : String(error) });
-    return null;
   }
-}
 
-  /**
-   * 全統合サービス同期 - Teams統合対応版
-   */
   async syncAll(): Promise<IntegrationAnalytics[]> {
     console.log('全統合サービス同期開始...');
     this.emit('sync_all_started', {});
@@ -330,7 +300,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     const results: IntegrationAnalytics[] = [];
     const errors: string[] = [];
 
-    // 並列同期実行
     const syncPromises = connectedIntegrations.map(async (integration) => {
       try {
         const analytics = await this.sync(integration.getIntegration().id);
@@ -351,258 +320,70 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     return results;
   }
 
-  // ✅ 分析データ管理 - Teams統合対応版
-
-  /**
-   * 統合分析データ取得 - Teams統合対応版
-   */
   async getAnalytics(integrationId: string): Promise<IntegrationAnalytics | null> {
     try {
-      console.log(`🔍 分析データ取得開始: ${integrationId}`);
+      console.log(`分析データ取得開始: ${integrationId}`);
       
-      // キャッシュから取得
       const cached = this.analytics.get(integrationId);
       if (cached && this.isAnalyticsFresh(cached)) {
-        console.log(`✅ キャッシュから分析データ取得: ${integrationId}`);
+        console.log(`キャッシュから分析データ取得: ${integrationId}`);
         return cached;
       }
 
-      // ✅ 統合サービスから直接分析データを生成
       const integration = this.registry.get(integrationId);
       if (!integration) {
-        console.error(`❌ 統合サービスが見つかりません: ${integrationId}`);
+        console.error(`統合サービスが見つかりません: ${integrationId}`);
         return null;
       }
 
-      // ✅ 統合サービスから分析データを取得
       try {
         const analytics = await integration.getAnalytics();
         if (analytics) {
           this.analytics.set(integrationId, analytics);
-          console.log(`✅ 統合サービスから分析データ取得: ${integrationId}`);
+          console.log(`統合サービスから分析データ取得: ${integrationId}`);
           return analytics;
         }
       } catch (error) {
-        console.warn(`⚠️ 統合サービスからの分析データ取得失敗 [${integrationId}]:`, error);
+        console.warn(`統合サービスからの分析データ取得失敗 [${integrationId}]:`, error);
       }
 
-      // ✅ SlackIntegrationの場合、モック分析データを生成
-      if (integrationId === 'slack') {
-        console.log('📊 Slack分析データを新規生成中...');
-        return await this.generateMockAnalytics(integrationId, 'Slack');
-      }
-
-      // ✅ TeamsIntegrationの場合、モック分析データを生成
-      if (integrationId === 'microsoft-teams') {
-        console.log('📊 Microsoft Teams分析データを新規生成中...');
-        return await this.generateMockAnalytics(integrationId, 'Microsoft Teams');
-      }
-
-      // ローカルストレージから取得
       const stored = this.loadAnalyticsFromStorage(integrationId);
       if (stored && this.isAnalyticsFresh(stored)) {
         this.analytics.set(integrationId, stored);
-        console.log(`✅ ストレージから分析データ取得: ${integrationId}`);
+        console.log(`ストレージから分析データ取得: ${integrationId}`);
         return stored;
       }
 
-      console.log(`⚠️ 分析データが見つかりません: ${integrationId}`);
+      console.log(`分析データが見つかりません: ${integrationId}`);
       return null;
     } catch (error) {
-      console.error(`❌ 分析データ取得エラー [${integrationId}]:`, error);
+      console.error(`分析データ取得エラー [${integrationId}]:`, error);
       return null;
     }
   }
 
-  /**
-   * モック分析データ生成 - Teams統合対応版
-   */
- private async generateMockAnalytics(integrationId: string, serviceName: string): Promise<IntegrationAnalytics> {
-  // サービス別のモックメトリクス生成（型安全版）
-  let mockMetrics: AnalyticsMetrics;
-  let mockInsights: AnalyticsInsight[];
-  let healthScore: number;
-
-  switch (integrationId) {
-    case 'microsoft-teams':
-      mockMetrics = {
-        messageCount: 150,
-        activeUsers: 20,
-        averageResponseTime: 120,
-        engagementRate: 0.88,
-        burnoutRisk: 30,
-        stressLevel: 25,
-        workLifeBalance: 80,
-        teamCohesion: 85
-      };
-      mockInsights = [
-        {
-          id: `teams-insight-${Date.now()}`,
-          type: 'positive',
-          title: `${serviceName}でのアクティブな協業`,
-          description: `${serviceName}でのチームコラボレーションが活発です。`,
-          impact: 'high',
-          actionable: false,
-          createdAt: new Date()
-        }
-      ];
-      healthScore = 82;
-      break;
-
-    case 'chatwork':
-      mockMetrics = {
-        messageCount: 120,
-        activeUsers: 18,
-        averageResponseTime: 240,
-        engagementRate: 0.85,
-        burnoutRisk: 30,
-        stressLevel: 35,
-        workLifeBalance: 78,
-        teamCohesion: 82
-      };
-      mockInsights = [
-        {
-          id: `chatwork-insight-${Date.now()}`,
-          type: 'positive',
-          title: 'ChatWorkでの効率的なタスク管理',
-          description: 'タスク機能を活用した効率的なプロジェクト管理が行われています。',
-          impact: 'high',
-          actionable: false,
-          createdAt: new Date()
-        }
-      ];
-      healthScore = 80;
-      break;
-
-    case 'line-works':
-      mockMetrics = {
-        messageCount: 180,
-        activeUsers: 22,
-        averageResponseTime: 90,
-        engagementRate: 0.92,
-        burnoutRisk: 20,
-        stressLevel: 28,
-        workLifeBalance: 85,
-        teamCohesion: 88
-      };
-      mockInsights = [
-        {
-          id: `lineworks-insight-${Date.now()}`,
-          type: 'positive',
-          title: 'LINE WORKSでの迅速なコミュニケーション',
-          description: '平均応答時間が非常に短く、迅速なコミュニケーションが実現されています。',
-          impact: 'high',
-          actionable: false,
-          createdAt: new Date()
-        }
-      ];
-      healthScore = 86;
-      break;
-
-    case 'cybozu-office':
-      mockMetrics = {
-        messageCount: 80,
-        activeUsers: 25,
-        averageResponseTime: 480,
-        engagementRate: 0.78,
-        burnoutRisk: 35,
-        stressLevel: 40,
-        workLifeBalance: 75,
-        teamCohesion: 80
-      };
-      mockInsights = [
-        {
-          id: `cybozu-insight-${Date.now()}`,
-          type: 'positive',
-          title: 'サイボウズ Officeでの体系的な業務管理',
-          description: 'グループウェア機能を活用した体系的な業務管理が実現されています。',
-          impact: 'high',
-          actionable: false,
-          createdAt: new Date()
-        }
-      ];
-      healthScore = 78;
-      break;
-
-    case 'zoom':
-      mockMetrics = {
-        messageCount: 45,
-        activeUsers: 20,
-        averageResponseTime: 120,
-        engagementRate: 0.87,
-        burnoutRisk: 32,
-        stressLevel: 32,
-        workLifeBalance: 82,
-        teamCohesion: 85
-      };
-      mockInsights = [
-        {
-          id: `zoom-insight-${Date.now()}`,
-          type: 'positive',
-          title: 'Zoom会議での高いエンゲージメント',
-          description: 'ビデオ会議でのエンゲージメント率が高水準です。',
-          impact: 'high',
-          actionable: false,
-          createdAt: new Date()
-        }
-      ];
-      healthScore = 84;
-      break;
-
-    default: // slack
-      mockMetrics = {
-        messageCount: 100,
-        activeUsers: 15,
-        averageResponseTime: 180,
-        engagementRate: 0.95,
-        burnoutRisk: 25,
-        stressLevel: 30,
-        workLifeBalance: 85,
-        teamCohesion: 90
-      };
-      mockInsights = [
-        {
-          id: `slack-insight-${Date.now()}`,
-          type: 'positive',
-          title: '高いチームエンゲージメント',
-          description: 'チームのエンゲージメント率が95%と非常に高い状態です。',
-          impact: 'high',
-          actionable: false,
-          createdAt: new Date()
-        }
-      ];
-      healthScore = 88;
-      break;
+  private getServiceDisplayName(integrationId: string): string {
+    const displayNames: { [key: string]: string } = {
+      'slack': 'Slack',
+      'microsoft-teams': 'Microsoft Teams',
+      'chatwork': 'ChatWork',
+      'line-works': 'LINE WORKS',
+      'discord': 'Discord',
+      'google-meet': 'Google Meet',
+      'cybozu-office': 'サイボウズ Office',
+      'zoom': 'Zoom'
+    };
+    return displayNames[integrationId] || integrationId;
   }
 
-  const analytics: IntegrationAnalytics = {
-    integrationId: integrationId,
-    metrics: mockMetrics,
-    insights: mockInsights,
-    alerts: [],
-    lastUpdated: new Date(),
-    healthScore: healthScore,
-    trends: []
-  };
-
-  this.analytics.set(integrationId, analytics);
-  
-  console.log(`✅ ${serviceName}分析データ生成完了: 健全性スコア ${healthScore}/100`);
-  return analytics;
-}
-  /**
-   * 健全性スコア取得 - Teams統合対応版
-   */
   async getHealthScore(integrationId?: string): Promise<number> {
     try {
       if (integrationId) {
-        // 特定統合サービスの健全性スコア
         const integration = this.registry.get(integrationId);
         if (!integration) return 0;
         
         return await integration.getHealthScore();
       } else {
-        // 全体の健全性スコア
         const connectedIntegrations = this.registry.getConnected();
         if (connectedIntegrations.length === 0) return 0;
 
@@ -628,28 +409,22 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  /**
-   * インサイト取得 - Teams統合対応版
-   */
   async getInsights(integrationId?: string): Promise<AnalyticsInsight[]> {
     try {
       const insights: AnalyticsInsight[] = [];
 
       if (integrationId) {
-        // 特定統合サービスのインサイト
         const analytics = await this.getAnalytics(integrationId);
         if (analytics) {
           insights.push(...analytics.insights);
         }
       } else {
-        // 全統合サービスのインサイト
         const allAnalytics = Array.from(this.analytics.values());
         for (const analytics of allAnalytics) {
           insights.push(...analytics.insights);
         }
       }
 
-      // 重要度順でソート
       return insights.sort((a, b) => {
         const importanceOrder = { critical: 4, high: 3, medium: 2, low: 1 };
         return importanceOrder[b.impact] - importanceOrder[a.impact];
@@ -660,26 +435,20 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  /**
-   * アラート取得 - Teams統合対応版
-   */
   async getAlerts(severity?: string): Promise<AnalyticsAlert[]> {
     try {
       const alerts: AnalyticsAlert[] = [];
 
-      // 全統合サービスのアラート収集
       const allAnalytics = Array.from(this.analytics.values());
       for (const analytics of allAnalytics) {
         alerts.push(...analytics.alerts);
       }
 
-      // 重要度フィルタリング
       let filteredAlerts = alerts;
       if (severity) {
         filteredAlerts = alerts.filter(alert => alert.severity === severity);
       }
 
-      // 作成日時順でソート（新しい順）
       return filteredAlerts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     } catch (error) {
       console.error('アラート取得エラー:', error);
@@ -687,11 +456,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  // ✅ ダッシュボードデータ - Teams統合対応版
-
-  /**
-   * ダッシュボードデータ生成 - Teams統合対応版
-   */
   async getDashboardData(): Promise<IntegrationDashboardData> {
     try {
       const totalIntegrations = this.registry.size();
@@ -721,36 +485,22 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  // ✅ 設定管理 - Teams統合対応版
-
-  /**
-   * 統合設定取得 - Teams統合対応版
-   */
   getSettings(): IntegrationSettings {
     return { ...this.settings };
   }
 
-  /**
-   * 統合設定更新 - Teams統合対応版
-   */
   updateSettings(newSettings: Partial<IntegrationSettings>): void {
     this.settings = {
       ...this.settings,
       ...newSettings
     };
 
-    // 設定変更を反映
     this.applySettings();
     
     console.log('統合設定更新完了');
     this.emit('settings_updated', { settings: this.settings });
   }
 
-  // ✅ 自動同期管理 - Teams統合対応版
-
-  /**
-   * 自動同期開始 - Teams統合対応版
-   */
   private startAutoSync(): void {
     const connectedIntegrations = this.registry.getConnected();
     
@@ -761,14 +511,10 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     console.log(`自動同期開始: ${connectedIntegrations.length}サービス`);
   }
 
-  /**
-   * 統合サービス別同期間隔開始 - Teams統合対応版
-   */
   private startSyncInterval(integrationId: string): void {
-    // 既存の間隔をクリア
     this.stopSyncInterval(integrationId);
 
-    const intervalMs = this.settings.syncInterval * 60 * 1000; // 分をミリ秒に変換
+    const intervalMs = this.settings.syncInterval * 60 * 1000;
     
     const interval = setInterval(async () => {
       await this.sync(integrationId);
@@ -778,9 +524,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     console.log(`自動同期間隔設定: ${integrationId} (${this.settings.syncInterval}分)`);
   }
 
-  /**
-   * 統合サービス別同期間隔停止 - Teams統合対応版
-   */
   private stopSyncInterval(integrationId: string): void {
     const interval = this.syncIntervals.get(integrationId);
     if (interval) {
@@ -790,9 +533,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  /**
-   * 全同期間隔クリア - Teams統合対応版
-   */
   private clearSyncIntervals(): void {
     for (const [integrationId, interval] of this.syncIntervals) {
       clearInterval(interval);
@@ -801,22 +541,14 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     console.log('全自動同期間隔クリア完了');
   }
 
-  // ✅ ヘルパーメソッド - Teams統合対応版
-
-  /**
-   * 分析データの新鮮度確認
-   */
   private isAnalyticsFresh(analytics: IntegrationAnalytics): boolean {
     const now = new Date();
     const lastUpdated = new Date(analytics.lastUpdated);
-    const maxAgeMs = this.settings.syncInterval * 60 * 1000; // 同期間隔と同じ
+    const maxAgeMs = this.settings.syncInterval * 60 * 1000;
     
     return (now.getTime() - lastUpdated.getTime()) < maxAgeMs;
   }
 
-  /**
-   * ローカルストレージから分析データ読み込み
-   */
   private loadAnalyticsFromStorage(integrationId: string): IntegrationAnalytics | null {
     try {
       if (typeof window === 'undefined' || !window.localStorage) {
@@ -829,7 +561,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       
       if (keys.length === 0) return null;
 
-      // 最新のデータを取得
       const latestKey = keys.sort().pop();
       if (!latestKey) return null;
 
@@ -838,7 +569,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
 
       const analytics = JSON.parse(data) as IntegrationAnalytics;
       
-      // 日付オブジェクトを復元
       analytics.lastUpdated = new Date(analytics.lastUpdated);
       analytics.insights.forEach(insight => {
         insight.createdAt = new Date(insight.createdAt);
@@ -857,18 +587,13 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  /**
-   * トップメトリクス生成 - Teams統合対応版
-   */
   private async generateTopMetrics(): Promise<DashboardMetric[]> {
     const metrics: DashboardMetric[] = [];
 
     try {
-      // 全統合サービスのメトリクスを集計
       const allAnalytics = Array.from(this.analytics.values());
       
       if (allAnalytics.length > 0) {
-        // 平均エンゲージメント率
         const avgEngagement = allAnalytics.reduce((sum, analytics) => 
           sum + analytics.metrics.engagementRate, 0) / allAnalytics.length;
         
@@ -876,23 +601,21 @@ export class IntegrationManager implements ModifiedIntegrationManager {
           name: 'エンゲージメント率',
           value: Math.round(avgEngagement * 100),
           unit: '%',
-          trend: 'stable', // TODO: 実際のトレンド計算
+          trend: 'stable',
           changePercent: 0
         });
 
-        // 平均応答時間
         const avgResponseTime = allAnalytics.reduce((sum, analytics) =>
            sum + analytics.metrics.averageResponseTime, 0) / allAnalytics.length;
         
         metrics.push({
           name: '平均応答時間',
-          value: Math.round(avgResponseTime / 60), // 分単位
+          value: Math.round(avgResponseTime / 60),
           unit: '分',
           trend: 'stable',
           changePercent: 0
         });
 
-        // アクティブユーザー数
         const totalActiveUsers = allAnalytics.reduce((sum, analytics) => 
           sum + analytics.metrics.activeUsers, 0);
         
@@ -903,18 +626,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
           trend: 'stable',
           changePercent: 0
         });
-
-        // Teams固有メトリクス追加
-        const teamsAnalytics = allAnalytics.find(a => a.integrationId === 'microsoft-teams');
-        if (teamsAnalytics) {
-          metrics.push({
-            name: 'Teams会議参加率',
-            value: Math.round(teamsAnalytics.metrics.engagementRate * 100),
-            unit: '%',
-            trend: 'up',
-            changePercent: 5
-          });
-        }
       }
     } catch (error) {
       console.error('トップメトリクス生成エラー:', error);
@@ -923,9 +634,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     return metrics;
   }
 
-  /**
-   * 統合状態サマリー生成 - Teams統合対応版
-   */
   private async generateIntegrationStatusSummary(): Promise<IntegrationStatusSummary[]> {
     const summary: IntegrationStatusSummary[] = [];
 
@@ -935,7 +643,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       for (const integration of allIntegrations) {
         const integrationData = integration.getIntegration();
         
-        // 健全性スコアを非同期で取得
         let healthScore = 0;
         try {
           healthScore = await integration.getHealthScore();
@@ -959,9 +666,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     return summary;
   }
 
-  /**
-   * 空のダッシュボードデータ
-   */
   private getEmptyDashboardData(): IntegrationDashboardData {
     return {
       overallHealthScore: 0,
@@ -974,13 +678,10 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     };
   }
 
-  /**
-   * デフォルト設定取得 - Teams統合対応版
-   */
   private getDefaultSettings(): IntegrationSettings {
     return {
-      enabledIntegrations: Object.values(INTEGRATION_SERVICES), // Teams含む全14サービス
-      syncInterval: 60, // 60分
+      enabledIntegrations: Object.values(INTEGRATION_SERVICES),
+      syncInterval: 60,
       dataRetentionDays: 90,
       alertThresholds: DEFAULT_ALERT_THRESHOLDS,
       privacySettings: {
@@ -998,30 +699,15 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     };
   }
 
-  /**
-   * 設定適用 - Teams統合対応版
-   */
   private applySettings(): void {
-    // 同期間隔変更の反映
     this.clearSyncIntervals();
     this.startAutoSync();
-
-    // その他の設定変更処理
-    // TODO: 必要に応じて実装
   }
 
-  // ✅ イベントシステム - Teams統合対応版
-
-  /**
-   * イベントシステム初期化
-   */
   private initializeEventSystem(): void {
     this.eventListeners.clear();
   }
 
-  /**
-   * イベントリスナー追加
-   */
   on(event: string, listener: Function): void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, []);
@@ -1029,9 +715,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     this.eventListeners.get(event)!.push(listener);
   }
 
-  /**
-   * イベントリスナー削除
-   */
   off(event: string, listener: Function): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
@@ -1042,9 +725,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  /**
-   * イベント発火
-   */
   private emit(event: string, data: any): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
@@ -1058,11 +738,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
-  // ✅ クリーンアップ - Teams統合対応版
-
-  /**
-   * システム終了処理
-   */
   shutdown(): void {
     console.log('統合管理システム終了処理開始...');
     
@@ -1076,8 +751,5 @@ export class IntegrationManager implements ModifiedIntegrationManager {
   }
 }
 
-// ✅ シングルトンインスタンスエクスポート
 export const integrationManager = IntegrationManager.getInstance();
-
-// ✅ デフォルトエクスポート
 export default IntegrationManager;

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { RefreshCw, Info } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { RefreshCw, Info, Download, Share2 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 
@@ -63,24 +63,24 @@ interface ReportFilterState {
   sortBy: string;
 }
 
-// 🔧 実データレポート生成サービス（実Slackワークスペース対応版）
+// 実データレポート生成サービス（統合ワークスペース対応版）
 class RealDataReportsService {
   static async fetchRealReports(): Promise<{ reportsData: { reports: TeamHealthReport[], summary: ReportSummary } | null, dataSourceInfo: DataSourceInfo }> {
     try {
-      console.log('📊 実際のSlackワークスペースからレポートデータを取得中...');
+      console.log('📊 統合ワークスペースからレポートデータを取得中...');
       
-      // 実際のSlackワークスペースからデータ取得を試行
-      const slackUsers = await this.fetchActualSlackUsers();
-      const slackAnalytics = await this.fetchActualSlackAnalytics();
+      // 統合ワークスペースからデータ取得を試行
+      const workspaceUsers = await this.fetchActualWorkspaceUsers();
+      const workspaceAnalytics = await this.fetchActualWorkspaceAnalytics();
       
-      if (slackUsers.length === 0 && !slackAnalytics) {
-        // 実際のSlackワークスペースが空の場合
-        console.log('✅ 実際のSlackワークスペース確認完了: レポートデータなし');
+      if (workspaceUsers.length === 0 && !workspaceAnalytics) {
+        // 統合ワークスペースが空の場合
+        console.log('✅ 統合ワークスペース確認完了: レポートデータなし');
         return {
           reportsData: null,
           dataSourceInfo: {
             isRealData: true,
-            source: '実際のSlackワークスペース',
+            source: '統合ワークスペース',
             lastUpdated: new Date().toISOString(),
             connectionStatus: 'connected',
             recordCount: 0
@@ -88,27 +88,27 @@ class RealDataReportsService {
         };
       }
       
-      // 実際のSlackデータからレポートデータを生成
-      const realReportsData = await this.convertSlackDataToReports(slackUsers, slackAnalytics);
+      // 実際のワークスペースデータからレポートデータを生成
+      const realReportsData = await this.convertWorkspaceDataToReports(workspaceUsers, workspaceAnalytics);
       
-      console.log('✅ 実際のSlackワークスペースからレポートデータ取得完了');
+      console.log('✅ 統合ワークスペースからレポートデータ取得完了');
       return {
         reportsData: realReportsData,
         dataSourceInfo: {
           isRealData: true,
-          source: '実際のSlackワークスペース',
+          source: '統合ワークスペース',
           lastUpdated: new Date().toISOString(),
           connectionStatus: 'connected',
           recordCount: realReportsData.reports.length
         }
       };
     } catch (error) {
-      console.error('❌ 実際のSlackワークスペースからのレポートデータ取得エラー:', error);
+      console.error('❌ 統合ワークスペースからのレポートデータ取得エラー:', error);
       return {
         reportsData: null,
         dataSourceInfo: {
           isRealData: true,
-          source: '実際のSlackワークスペース',
+          source: '統合ワークスペース',
           lastUpdated: new Date().toISOString(),
           connectionStatus: 'error',
           recordCount: 0
@@ -117,32 +117,38 @@ class RealDataReportsService {
     }
   }
   
-  static async fetchActualSlackUsers(): Promise<any[]> {
-    // 実際のSlack統合からユーザー取得
-    const slackIntegrations = Array.from(integrationManager.integrations.values())
-      .filter(integration => integration.id === 'slack');
+  static async fetchActualWorkspaceUsers(): Promise<any[]> {
+    // 統合ワークスペースからユーザー取得
+    const workspaceIntegrations = Array.from(integrationManager.integrations.values())
+      .filter(integration => integration.status === 'connected');
     
-    if (slackIntegrations.length > 0 && slackIntegrations[0].status === 'connected') {
-      // 実際のSlack APIからユーザー取得（現在は空配列を返す）
+    if (workspaceIntegrations.length > 0) {
+      // 実際のワークスペース APIからユーザー取得（現在は空配列を返す）
       return [];
     }
     return [];
   }
   
-  static async fetchActualSlackAnalytics(): Promise<any> {
-    // 実際のSlack統合から分析データ取得
+  static async fetchActualWorkspaceAnalytics(): Promise<any> {
+    // 統合ワークスペースから分析データ取得
     try {
-      const healthScore = await integrationManager.getHealthScore('slack');
-      return { healthScore };
+      const connectedIntegrations = Array.from(integrationManager.integrations.values())
+        .filter(integration => integration.status === 'connected');
+      
+      if (connectedIntegrations.length > 0) {
+        const healthScore = await integrationManager.getHealthScore(connectedIntegrations[0].id);
+        return { healthScore };
+      }
+      return null;
     } catch (error) {
-      console.warn('Slack分析データ取得に失敗:', error);
+      console.warn('ワークスペース分析データ取得に失敗:', error);
       return null;
     }
   }
   
-  static async convertSlackDataToReports(slackUsers: any[], slackAnalytics: any): Promise<{ reports: TeamHealthReport[], summary: ReportSummary }> {
-    // 実際のSlackデータからレポートデータを生成
-    const healthScore = slackAnalytics ? await integrationManager.getHealthScore('slack') : 75;
+  static async convertWorkspaceDataToReports(workspaceUsers: any[], workspaceAnalytics: any): Promise<{ reports: TeamHealthReport[], summary: ReportSummary }> {
+    // 実際のワークスペースデータからレポートデータを生成
+    const healthScore = workspaceAnalytics ? await integrationManager.getHealthScore('slack') : 75;
     const now = new Date();
     
     // チームレポート生成
@@ -169,8 +175,8 @@ class RealDataReportsService {
       
       // 推奨事項生成（実データベース）
       const recommendations = [
-        `実際のSlackデータ分析により、${teamName}チームのコミュニケーション頻度が${metrics.communication < 70 ? '低下' : '良好'}していることが確認されました。`,
-        `Slackワークスペースの活動パターンから、チームの生産性向上のための具体的な改善案を提案します。`,
+        `統合ワークスペースデータ分析により、${teamName}チームのコミュニケーション頻度が${metrics.communication < 70 ? '低下' : '良好'}していることが確認されました。`,
+        `ワークスペースの活動パターンから、チームの生産性向上のための具体的な改善案を提案します。`,
         `実際のメッセージ分析に基づき、チームメンバー間の協力関係強化施策を実施することを推奨します。`
       ];
       
@@ -189,7 +195,7 @@ class RealDataReportsService {
         },
         recommendations,
         isRealData: true,
-        dataSource: 'slack',
+        dataSource: 'workspace',
         lastSyncTime: now
       };
     });
@@ -209,7 +215,7 @@ class RealDataReportsService {
   }
 }
 
-// 🔧 APIサービス関数（実データ対応版）
+// APIサービス関数（実データ対応版）
 class ReportService {
   static async fetchReports(): Promise<{ reportsData: { reports: TeamHealthReport[], summary: ReportSummary } | null, dataSourceInfo: DataSourceInfo }> {
     const { reportsData, dataSourceInfo } = await RealDataReportsService.fetchRealReports();
@@ -272,22 +278,22 @@ const DataSourceIndicator: React.FC<DataSourceIndicatorProps> = ({ dataSourceInf
       return {
         color: 'bg-green-100 text-green-800 border-green-200',
         icon: '✅',
-        text: '実際のSlackワークスペースに接続済み',
+        text: '統合ワークスペースに接続済み',
         description: `${dataSourceInfo.recordCount}件のレポートデータを生成`
       };
     } else if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'error') {
       return {
         color: 'bg-red-100 text-red-800 border-red-200',
         icon: '❌',
-        text: 'Slackワークスペース接続エラー',
+        text: 'ワークスペース接続エラー',
         description: 'データ取得に失敗しました'
       };
     } else {
       return {
         color: 'bg-gray-100 text-gray-800 border-gray-200',
         icon: '📋',
-        text: 'Slackワークスペース未接続',
-        description: 'Slack統合を設定してください'
+        text: 'ワークスペース未接続',
+        description: 'ワークスペース統合を設定してください'
       };
     }
   };
@@ -589,7 +595,7 @@ export default function ReportsPage() {
       setData(null);
       setDataSourceInfo({
         isRealData: true,
-        source: '実際のSlackワークスペース',
+        source: '統合ワークスペース',
         lastUpdated: new Date().toISOString(),
         connectionStatus: 'error',
         recordCount: 0
@@ -617,6 +623,57 @@ export default function ReportsPage() {
     fetchData();
   }, [fetchData]);
 
+  // レポート出力機能
+  const handleExportReport = useCallback(() => {
+    if (!data) return;
+    
+    // CSV形式でレポートデータをエクスポート
+    const csvContent = [
+      ['チーム名', '健全性スコア', '前月比', 'コミュニケーション', '生産性', '満足度', 'ワークライフバランス', 'コラボレーション', '最終更新'],
+      ...data.reports.map(report => [
+        report.teamName,
+        report.healthScore.toString(),
+        (report.healthScore - report.previousScore).toString(),
+        report.metrics.communication.toString(),
+        report.metrics.productivity.toString(),
+        report.metrics.satisfaction.toString(),
+        report.metrics.workLifeBalance.toString(),
+        report.metrics.collaboration.toString(),
+        report.lastUpdated.toLocaleDateString()
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `team_health_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [data]);
+
+  // レポート共有機能
+  const handleShareReport = useCallback(() => {
+    if (!data) return;
+    
+    const shareText = `チーム健全性レポート\n\n平均健全性スコア: ${data.summary.averageHealthScore}\n改善中チーム: ${data.summary.teamsImproving}件\n悪化中チーム: ${data.summary.teamsDeclining}件\n\n詳細: ${window.location.href}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'チーム健全性レポート',
+        text: shareText,
+        url: window.location.href
+      });
+    } else {
+      // フォールバック: クリップボードにコピー
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('レポート情報をクリップボードにコピーしました');
+      });
+    }
+  }, [data]);
+
   // 詳細表示
   const handleViewDetails = useCallback((report: TeamHealthReport) => {
     setSelectedReport(report);
@@ -630,7 +687,7 @@ export default function ReportsPage() {
     let filtered = data.reports.filter(report => {
       if (filter.period !== 'all' && report.period !== filter.period) return false;
       if (filter.team !== 'all' && report.teamName !== filter.team) return false;
-      return true;
+       return true;
     });
 
     // ソート
@@ -666,7 +723,7 @@ export default function ReportsPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">レポートデータを読み込み中...</p>
-          <p className="text-sm text-gray-500 mt-2">実際のSlackワークスペースからデータを取得しています</p>
+          <p className="text-sm text-gray-500 mt-2">統合ワークスペースからデータを取得しています</p>
         </div>
       </div>
     );
@@ -681,7 +738,7 @@ export default function ReportsPage() {
           <div className="flex justify-between items-start mb-8">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">チーム健全性レポート</h1>
-              <p className="text-gray-600">実際のSlackワークスペースデータに基づく詳細な健全性分析とトレンドレポート</p>
+              <p className="text-gray-600">統合ワークスペースデータに基づく詳細な健全性分析とトレンドレポート</p>
             </div>
             <Button onClick={handleRefresh} disabled={refreshing}>
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -699,13 +756,13 @@ export default function ReportsPage() {
               生成するレポートがありません
             </h3>
             <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-              あなたのSlackワークスペースには現在レポート生成に必要なデータが不足しているか、
+              あなたの統合ワークスペースには現在レポート生成に必要なデータが不足しているか、
               十分な活動履歴がありません。チームの活動が蓄積されるとレポートが自動生成されます。
             </p>
             <div className="space-y-4">
               <Button onClick={handleManualSync} disabled={refreshing}>
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                🔄 再同期
+                再同期
               </Button>
             </div>
           </div>
@@ -726,7 +783,7 @@ export default function ReportsPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">チーム健全性レポート</h1>
               <p className="text-gray-600 mt-1">
-                実際のSlackワークスペースデータに基づく詳細な健全性分析とトレンドレポート
+                統合ワークスペースデータに基づく詳細な健全性分析とトレンドレポート
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -734,12 +791,14 @@ export default function ReportsPage() {
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 更新
               </Button>
-              <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
-                📊 レポート出力
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                📧 レポート共有
-              </button>
+              <Button onClick={handleExportReport} disabled={!data}>
+                <Download className="h-4 w-4 mr-2" />
+                レポート出力
+              </Button>
+              <Button onClick={handleShareReport} disabled={!data}>
+                <Share2 className="h-4 w-4 mr-2" />
+                レポート共有
+              </Button>
             </div>
           </div>
         </div>
@@ -932,7 +991,7 @@ export default function ReportsPage() {
                         <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                           <div className="flex items-center text-green-800 text-sm">
                             <span className="mr-2">🔗</span>
-                            このスコアは実際のSlackワークスペースデータに基づいて算出されています
+                            このスコアは統合ワークスペースデータに基づいて算出されています
                           </div>
                         </div>
                       </div>
@@ -1095,15 +1154,14 @@ export default function ReportsPage() {
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex flex-wrap items-center gap-3">
-                    <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm">
-                      📊 詳細レポート出力
-                    </button>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
-                      📧 チームに共有
-                    </button>
-                    <button className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm">
-                      📅 改善計画作成
-                    </button>
+                    <Button onClick={handleExportReport} className="text-sm">
+                      <Download className="w-4 h-4 mr-2" />
+                      詳細レポート出力
+                    </Button>
+                    <Button onClick={handleShareReport} className="text-sm">
+                      <Share2 className="w-4 h-4 mr-2" />
+                      チームに共有
+                    </Button>
                   </div>
                   <button
                     onClick={() => setIsDetailModalOpen(false)}

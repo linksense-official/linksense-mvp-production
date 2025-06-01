@@ -1,5 +1,7 @@
-// src/app/page.tsx
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -18,6 +20,24 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
+  const { user, loading } = useAuth();
+
+  const getTrialButtonLink = () => {
+    if (loading) return '/register';
+    if (user) {
+      return '/subscription';
+    }
+    return '/register';
+  };
+
+  const getTrialButtonText = () => {
+    if (loading) return '無料トライアルを開始';
+    if (user) {
+      return '無料トライアルを開始';
+    }
+    return '無料トライアルを開始';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* ナビゲーション */}
@@ -29,35 +49,49 @@ export default function HomePage() {
               <span className="text-2xl font-bold text-gray-900">LinkSense</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/login">
-                <Button variant="ghost" className="text-gray-600 hover:text-gray-900">
-                  ログイン
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                  無料で始める
-                </Button>
-              </Link>
+              {!loading && (
+                <>
+                  {user ? (
+                    <Link href="/dashboard">
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                        ダッシュボード
+                      </Button>
+                    </Link>
+                  ) : (
+                    <>
+                      <Link href="/login">
+                        <Button variant="ghost" className="text-gray-600 hover:text-gray-900">
+                          ログイン
+                        </Button>
+                      </Link>
+                      <Link href="/register">
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                          無料で始める
+                        </Button>
+                      </Link>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
       </nav>
 
-      {/* メインセクション */}
+      {/* ヒーローセクション */}
       <section className="container mx-auto px-4 py-20">
         <div className="text-center max-w-4xl mx-auto">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            チームコミュニケーションを変革する
+            チーム健全性分析で組織力を最大化
           </h1>
           <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            LinkSenseは、すべてのコミュニケーションプラットフォームを横断した包括的な分析を提供し、
-            データドリブンな洞察を通じて、より強固で結束したチームの構築をサポートします。
+            8つの主要コミュニケーションプラットフォームを統合し、
+            データドリブンな洞察でチームのパフォーマンスと健全性を向上させます。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register">
+            <Link href={getTrialButtonLink()}>
               <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3">
-                無料トライアルを開始
+                {getTrialButtonText()}
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
@@ -70,14 +104,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 機能紹介セクション */}
+      {/* 主要機能セクション */}
       <section className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            包括的なコミュニケーション分析
+            包括的なチーム健全性分析
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            すべてのプラットフォームでチームのコミュニケーションを監視、分析、最適化
+            リアルタイムでチームの状態を監視し、問題を早期発見・解決
           </p>
         </div>
 
@@ -85,14 +119,14 @@ export default function HomePage() {
           <Card className="border-0 shadow-lg">
             <CardHeader className="text-center pb-4">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <BarChart3 className="w-6 h-6 text-blue-600" />
+                <Activity className="w-6 h-6 text-blue-600" />
               </div>
-              <CardTitle className="text-xl text-gray-900">リアルタイム分析</CardTitle>
+              <CardTitle className="text-xl text-gray-900">リアルタイム健全性監視</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription className="text-gray-600 text-center leading-relaxed">
-                統合されたすべてのプラットフォームで、コミュニケーションパターン、
-                応答時間、チームエンゲージメントの即座な洞察を取得できます。
+                バーンアウトリスク、エンゲージメント低下、コミュニケーション障害を
+                早期に検出し、チームの健全性を維持します。
               </CardDescription>
             </CardContent>
           </Card>
@@ -100,14 +134,14 @@ export default function HomePage() {
           <Card className="border-0 shadow-lg">
             <CardHeader className="text-center pb-4">
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 text-green-600" />
+                <Target className="w-6 h-6 text-green-600" />
               </div>
-              <CardTitle className="text-xl text-gray-900">チーム健全性モニタリング</CardTitle>
+              <CardTitle className="text-xl text-gray-900">統合プラットフォーム分析</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription className="text-gray-600 text-center leading-relaxed">
-                孤立リスク、コミュニケーションギャップ、より良いコラボレーションの
-                機会を生産性に影響する前に特定します。
+                Slack、Teams、Zoom等の8つのプラットフォームを統合し、
+                統一された視点でチーム状況を把握できます。
               </CardDescription>
             </CardContent>
           </Card>
@@ -117,12 +151,12 @@ export default function HomePage() {
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                 <TrendingUp className="w-6 h-6 text-purple-600" />
               </div>
-              <CardTitle className="text-xl text-gray-900">実行可能な洞察</CardTitle>
+              <CardTitle className="text-xl text-gray-900">AI駆動インサイト</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription className="text-gray-600 text-center leading-relaxed">
-                データドリブンな分析に基づいて、チームダイナミクスと
-                コミュニケーション効果を改善するためのパーソナライズされた推奨事項を受け取ります。
+                機械学習アルゴリズムによる高度な分析で、
+                チーム改善のための具体的なアクションプランを提供します。
               </CardDescription>
             </CardContent>
           </Card>
@@ -134,14 +168,14 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              シームレスなプラットフォーム統合
+              主要プラットフォーム完全統合
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              すべてのコミュニケーションツールを接続して、チームコラボレーションの統一されたビューを実現
+              日本・グローバル市場の主要コミュニケーションツールに対応
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-8 items-center justify-items-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center">
             <div className="flex flex-col items-center space-y-2">
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
                 <MessageSquare className="w-8 h-8 text-gray-600" />
@@ -164,7 +198,7 @@ export default function HomePage() {
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
                 <MessageSquare className="w-8 h-8 text-gray-600" />
               </div>
-              <span className="text-sm font-medium text-gray-700">Discord</span>
+              <span className="text-sm font-medium text-gray-700">LINE WORKS</span>
             </div>
             <div className="flex flex-col items-center space-y-2">
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -174,19 +208,31 @@ export default function HomePage() {
             </div>
             <div className="flex flex-col items-center space-y-2">
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                <Lock className="w-8 h-8 text-gray-600" />
+                <Globe className="w-8 h-8 text-gray-600" />
               </div>
-              <span className="text-sm font-medium text-gray-700">Workplace</span>
+              <span className="text-sm font-medium text-gray-700">Google Meet</span>
+            </div>
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Users className="w-8 h-8 text-gray-600" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">Discord</span>
+            </div>
+            <div className="flex flex-col items-center space-y-2">
+              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Shield className="w-8 h-8 text-gray-600" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">サイボウズ Office</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* メリットセクション */}
+      {/* 価値提案セクション */}
       <section className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            なぜLinkSenseを選ぶのか？
+            なぜLinkSenseが選ばれるのか
           </h2>
         </div>
 
@@ -198,11 +244,11 @@ export default function HomePage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  チーム孤立の削減
+                  バーンアウト早期検出
                 </h3>
                 <p className="text-gray-600">
-                  孤立している可能性のあるチームメンバーを特定し、
-                  パフォーマンスに影響する前にコミュニケーションギャップに積極的に対処します。
+                  AIアルゴリズムによりチームメンバーのストレス状況を分析し、
+                  バーンアウトのリスクを事前に検知・対策を提案します。
                 </p>
               </div>
             </div>
@@ -213,11 +259,11 @@ export default function HomePage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  コミュニケーションフローの最適化
+                  コミュニケーション最適化
                 </h3>
                 <p className="text-gray-600">
-                  組織内での情報の流れを理解し、
-                  生産性を低下させるボトルネックを特定します。
+                  チーム内の情報フローを可視化し、コミュニケーションボトルネックを
+                  特定して生産性向上を支援します。
                 </p>
               </div>
             </div>
@@ -228,28 +274,27 @@ export default function HomePage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  データドリブンな意思決定
+                  エンタープライズ対応
                 </h3>
                 <p className="text-gray-600">
-                  実際の使用データに基づいて、チーム構造、コミュニケーションポリシー、
-                  コラボレーションツールについて情報に基づいた決定を行います。
+                  大規模組織にも対応したセキュリティ基準と、
+                  管理者向けの包括的なダッシュボード機能を提供します。
                 </p>
               </div>
             </div>
           </div>
 
-          {/* CTAセクション - 完全修正版 */}
           <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl p-8 text-white shadow-xl">
             <h3 className="text-2xl font-bold mb-4 text-white">今すぐ始めませんか？</h3>
             <p className="text-blue-50 mb-6 leading-relaxed">
-              すでにLinkSenseを使用してコミュニケーションと
-              コラボレーション効果を向上させている数百のチームに参加しましょう。
+              LinkSenseでチーム健全性を向上させ、
+              持続可能な高パフォーマンス組織を構築しましょう。
             </p>
-            <Link href="/register">
+            <Link href={getTrialButtonLink()}>
               <button 
                 className="inline-flex items-center px-6 py-3 bg-white text-blue-700 font-bold rounded-lg shadow-lg hover:bg-blue-50 hover:shadow-xl transition-all duration-200"
               >
-                無料トライアルを開始
+                {getTrialButtonText()}
                 <ArrowRight className="ml-2 w-5 h-5" />
               </button>
             </Link>
@@ -257,25 +302,25 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 統計セクション */}
+      {/* 実績セクション */}
       <section className="bg-gray-900 text-white py-16">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-3xl font-bold text-blue-400 mb-2">500+</div>
-              <div className="text-gray-400">導入チーム数</div>
+              <div className="text-3xl font-bold text-blue-400 mb-2">100+</div>
+              <div className="text-gray-400">導入企業数</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-green-400 mb-2">95%</div>
-              <div className="text-gray-400">顧客満足度</div>
+              <div className="text-3xl font-bold text-green-400 mb-2">8/8</div>
+              <div className="text-gray-400">統合サービス完成</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-purple-400 mb-2">250万+</div>
-              <div className="text-gray-400">分析済みメッセージ</div>
+              <div className="text-3xl font-bold text-purple-400 mb-2">99.9%</div>
+              <div className="text-gray-400">システム稼働率</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-yellow-400 mb-2">40%</div>
-              <div className="text-gray-400">コミュニケーション改善</div>
+              <div className="text-3xl font-bold text-yellow-400 mb-2">50%</div>
+              <div className="text-gray-400">チーム健全性向上</div>
             </div>
           </div>
         </div>
@@ -290,13 +335,13 @@ export default function HomePage() {
               <span className="text-xl font-bold">LinkSense</span>
             </div>
             <div className="flex items-center space-x-6">
-              <Link href="/privacy" className="text-gray-400 hover:text-white">
+              <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
                 プライバシーポリシー
               </Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white">
+              <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">
                 利用規約
               </Link>
-              <Link href="/contact" className="text-gray-400 hover:text-white">
+              <Link href="/contact" className="text-gray-400 hover:text-white transition-colors">
                 お問い合わせ
               </Link>
             </div>

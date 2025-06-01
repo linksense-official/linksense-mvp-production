@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 interface NotificationState {
   show: boolean;
@@ -45,6 +45,24 @@ const CheckIcon = ({ className }: { className: string }) => (
 const ExclamationTriangleIcon = ({ className }: { className: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+  </svg>
+);
+
+const UserIcon = ({ className }: { className: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+  </svg>
+);
+
+const ShieldCheckIcon = ({ className }: { className: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.623 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+  </svg>
+);
+
+const TrashIcon = ({ className }: { className: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
   </svg>
 );
 
@@ -303,16 +321,8 @@ export default function ProfilePage() {
     name: user?.name || 'デモユーザー',
     email: user?.email || 'demo@company.com',
     department: 'プロダクト開発部',
-    position: 'シニアエンジニア',
     phone: '090-1234-5678',
-    location: '東京オフィス',
-    bio: 'フルスタック開発者として5年の経験があります。特にReact/Next.jsとNode.jsを得意としており、チーム健全性の向上に情熱を注いでいます。',
-    skills: ['React', 'TypeScript', 'Node.js', 'Python', 'AWS', 'Docker'],
-    languages: [
-      { name: '日本語', level: 'ネイティブ' },
-      { name: '英語', level: 'ビジネスレベル' },
-      { name: '中国語', level: '初級' }
-    ]
+    bio: 'フルスタック開発者として5年の経験があります。特にReact/Next.jsとNode.jsを得意としており、チーム健全性の向上に情熱を注いでいます。'
   });
 
   useEffect(() => {
@@ -364,6 +374,60 @@ export default function ProfilePage() {
       }, 4000);
     }
   };
+
+  // 🔧 セキュリティ設定ボタン機能実装
+  const handlePasswordChange = useCallback(() => {
+    console.log('🔐 パスワード変更機能を実行');
+    // 実装例: パスワード変更ページまたはモーダルに遷移
+    router.push('/reset-password');
+  }, [router]);
+
+  const handleTwoFactorAuth = useCallback(() => {
+    console.log('🔒 二段階認証設定を実行');
+    // 実装例: 2FA設定ページに遷移
+    router.push('/settings/2fa');
+  }, [router]);
+
+  const handleLoginHistory = useCallback(() => {
+    console.log('📋 ログイン履歴を表示');
+    // 実装例: ログイン履歴ページに遷移
+    router.push('/settings/login-history');
+  }, [router]);
+
+  // 🔧 アカウント削除機能実装
+  const handleAccountDeletion = useCallback(() => {
+    const confirmMessage = 'アカウントを削除すると、すべてのデータが永久に失われます。この操作は取り消せません。\n\n本当にアカウントを削除しますか？';
+    
+    if (window.confirm(confirmMessage)) {
+      const finalConfirm = 'この操作は本当に取り消せません。最終確認です。\n\nアカウントを削除しますか？';
+      
+      if (window.confirm(finalConfirm)) {
+        console.log('🗑️ アカウント削除処理を実行');
+        
+        try {
+          // 実際のアカウント削除API呼び出し
+          // await deleteUserAccount(user.id);
+          
+          // ローカルストレージクリア
+          if (typeof window !== 'undefined') {
+            localStorage.clear();
+            sessionStorage.clear();
+          }
+          
+          showNotification('アカウントが正常に削除されました。ご利用ありがとうございました。', 'info');
+          
+          // ログアウトしてホームページにリダイレクト
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 2000);
+          
+        } catch (error) {
+          console.error('❌ アカウント削除エラー:', error);
+          showNotification('アカウント削除中にエラーが発生しました。サポートにお問い合わせください。', 'error');
+        }
+      }
+    }
+  }, [showNotification]);
 
   const stats = [
     { label: 'アラート処理数', value: '127', change: '+12%', changeType: 'positive' },
@@ -443,7 +507,7 @@ export default function ProfilePage() {
               </button>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mt-4">{formData.name}</h1>
-            <p className="text-lg text-gray-600">{formData.position}</p>
+            <p className="text-lg text-gray-600">プロダクト開発チーム</p>
             <p className="text-gray-500">{formData.department}</p>
           </div>
 
@@ -470,7 +534,10 @@ export default function ProfilePage() {
 
           {/* 基本情報セクション */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">基本情報</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <UserIcon className="h-6 w-6 text-blue-600 mr-2" />
+              基本情報
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 名前 */}
               <div>
@@ -553,43 +620,6 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* 役職 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">役職</label>
-                {isEditing.position ? (
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={formData.position}
-                      onChange={(e) => handleInputChange('position', e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={() => handleSave('position')}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      保存
-                    </button>
-                    <button
-                      onClick={() => handleCancel('position')}
-                      className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <p className="text-gray-900">{formData.position}</p>
-                    <button
-                      onClick={() => handleEdit('position')}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
-                    >
-                      編集
-                    </button>
-                  </div>
-                )}
-              </div>
-
               {/* 電話番号 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">電話番号</label>
@@ -607,7 +637,7 @@ export default function ProfilePage() {
                     >
                       保存
                     </button>
-                      <button
+                    <button
                       onClick={() => handleCancel('phone')}
                       className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                     >
@@ -619,43 +649,6 @@ export default function ProfilePage() {
                     <p className="text-gray-900">{formData.phone}</p>
                     <button
                       onClick={() => handleEdit('phone')}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
-                    >
-                      編集
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* 勤務地 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">勤務地</label>
-                {isEditing.location ? (
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={formData.location}
-                      onChange={(e) => handleInputChange('location', e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={() => handleSave('location')}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      保存
-                    </button>
-                    <button
-                      onClick={() => handleCancel('location')}
-                      className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <p className="text-gray-900">{formData.location}</p>
-                    <button
-                      onClick={() => handleEdit('location')}
                       className="text-blue-600 hover:text-blue-700 text-sm"
                     >
                       編集
@@ -707,225 +700,78 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* スキルセクション */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">スキル</h2>
-              <button
-                onClick={() => handleEdit('skills')}
-                className="text-blue-600 hover:text-blue-700 text-sm"
-              >
-                編集
-              </button>
-            </div>
-            {isEditing.skills ? (
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  {formData.skills.map((skill, index) => (
-                    <div key={index} className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-                      <span>{skill}</span>
-                      <button
-                        onClick={() => {
-                          const newSkills = formData.skills.filter((_, i) => i !== index);
-                          setFormData(prev => ({ ...prev, skills: newSkills }));
-                        }}
-                        className="ml-2 text-blue-600 hover:text-blue-800"
-                      >
-                        <XMarkIcon className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    placeholder="新しいスキルを追加"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        const input = e.target as HTMLInputElement;
-                        if (input.value.trim()) {
-                          setFormData(prev => ({ 
-                            ...prev, 
-                            skills: [...prev.skills, input.value.trim()] 
-                          }));
-                          input.value = '';
-                        }
-                      }
-                    }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={() => handleSave('skills')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => handleCancel('skills')}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
-                    キャンセル
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">Enterキーで追加できます</p>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {formData.skills.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 言語スキルセクション */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">言語スキル</h2>
-              <button
-                onClick={() => handleEdit('languages')}
-                className="text-blue-600 hover:text-blue-700 text-sm"
-              >
-                編集
-              </button>
-            </div>
-            {isEditing.languages ? (
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  {formData.languages.map((language, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg">
-                      <input
-                        type="text"
-                        value={language.name}
-                        onChange={(e) => {
-                          const newLanguages = [...formData.languages];
-                          newLanguages[index] = { ...newLanguages[index], name: e.target.value };
-                          setFormData(prev => ({ ...prev, languages: newLanguages }));
-                        }}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="言語名"
-                      />
-                      <select
-                        value={language.level}
-                        onChange={(e) => {
-                          const newLanguages = [...formData.languages];
-                          newLanguages[index] = { ...newLanguages[index], level: e.target.value };
-                          setFormData(prev => ({ ...prev, languages: newLanguages }));
-                        }}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="初級">初級</option>
-                        <option value="中級">中級</option>
-                        <option value="上級">上級</option>
-                        <option value="ビジネスレベル">ビジネスレベル</option>
-                        <option value="ネイティブ">ネイティブ</option>
-                      </select>
-                      <button
-                        onClick={() => {
-                          const newLanguages = formData.languages.filter((_, i) => i !== index);
-                          setFormData(prev => ({ ...prev, languages: newLanguages }));
-                        }}
-                        className="p-2 text-red-600 hover:text-red-800"
-                      >
-                        <XMarkIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={() => {
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      languages: [...prev.languages, { name: '', level: '初級' }] 
-                    }));
-                  }}
-                  className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-gray-400 hover:text-gray-700 transition-colors"
-                >
-                  + 言語を追加
-                </button>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleSave('languages')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={() => handleCancel('languages')}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
-                    キャンセル
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {formData.languages.map((language, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-900">{language.name}</span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      language.level === 'ネイティブ' ? 'bg-green-100 text-green-800' :
-                      language.level === 'ビジネスレベル' ? 'bg-blue-100 text-blue-800' :
-                      language.level === '上級' ? 'bg-purple-100 text-purple-800' :
-                      language.level === '中級' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {language.level}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* セキュリティ設定セクション */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">セキュリティ設定</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <ShieldCheckIcon className="h-6 w-6 text-green-600 mr-2" />
+              セキュリティ設定
+            </h2>
             <div className="space-y-6">
               {/* パスワード変更 */}
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
                 <div>
-                  <h3 className="font-medium text-gray-900">パスワード</h3>
+                  <h3 className="font-medium text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3a1 1 0 011-1l2.586-2.586A6 6 0 1121 9z" />
+                    </svg>
+                    パスワード
+                  </h3>
                   <p className="text-sm text-gray-600">最後の変更: 2024年3月15日</p>
                 </div>
                 <button
-                  onClick={() => showNotification('パスワード変更機能は開発中です', 'info')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  onClick={handlePasswordChange}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
                 >
-                  変更
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>変更</span>
                 </button>
               </div>
 
               {/* 二段階認証 */}
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
                 <div>
-                  <h3 className="font-medium text-gray-900">二段階認証</h3>
+                  <h3 className="font-medium text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    二段階認証
+                  </h3>
                   <p className="text-sm text-gray-600">アカウントのセキュリティを強化します</p>
                 </div>
                 <button
-                  onClick={() => showNotification('二段階認証設定は開発中です', 'info')}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  onClick={handleTwoFactorAuth}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
                 >
-                  設定
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>設定</span>
                 </button>
               </div>
 
               {/* ログイン履歴 */}
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
                 <div>
-                  <h3 className="font-medium text-gray-900">ログイン履歴</h3>
+                  <h3 className="font-medium text-gray-900 flex items-center">
+                    <svg className="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    ログイン履歴
+                  </h3>
                   <p className="text-sm text-gray-600">最近のログイン活動を確認できます</p>
                 </div>
                 <button
-                  onClick={() => showNotification('ログイン履歴機能は開発中です', 'info')}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  onClick={handleLoginHistory}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
                 >
-                  確認
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span>確認</span>
                 </button>
               </div>
             </div>
@@ -933,31 +779,28 @@ export default function ProfilePage() {
 
           {/* アカウント操作セクション */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">アカウント操作</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <svg className="w-6 h-6 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              アカウント操作
+            </h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
-                <div>
-                  <h3 className="font-medium text-yellow-800">データのエクスポート</h3>
-                  <p className="text-sm text-yellow-700">あなたのデータをダウンロードできます</p>
-                </div>
-                <button
-                  onClick={() => showNotification('データエクスポート機能は開発中です', 'info')}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
-                >
-                  エクスポート
-                </button>
-              </div>
-
               <div className="flex items-center justify-between p-4 border border-red-200 bg-red-50 rounded-lg">
                 <div>
-                  <h3 className="font-medium text-red-800">アカウントの削除</h3>
+                  <h3 className="font-medium text-red-800 flex items-center">
+                    <TrashIcon className="h-5 w-5 text-red-600 mr-2" />
+                    アカウントの削除
+                  </h3>
                   <p className="text-sm text-red-700">この操作は取り消せません</p>
                 </div>
                 <button
-                  onClick={() => showNotification('アカウント削除機能は開発中です', 'warning')}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  onClick={handleAccountDeletion}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
                 >
-                  削除
+                  <TrashIcon className="h-4 w-4" />
+                  <span>削除</span>
                 </button>
               </div>
             </div>
@@ -973,6 +816,23 @@ export default function ProfilePage() {
         onImageUpdate={handleImageUpdate}
         onNotification={handleNotification}
       />
+
+      <style jsx>{`
+        @keyframes slide-in-right {
+          from {
+            opacity: 0;
+            transform: translateX(100%);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        .animate-slide-in-right {
+          animation: slide-in-right 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

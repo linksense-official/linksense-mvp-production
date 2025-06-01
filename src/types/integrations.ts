@@ -1,6 +1,6 @@
 // src/types/integrations.ts
-// LinkSense MVP - 統合サービス型定義システム - 6サービス完全対応版
-// 型安全性完全確保 + 新サービス型定義追加
+// LinkSense MVP - 統合サービス型定義システム - 8サービス完全対応版
+// 型安全性完全確保 + Discord・Google Meet対応 + 新サービス型定義追加
 
 // ✅ 基本的な統合サービス型定義
 export type IntegrationCategory = 'communication' | 'project' | 'analytics' | 'hr' | 'meeting';
@@ -44,6 +44,8 @@ export interface IntegrationCredentials {
   refreshToken?: string;
   clientId?: string;
   clientSecret?: string;
+  sessionToken?: string;  // サイボウズ Office用
+  baseUrl?: string;       // サイボウズ Office用
   
   // API Key関連
   apiKey?: string;
@@ -62,6 +64,7 @@ export interface IntegrationCredentials {
   workspaceId?: string;
   tenantId?: string;
   accountId?: string;
+  guildId?: string; // Discord用
   
   // トークン管理
   expiresAt?: Date;
@@ -79,7 +82,7 @@ export interface IntegrationAnalytics {
   trends: AnalyticsTrend[];
 }
 
-// ✅ 分析メトリクス
+// ✅ 分析メトリクス - Discord・Google Meet対応拡張版
 export interface AnalyticsMetrics {
   // コミュニケーション指標
   messageCount: number;
@@ -103,6 +106,18 @@ export interface AnalyticsMetrics {
   stressLevel: number;
   workLifeBalance: number;
   teamCohesion: number;
+  
+  // Discord特化指標
+  voiceParticipation?: number;
+  communityHealth?: number;
+  roleUtilization?: number;
+  botEffectiveness?: number;
+  
+  // Google Meet特化指標
+  meetingFatigue?: number;
+  cameraUsageRate?: number;
+  screenShareRate?: number;
+  recordingUsage?: number;
 }
 
 // ✅ 分析インサイト - 拡張版
@@ -421,6 +436,193 @@ export interface LineWorksMessage {
   updatedTime: string;
 }
 
+// ✅ Discord統合（ゲーミング・クリエイター特化）
+export interface DiscordIntegration extends Integration {
+  id: 'discord';
+  credentials?: DiscordCredentials;
+  data?: DiscordData;
+}
+
+export interface DiscordCredentials extends IntegrationCredentials {
+  accessToken: string;
+  refreshToken?: string;
+  guildId: string;
+  botToken?: string;
+}
+
+export interface DiscordData {
+  guild: DiscordGuild;
+  channels: DiscordChannel[];
+  members: DiscordMember[];
+  messages: DiscordMessage[];
+  voiceStates: DiscordVoiceState[];
+  roles: DiscordRole[];
+  bots: DiscordBot[];
+}
+
+export interface DiscordGuild {
+  id: string;
+  name: string;
+  description?: string;
+  memberCount: number;
+  onlineCount: number;
+  boostLevel: number;
+  createdAt: Date;
+  features: string[];
+}
+
+export interface DiscordChannel {
+  id: string;
+  name: string;
+  type: 'text' | 'voice' | 'category' | 'forum' | 'stage';
+  memberCount: number;
+  messageCount: number;
+  lastActivity: Date;
+  isNsfw: boolean;
+  parentId?: string;
+}
+
+export interface DiscordMember {
+  id: string;
+  username: string;
+  displayName: string;
+  isBot: boolean;
+  isOnline: boolean;
+  joinedAt: Date;
+  roles: string[];
+  messageCount: number;
+  voiceMinutes: number;
+  lastSeen: Date;
+  gameActivity?: string;
+  streamingActivity?: string;
+}
+
+export interface DiscordMessage {
+  id: string;
+  channelId: string;
+  authorId: string;
+  content: string;
+  timestamp: Date;
+  reactionCount: number;
+  attachmentCount: number;
+  mentionCount: number;
+  isReply: boolean;
+  threadId?: string;
+}
+
+export interface DiscordVoiceState {
+  userId: string;
+  channelId: string;
+  sessionStart: Date;
+  sessionEnd?: Date;
+  duration: number;
+  isMuted: boolean;
+  isDeafened: boolean;
+  isStreaming: boolean;
+  isVideoEnabled: boolean;
+}
+
+export interface DiscordRole {
+  id: string;
+  name: string;
+  color: number;
+  permissions: string;
+  memberCount: number;
+  isManaged: boolean;
+  isHoisted: boolean;
+  position: number;
+}
+
+export interface DiscordBot {
+  id: string;
+  name: string;
+  commandsUsed: number;
+  automationLevel: number;
+  moderationActions: number;
+  musicMinutes: number;
+}
+
+// ✅ Google Meet統合
+export interface GoogleMeetIntegration extends Integration {
+  id: 'google-meet';
+  credentials?: GoogleMeetCredentials;
+  data?: GoogleMeetData;
+}
+
+export interface GoogleMeetCredentials extends IntegrationCredentials {
+  accessToken: string;
+  refreshToken: string;
+  clientId: string;
+  clientSecret: string;
+  scope: string;
+}
+
+export interface GoogleMeetData {
+  meetings: GoogleMeetMeeting[];
+  users: GoogleMeetUser[];
+  calendar: GoogleCalendarEvent[];
+  workspace: GoogleWorkspace;
+}
+
+export interface GoogleMeetMeeting {
+  id: string;
+  meetingCode: string;
+  title: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  organizerId: string;
+  participantCount: number;
+  participants: GoogleMeetParticipant[];
+  isRecorded: boolean;
+  hasScreenShare: boolean;
+}
+
+export interface GoogleMeetUser {
+  id: string;
+  email: string;
+  name: string;
+  photoUrl?: string;
+  isActive: boolean;
+  lastActivity: Date;
+  meetingCount: number;
+  totalMeetingMinutes: number;
+}
+
+export interface GoogleMeetParticipant {
+  userId: string;
+  email: string;
+  name: string;
+  joinTime: Date;
+  leaveTime?: Date;
+  duration: number;
+  cameraOnTime: number;
+  micOnTime: number;
+  screenShareTime: number;
+}
+
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  start: Date;
+  end: Date;
+  attendees: Array<{
+    email: string;
+    responseStatus: 'accepted' | 'declined' | 'tentative' | 'needsAction';
+  }>;
+  meetingUrl?: string;
+  isRecurring: boolean;
+  createdBy: string;
+}
+
+export interface GoogleWorkspace {
+  domain: string;
+  organizationName: string;
+  userCount: number;
+  adminEmail: string;
+  createdTime: Date;
+}
+
 // ✅ サイボウズ Office統合（日本市場特化）
 export interface CybozuOfficeIntegration extends Integration {
   id: 'cybozu-office';
@@ -737,19 +939,19 @@ export interface WebhookRetryPolicy {
   exponentialBackoff: boolean;
 }
 
-// ✅ 統合サービス定義（6サービス対応）
+// ✅ 統合サービス定義（8サービス対応）
 export const INTEGRATION_SERVICES = {
-  // 主要6サービス
+  // 主要8サービス
   SLACK: 'slack',
   MICROSOFT_TEAMS: 'microsoft-teams',
   CHATWORK: 'chatwork',
   LINE_WORKS: 'line-works',
+  DISCORD: 'discord',
+  GOOGLE_MEET: 'google-meet',
   CYBOZU_OFFICE: 'cybozu-office',
   ZOOM: 'zoom',
   
   // 将来拡張予定
-  GOOGLE_MEET: 'google-meet',
-  DISCORD: 'discord',
   CISCO_WEBEX: 'cisco-webex',
   GOTOMEETING: 'gotomeeting',
   RINGCENTRAL: 'ringcentral',

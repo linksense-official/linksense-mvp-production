@@ -1,6 +1,6 @@
 // src/lib/integrations/base-integration.ts
-// LinkSense MVP - 統合サービス基底クラスシステム - 型整合性修正版
-// 13サービス全対応 + 拡張可能な設計 + 非同期メソッド対応
+// LinkSense MVP - 統合サービス基底クラスシステム - 本番版
+// 8サービス完全対応 + 拡張可能な設計 + 非同期メソッド対応
 
 import type {
   Integration,
@@ -16,7 +16,9 @@ import type {
   AuthType
 } from '@/types/integrations';
 
-// ✅ 統合サービス基底クラス - 型整合性修正版
+/**
+ * 統合サービス基底クラス - 本番版
+ */
 export abstract class BaseIntegration {
   protected integration: Integration;
   protected isInitialized: boolean = false;
@@ -27,15 +29,13 @@ export abstract class BaseIntegration {
     this.integration = integration;
   }
 
-  // ✅ 抽象メソッド - 各サービスで実装必須
+  // 抽象メソッド - 各サービスで実装必須
   abstract connect(credentials: IntegrationCredentials): Promise<boolean>;
   abstract disconnect(): Promise<boolean>;
   abstract validateCredentials(credentials: IntegrationCredentials): Promise<boolean>;
   abstract fetchData(): Promise<any>;
   abstract calculateMetrics(data: any): Promise<AnalyticsMetrics>;
   abstract generateInsights(metrics: AnalyticsMetrics): Promise<AnalyticsInsight[]>;
-
-  // ✅ 共通メソッド - 全サービス共通機能
 
   /**
    * 統合サービスの初期化
@@ -48,10 +48,12 @@ export abstract class BaseIntegration {
           this.integration.status = 'connected';
           this.isInitialized = true;
           await this.updateLastSync();
+          console.log(`統合サービス初期化成功: ${this.integration.name}`);
           return true;
         }
       }
       this.integration.status = 'disconnected';
+      console.warn(`統合サービス初期化失敗: ${this.integration.name}`);
       return false;
     } catch (error) {
       this.handleError('初期化エラー', error);
@@ -74,13 +76,16 @@ export abstract class BaseIntegration {
     };
 
     if (this.syncInProgress) {
-      syncResult.errors.push('同期が既に進行中です');
+      const errorMsg = '同期が既に進行中です';
+      syncResult.errors.push(errorMsg);
+      console.warn(`${this.integration.name}: ${errorMsg}`);
       return syncResult;
     }
 
     try {
       this.syncInProgress = true;
       this.integration.status = 'connecting';
+      console.log(`データ同期開始: ${this.integration.name}`);
 
       // 認証状態確認
       if (!await this.isAuthenticated()) {
@@ -126,9 +131,11 @@ export abstract class BaseIntegration {
       syncResult.success = true;
       syncResult.recordsProcessed = this.getRecordCount(rawData);
       
+      console.log(`データ同期完了: ${this.integration.name} (${syncResult.recordsProcessed}件処理)`);
+      
     } catch (error) {
       this.handleError('同期エラー', error);
-      syncResult.errors.push(this.lastError || 'Unknown error');
+      syncResult.errors.push(this.lastError || '不明なエラー');
       this.integration.status = 'error';
     } finally {
       this.syncInProgress = false;
@@ -139,36 +146,36 @@ export abstract class BaseIntegration {
   }
 
   /**
- * 健全性スコア計算（0-100） - 非同期対応版
- */
-protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number> {
-  const weights = {
-    engagement: 0.3,
-    response: 0.25,
-    burnout: 0.25,
-    collaboration: 0.2
-  };
+   * 健全性スコア計算（0-100）
+   */
+  protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number> {
+    const weights = {
+      engagement: 0.3,    // エンゲージメント
+      response: 0.25,     // 応答時間
+      burnout: 0.25,      // バーンアウト
+      collaboration: 0.2  // チーム結束
+    };
 
-  let score = 0;
+    let score = 0;
 
-  // エンゲージメントスコア (0-100)
-  const engagementScore = Math.min(100, metrics.engagementRate * 100);
-  score += engagementScore * weights.engagement;
+    // エンゲージメントスコア (0-100)
+    const engagementScore = Math.min(100, metrics.engagementRate * 100);
+    score += engagementScore * weights.engagement;
 
-  // 応答時間スコア (逆比例: 早いほど高スコア)
-  const responseScore = Math.max(0, 100 - (metrics.averageResponseTime / 60)); // 分単位
-  score += Math.min(100, responseScore) * weights.response;
+    // 応答時間スコア (逆比例: 早いほど高スコア)
+    const responseScore = Math.max(0, 100 - (metrics.averageResponseTime / 60)); // 分単位
+    score += Math.min(100, responseScore) * weights.response;
 
-  // バーンアウトリスク (逆スコア: 低いほど良い)
-  const burnoutScore = Math.max(0, 100 - metrics.burnoutRisk);
-  score += burnoutScore * weights.burnout;
+    // バーンアウトリスク (逆スコア: 低いほど良い)
+    const burnoutScore = Math.max(0, 100 - metrics.burnoutRisk);
+    score += burnoutScore * weights.burnout;
 
-  // チーム結束スコア
-  const collaborationScore = metrics.teamCohesion;
-  score += collaborationScore * weights.collaboration;
+    // チーム結束スコア
+    const collaborationScore = metrics.teamCohesion;
+    score += collaborationScore * weights.collaboration;
 
-  return Math.round(Math.max(0, Math.min(100, score)));
-}
+    return Math.round(Math.max(0, Math.min(100, score)));
+  }
 
   /**
    * アラート検証
@@ -243,6 +250,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
         if (this.integration.credentials.refreshToken) {
           return await this.refreshToken();
         }
+        console.warn(`認証トークンが期限切れです: ${this.integration.name}`);
         return false;
       }
     }
@@ -255,6 +263,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
    */
   protected async refreshToken(): Promise<boolean> {
     // 各サービスで実装
+    console.log(`トークンリフレッシュが必要です: ${this.integration.name}`);
     return false;
   }
 
@@ -266,6 +275,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
       ...this.integration.config,
       ...config
     };
+    console.log(`設定更新完了: ${this.integration.name}`);
   }
 
   /**
@@ -276,6 +286,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
       ...this.integration.credentials,
       ...credentials
     };
+    console.log(`認証情報更新完了: ${this.integration.name}`);
   }
 
   /**
@@ -293,7 +304,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
   }
 
   /**
-   * 健全性スコア取得 - 非同期対応版
+   * 健全性スコア取得
    */
   async getHealthScore(): Promise<number> {
     try {
@@ -352,6 +363,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
    */
   enable(): void {
     this.integration.isEnabled = true;
+    console.log(`統合サービス有効化: ${this.integration.name}`);
   }
 
   /**
@@ -360,6 +372,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
   disable(): void {
     this.integration.isEnabled = false;
     this.integration.status = 'disconnected';
+    console.log(`統合サービス無効化: ${this.integration.name}`);
   }
 
   /**
@@ -370,14 +383,14 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
   }
 
   /**
-   * 接続状態確認 - 非同期版
+   * 接続状態確認
    */
   async isConnected(): Promise<boolean> {
     return this.getStatus() === 'connected' && await this.isAuthenticated();
   }
 
   /**
-   * 分析データ取得 - 非同期版
+   * 分析データ取得
    */
   async getAnalytics(): Promise<IntegrationAnalytics | null> {
     try {
@@ -404,7 +417,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
     }
   }
 
-  // ✅ 保護されたヘルパーメソッド
+  // 保護されたヘルパーメソッド
 
   /**
    * エラーハンドリング
@@ -440,15 +453,14 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
    * 分析結果保存
    */
   protected async saveAnalytics(analytics: IntegrationAnalytics): Promise<void> {
-    // データベースまたはローカルストレージに保存
-    // 実装は環境に依存
     try {
       const key = `analytics_${this.integration.id}_${Date.now()}`;
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem(key, JSON.stringify(analytics));
+        console.log(`分析結果保存完了: ${this.integration.name}`);
       }
     } catch (error) {
-      console.warn('分析結果の保存に失敗:', error);
+      console.warn(`分析結果の保存に失敗 [${this.integration.name}]:`, error);
     }
   }
 
@@ -509,6 +521,7 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
    */
   protected async handleRateLimit(retryAfter?: number): Promise<void> {
     const delay = retryAfter ? retryAfter * 1000 : 1000;
+    console.warn(`レート制限のため${delay}ms待機: ${this.integration.name}`);
     await new Promise(resolve => setTimeout(resolve, delay));
   }
 
@@ -517,7 +530,6 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
    */
   protected validateData(data: any, schema: any): boolean {
     // 簡易的なデータ検証
-    // 本格的な実装ではzodやjoi等を使用
     return data !== null && data !== undefined;
   }
 
@@ -536,12 +548,16 @@ protected async calculateHealthScore(metrics: AnalyticsMetrics): Promise<number>
   }
 }
 
-// ✅ 統合サービスコンストラクタ型定義
+/**
+ * 統合サービスコンストラクタ型定義
+ */
 export interface IntegrationConstructor {
   new (integration: Integration): BaseIntegration;
 }
 
-// ✅ 統合サービスファクトリー
+/**
+ * 統合サービスファクトリー
+ */
 export class IntegrationFactory {
   private static integrations = new Map<string, IntegrationConstructor>();
 
@@ -550,6 +566,7 @@ export class IntegrationFactory {
    */
   static register(id: string, integrationClass: IntegrationConstructor): void {
     this.integrations.set(id, integrationClass);
+    console.log(`統合サービス登録完了: ${id}`);
   }
 
   /**
@@ -562,6 +579,7 @@ export class IntegrationFactory {
       return null;
     }
 
+    console.log(`統合サービス作成: ${integration.id}`);
     return new IntegrationClass(integration);
   }
 
@@ -583,18 +601,25 @@ export class IntegrationFactory {
    * 統合サービス登録解除
    */
   static unregister(integrationId: string): boolean {
-    return this.integrations.delete(integrationId);
+    const result = this.integrations.delete(integrationId);
+    if (result) {
+      console.log(`統合サービス登録解除: ${integrationId}`);
+    }
+    return result;
   }
 
   /**
    * 全統合サービス登録解除
    */
   static clear(): void {
+    console.log('全統合サービス登録解除');
     this.integrations.clear();
   }
 }
 
-// ✅ 統合サービスレジストリ
+/**
+ * 統合サービスレジストリ
+ */
 export class IntegrationRegistry {
   private static instance: IntegrationRegistry;
   private integrations = new Map<string, BaseIntegration>();
@@ -611,6 +636,7 @@ export class IntegrationRegistry {
    */
   add(integration: BaseIntegration): void {
     this.integrations.set(integration.getIntegration().id, integration);
+    console.log(`統合サービス追加: ${integration.getIntegration().name}`);
   }
 
   /**
@@ -640,13 +666,18 @@ export class IntegrationRegistry {
    * 統合サービス削除
    */
   remove(integrationId: string): boolean {
-    return this.integrations.delete(integrationId);
+    const result = this.integrations.delete(integrationId);
+    if (result) {
+      console.log(`統合サービス削除: ${integrationId}`);
+    }
+    return result;
   }
 
   /**
    * 全統合サービスクリア
    */
   clear(): void {
+    console.log('全統合サービスクリア');
     this.integrations.clear();
   }
 
@@ -672,7 +703,7 @@ export class IntegrationRegistry {
   }
 
   /**
-   * 健全性スコア一覧取得 - 非同期版
+   * 健全性スコア一覧取得
    */
   async getHealthScores(): Promise<{ [integrationId: string]: number }> {
     const scores: { [integrationId: string]: number } = {};
@@ -690,7 +721,7 @@ export class IntegrationRegistry {
   }
 
   /**
-   * 分析データ一覧取得 - 非同期版
+   * 分析データ一覧取得
    */
   async getAllAnalytics(): Promise<{ [integrationId: string]: IntegrationAnalytics | null }> {
     const analytics: { [integrationId: string]: IntegrationAnalytics | null } = {};
@@ -708,5 +739,4 @@ export class IntegrationRegistry {
   }
 }
 
-// ✅ デフォルトエクスポート
 export default BaseIntegration;

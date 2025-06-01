@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
 
 export default function SubscriptionPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { subscription, isLoading: subLoading } = useSubscription(user?.id);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -49,24 +49,6 @@ export default function SubscriptionPage() {
     }
   };
 
-  // 決済履歴ページ遷移
-  const handleBillingHistory = () => {
-  setActionLoading('billing');
-  console.log('💳 決済履歴ページ遷移');
-  
-  // 決済履歴ページに遷移
-  window.location.href = '/subscription/billing-history';
-};
-
-  // 使用量ページ遷移
- const handleUsageDetails = () => {
-  setActionLoading('usage');
-  console.log('📊 使用量ページ遷移');
-  
-  // 使用量ページに遷移
-  window.location.href = '/subscription/usage';
-};
-
   // プラン変更ページ遷移
   const handleChangePlan = () => {
     setActionLoading('change');
@@ -84,7 +66,7 @@ export default function SubscriptionPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">サブスクリプション管理</h1>
           <p className="mt-2 text-gray-600">
-            現在のプランの確認と変更、決済履歴の管理ができます
+            現在のプランの確認と変更ができます
           </p>
         </div>
 
@@ -95,14 +77,14 @@ export default function SubscriptionPage() {
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">現在のプラン</h2>
               
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg mb-6">
+              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg mb-6">
                 <div>
-                  <h3 className="text-lg font-medium text-blue-900">Professional</h3>
-                  <p className="text-blue-700">チーム健全性の包括的分析</p>
-                  <p className="text-2xl font-bold text-blue-900 mt-2">¥2,980/月</p>
+                  <h3 className="text-lg font-medium text-green-900">Starter</h3>
+                  <p className="text-green-700">基本的なチーム健全性分析</p>
+                  <p className="text-2xl font-bold text-green-900 mt-2">無料</p>
                 </div>
-                <div className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  人気プラン
+                <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  現在のプラン
                 </div>
               </div>
 
@@ -111,15 +93,12 @@ export default function SubscriptionPage() {
                 <h4 className="font-medium text-gray-900 mb-3">利用可能な機能</h4>
                 <ul className="space-y-2">
                   {[
-                    '高度な健全性分析',
-                    'リアルタイム分析',
-                    '日次レポート',
-                    'カスタムアラート',
-                    'データ保持 1年',
-                    '高度なダッシュボード',
-                    'チーム比較分析',
-                    'API アクセス',
-                    '優先サポート'
+                    '基本的な健全性分析',
+                    '週次レポート',
+                    '基本アラート',
+                    'データ保持 3ヶ月',
+                    '基本ダッシュボード',
+                    'コミュニティサポート'
                   ].map((feature, index) => (
                     <li key={index} className="flex items-center">
                       <svg className="w-5 h-5 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
@@ -134,27 +113,14 @@ export default function SubscriptionPage() {
               {/* アクションボタン */}
               <div className="flex flex-wrap gap-3">
                 <button 
-                  onClick={handleBillingHistory}
-                  disabled={actionLoading === 'billing'}
-                  className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionLoading === 'billing' ? '処理中...' : '決済履歴'}
-                </button>
-
-                <button 
-                  onClick={handleUsageDetails}
-                  disabled={actionLoading === 'usage'}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionLoading === 'usage' ? '処理中...' : '使用量確認'}
-                </button>
-
-                <button 
                   onClick={handleChangePlan}
                   disabled={actionLoading === 'change'}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  {actionLoading === 'change' ? '処理中...' : 'プランを変更'}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span>{actionLoading === 'change' ? '処理中...' : 'プランをアップグレード'}</span>
                 </button>
               </div>
             </div>
@@ -166,26 +132,26 @@ export default function SubscriptionPage() {
               <h2 className="text-xl font-semibold text-gray-900 mb-4">プラン変更</h2>
               
               <div className="space-y-4">
-                <div className="p-4 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors">
+                <div className="p-4 rounded-lg border-2 border-green-500 bg-green-50">
                   <h3 className="font-medium text-gray-900">Starter</h3>
                   <p className="text-sm text-gray-600 mb-2">基本的な機能</p>
                   <p className="font-bold text-gray-900 mb-3">無料</p>
-                  <button 
-                    onClick={() => handlePlanChange('starter')}
-                    disabled={actionLoading === 'starter'}
-                    className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {actionLoading === 'starter' ? '処理中...' : 'ダウングレード'}
-                  </button>
+                  <span className="w-full bg-green-500 text-white py-2 px-4 rounded-md text-center block">
+                    現在のプラン
+                  </span>
                 </div>
 
-                <div className="p-4 rounded-lg border-2 border-blue-500 bg-blue-50">
+                <div className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-300 transition-colors">
                   <h3 className="font-medium text-gray-900">Professional</h3>
                   <p className="text-sm text-gray-600 mb-2">チーム健全性の包括的分析</p>
                   <p className="font-bold text-gray-900 mb-3">¥2,980/月</p>
-                  <span className="w-full bg-blue-500 text-white py-2 px-4 rounded-md text-center block">
-                    現在のプラン
-                  </span>
+                  <button 
+                    onClick={() => handlePlanChange('professional')}
+                    disabled={actionLoading === 'professional'}
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {actionLoading === 'professional' ? '処理中...' : 'アップグレード'}
+                  </button>
                 </div>
 
                 <div className="p-4 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors">
@@ -212,7 +178,7 @@ export default function SubscriptionPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <h3 className="text-sm font-medium text-gray-500">プランID</h3>
-              <p className="text-lg font-semibold text-gray-900">professional</p>
+              <p className="text-lg font-semibold text-gray-900">starter</p>
             </div>
             
             <div>
@@ -221,16 +187,100 @@ export default function SubscriptionPage() {
             </div>
             
             <div>
-              <h3 className="text-sm font-medium text-gray-500">次回更新日</h3>
+              <h3 className="text-sm font-medium text-gray-500">開始日</h3>
               <p className="text-lg font-semibold text-gray-900">
-                {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('ja-JP')}
+                {new Date().toLocaleDateString('ja-JP')}
               </p>
             </div>
             
             <div>
-              <h3 className="text-sm font-medium text-gray-500">自動更新</h3>
-              <p className="text-lg font-semibold text-gray-900">有効</p>
+              <h3 className="text-sm font-medium text-gray-500">プランタイプ</h3>
+              <p className="text-lg font-semibold text-gray-900">無料プラン</p>
             </div>
+          </div>
+        </div>
+
+        {/* プラン比較セクション */}
+        <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">プラン比較</h2>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    機能
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Starter
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Professional
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Enterprise
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    健全性分析
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    基本
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    高度
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    エンタープライズ
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    レポート頻度
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    週次
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    日次
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    リアルタイム
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    データ保持期間
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    3ヶ月
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    1年
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    無制限
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    サポート
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    コミュニティ
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    優先サポート
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    専任サポート
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

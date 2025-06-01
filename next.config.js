@@ -6,14 +6,13 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 const nextConfig = {
-  // Next.js 15 実験的機能設定
+  // Next.js 14 実験的機能設定
   experimental: {
     esmExternals: true,
     // 本番環境での最適化
     ...(isProduction && {
       optimizeCss: true,
-      optimizeServerReact: true,
-      serverComponentsExternalPackages: ['@prisma/client'],
+      // serverComponentsExternalPackages は削除（Next.js 14では不要）
     }),
     // 開発環境での最適化
     ...(isDevelopment && {
@@ -92,7 +91,7 @@ const nextConfig = {
     return config;
   },
 
-  // 画像最適化設定（本番環境強化）
+  // 画像最適化設定（Next.js 14対応版）
   images: {
     domains: isProduction 
       ? [
@@ -108,11 +107,7 @@ const nextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: isProduction ? 86400 : 60, // 本番: 1日, 開発: 1分
-    // 本番環境での画像最適化
-    ...(isProduction && {
-      loader: 'default',
-      quality: 80,
-    }),
+    // quality設定を削除（Next.js 14では非推奨）
   },
 
   // セキュリティヘッダー（本番環境強化版）
@@ -298,9 +293,8 @@ const nextConfig = {
     CUSTOM_KEY: isProduction ? 'production-value' : 'development-value',
   },
 
-  // パフォーマンス最適化
+  // パフォーマンス最適化（swcMinifyを削除 - Next.js 14ではデフォルト有効）
   ...(isProduction && {
-    swcMinify: true,
     modularizeImports: {
       '@mui/icons-material': {
         transform: '@mui/icons-material/{{member}}',
@@ -314,7 +308,6 @@ const nextConfig = {
   // 開発環境設定
   ...(isDevelopment && {
     reactStrictMode: true,
-    fastRefresh: true,
   }),
 
   // ログ設定

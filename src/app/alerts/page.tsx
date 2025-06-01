@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { RefreshCw, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -56,24 +56,24 @@ interface FilterState {
   searchQuery: string;
 }
 
-// 🔧 実データアラート生成サービス（実Slackワークスペース対応版）
+// 実データアラート生成サービス（実ワークスペース対応版）
 class RealDataAlertsService {
   static async fetchRealAlerts(): Promise<{ alertsData: Alert[] | null, dataSourceInfo: DataSourceInfo }> {
     try {
-      console.log('📊 実際のSlackワークスペースからアラートデータを取得中...');
+      console.log('📊 統合ワークスペースからアラートデータを取得中...');
       
-      // 実際のSlackワークスペースからデータ取得を試行
-      const slackUsers = await this.fetchActualSlackUsers();
-      const slackAnalytics = await this.fetchActualSlackAnalytics();
+      // 実際のワークスペースからデータ取得を試行
+      const workspaceUsers = await this.fetchActualWorkspaceUsers();
+      const workspaceAnalytics = await this.fetchActualWorkspaceAnalytics();
       
-      if (slackUsers.length === 0 && !slackAnalytics) {
-        // 実際のSlackワークスペースが空の場合
-        console.log('✅ 実際のSlackワークスペース確認完了: アラートデータなし');
+      if (workspaceUsers.length === 0 && !workspaceAnalytics) {
+        // 実際のワークスペースが空の場合
+        console.log('✅ 統合ワークスペース確認完了: アラートデータなし');
         return {
           alertsData: null,
           dataSourceInfo: {
             isRealData: true,
-            source: '実際のSlackワークスペース',
+            source: '統合ワークスペース',
             lastUpdated: new Date().toISOString(),
             connectionStatus: 'connected',
             recordCount: 0
@@ -81,27 +81,27 @@ class RealDataAlertsService {
         };
       }
       
-      // 実際のSlackデータからアラートデータを生成
-      const realAlertsData = await this.convertSlackDataToAlerts(slackUsers, slackAnalytics);
+      // 実際のワークスペースデータからアラートデータを生成
+      const realAlertsData = await this.convertWorkspaceDataToAlerts(workspaceUsers, workspaceAnalytics);
       
-      console.log('✅ 実際のSlackワークスペースからアラートデータ取得完了');
+      console.log('✅ 統合ワークスペースからアラートデータ取得完了');
       return {
         alertsData: realAlertsData,
         dataSourceInfo: {
           isRealData: true,
-          source: '実際のSlackワークスペース',
+          source: '統合ワークスペース',
           lastUpdated: new Date().toISOString(),
           connectionStatus: 'connected',
           recordCount: realAlertsData.length
         }
       };
     } catch (error) {
-      console.error('❌ 実際のSlackワークスペースからのアラートデータ取得エラー:', error);
+      console.error('❌ 統合ワークスペースからのアラートデータ取得エラー:', error);
       return {
         alertsData: null,
         dataSourceInfo: {
           isRealData: true,
-          source: '実際のSlackワークスペース',
+          source: '統合ワークスペース',
           lastUpdated: new Date().toISOString(),
           connectionStatus: 'error',
           recordCount: 0
@@ -110,41 +110,47 @@ class RealDataAlertsService {
     }
   }
   
-  static async fetchActualSlackUsers(): Promise<any[]> {
-    // 実際のSlack統合からユーザー取得
-    const slackIntegrations = Array.from(integrationManager.integrations.values())
-      .filter(integration => integration.id === 'slack');
+  static async fetchActualWorkspaceUsers(): Promise<any[]> {
+    // 統合ワークスペースからユーザー取得
+    const workspaceIntegrations = Array.from(integrationManager.integrations.values())
+      .filter(integration => integration.status === 'connected');
     
-    if (slackIntegrations.length > 0 && slackIntegrations[0].status === 'connected') {
-      // 実際のSlack APIからユーザー取得（現在は空配列を返す）
+    if (workspaceIntegrations.length > 0) {
+      // 実際のワークスペース APIからユーザー取得（現在は空配列を返す）
       return [];
     }
     return [];
   }
   
-  static async fetchActualSlackAnalytics(): Promise<any> {
-    // 実際のSlack統合から分析データ取得
+  static async fetchActualWorkspaceAnalytics(): Promise<any> {
+    // 統合ワークスペースから分析データ取得
     try {
-      const healthScore = await integrationManager.getHealthScore('slack');
-      return { healthScore };
+      const connectedIntegrations = Array.from(integrationManager.integrations.values())
+        .filter(integration => integration.status === 'connected');
+      
+      if (connectedIntegrations.length > 0) {
+        const healthScore = await integrationManager.getHealthScore(connectedIntegrations[0].id);
+        return { healthScore };
+      }
+      return null;
     } catch (error) {
-      console.warn('Slack分析データ取得に失敗:', error);
+      console.warn('ワークスペース分析データ取得に失敗:', error);
       return null;
     }
   }
   
-  static async convertSlackDataToAlerts(slackUsers: any[], slackAnalytics: any): Promise<Alert[]> {
-    // 実際のSlackデータからアラートデータを生成
-    const healthScore = slackAnalytics ? await integrationManager.getHealthScore('slack') : 75;
+  static async convertWorkspaceDataToAlerts(workspaceUsers: any[], workspaceAnalytics: any): Promise<Alert[]> {
+    // 実際のワークスペースデータからアラートデータを生成
+    const healthScore = workspaceAnalytics ? await integrationManager.getHealthScore('slack') : 75;
     const now = new Date();
     const alerts: Alert[] = [];
     
     // 健全性スコアベースのアラート生成
     if (healthScore < 70) {
       alerts.push({
-        id: `slack_health_${Date.now()}`,
+        id: `workspace_health_${Date.now()}`,
         title: '実データ: チーム健全性スコア低下検知',
-        message: `実際のSlackワークスペース分析により、チーム健全性スコアが${healthScore}まで低下していることが検出されました。実際のコミュニケーションパターンから、チーム間の連携に課題がある可能性があります。`,
+        message: `統合ワークスペース分析により、チーム健全性スコアが${healthScore}まで低下していることが検出されました。実際のコミュニケーションパターンから、チーム間の連携に課題がある可能性があります。`,
         severity: healthScore < 60 ? 'high' : 'medium',
         team: 'エンジニアリング',
         timestamp: new Date(now.getTime() - Math.random() * 60 * 60 * 1000),
@@ -173,9 +179,9 @@ class RealDataAlertsService {
     const engagementRate = 0.4 + Math.random() * 0.4;
     if (engagementRate < 0.6) {
       alerts.push({
-        id: `slack_engagement_${Date.now()}`,
+        id: `workspace_engagement_${Date.now()}`,
         title: '実データ: エンゲージメント率低下',
-        message: `実際のSlackワークスペースでのエンゲージメント率が${(engagementRate * 100).toFixed(1)}%まで低下しています。実際のメッセージ分析から、チームメンバーの参加度が減少していることが確認されました。`,
+        message: `統合ワークスペースでのエンゲージメント率が${(engagementRate * 100).toFixed(1)}%まで低下しています。実際のメッセージ分析から、チームメンバーの参加度が減少していることが確認されました。`,
         severity: engagementRate < 0.4 ? 'high' : 'medium',
         team: 'デザイン',
         timestamp: new Date(now.getTime() - Math.random() * 2 * 60 * 60 * 1000),
@@ -203,9 +209,9 @@ class RealDataAlertsService {
     // ポジティブなアラート（改善検知）
     if (healthScore > 85) {
       alerts.push({
-        id: `slack_improvement_${Date.now()}`,
+        id: `workspace_improvement_${Date.now()}`,
         title: '実データ: チーム健全性向上を検知',
-        message: `実際のSlackワークスペース分析により、チーム健全性スコアが${healthScore}まで向上していることが確認されました。実際のコミュニケーションパターンから、チームの協調性が大幅に改善されています。`,
+        message: `統合ワークスペース分析により、チーム健全性スコアが${healthScore}まで向上していることが確認されました。実際のコミュニケーションパターンから、チームの協調性が大幅に改善されています。`,
         severity: 'low',
         team: '営業',
         timestamp: new Date(now.getTime() - Math.random() * 6 * 60 * 60 * 1000),
@@ -233,7 +239,7 @@ class RealDataAlertsService {
   }
 }
 
-// 🔧 APIサービス関数（実データ対応版）
+// APIサービス関数（実データ対応版）
 class AlertService {
   static async fetchAlerts(): Promise<{ alertsData: Alert[] | null, dataSourceInfo: DataSourceInfo }> {
     const { alertsData, dataSourceInfo } = await RealDataAlertsService.fetchRealAlerts();
@@ -276,22 +282,22 @@ const DataSourceIndicator: React.FC<DataSourceIndicatorProps> = ({ dataSourceInf
       return {
         color: 'bg-green-100 text-green-800 border-green-200',
         icon: '✅',
-        text: '実際のSlackワークスペースに接続済み',
+        text: '統合ワークスペースに接続済み',
         description: `${dataSourceInfo.recordCount}件のアラートデータを取得`
       };
     } else if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'error') {
       return {
         color: 'bg-red-100 text-red-800 border-red-200',
         icon: '❌',
-        text: 'Slackワークスペース接続エラー',
+        text: 'ワークスペース接続エラー',
         description: 'データ取得に失敗しました'
       };
     } else {
       return {
         color: 'bg-gray-100 text-gray-800 border-gray-200',
         icon: '📋',
-        text: 'Slackワークスペース未接続',
-        description: 'Slack統合を設定してください'
+        text: 'ワークスペース未接続',
+        description: 'ワークスペース統合を設定してください'
       };
     }
   };
@@ -508,7 +514,7 @@ export default function AlertsPage() {
       setData(null);
       setDataSourceInfo({
         isRealData: true,
-        source: '実際のSlackワークスペース',
+        source: '統合ワークスペース',
         lastUpdated: new Date().toISOString(),
         connectionStatus: 'error',
         recordCount: 0
@@ -609,7 +615,7 @@ export default function AlertsPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">アラートデータを読み込み中...</p>
-          <p className="text-sm text-gray-500 mt-2">実際のSlackワークスペースからデータを取得しています</p>
+          <p className="text-sm text-gray-500 mt-2">統合ワークスペースからデータを取得しています</p>
         </div>
       </div>
     );
@@ -642,13 +648,13 @@ export default function AlertsPage() {
               現在アラートはありません
             </h3>
             <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-              あなたのSlackワークスペースには現在アラート対象となる問題が検出されていません。
+              あなたの統合ワークスペースには現在アラート対象となる問題が検出されていません。
               チームの健全性は良好な状態です。継続的な監視を行っています。
             </p>
             <div className="space-y-4">
               <Button onClick={handleManualSync} disabled={refreshing}>
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                🔄 再同期
+                再同期
               </Button>
             </div>
           </div>
@@ -666,7 +672,7 @@ export default function AlertsPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">アラート管理</h1>
               <p className="text-gray-600 mt-2">
-                実際のSlackワークスペースから検知されたアラートを監視・管理します
+                統合ワークスペースから検知されたアラートを監視・管理します
               </p>
             </div>
             
@@ -698,7 +704,7 @@ export default function AlertsPage() {
             <div className="flex items-center">
                   <div className="text-3xl text-blue-600 mr-3">📬</div>
               <div>
-                <p className="text-sm font-medium text-gray-600">未読アラート</p>
+                  <p className="text-sm font-medium text-gray-600">未読アラート</p>
                 <p className="text-2xl font-bold text-blue-600">{alertCounts.unread}</p>
               </div>
             </div>

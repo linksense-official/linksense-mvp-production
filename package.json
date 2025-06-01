@@ -40,7 +40,6 @@
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -49,13 +48,10 @@
     "test:auth": "jest src/tests/auth/",
     "test:security": "jest src/tests/security/",
     "test:integration": "jest src/tests/integration/",
-    
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
-    
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -63,49 +59,36 @@
     "db:migrate:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "db:seed": "node prisma/seed.js",
-    
     "build:analyze": "ANALYZE=true npm run build",
     "build:production": "NODE_ENV=production npm run build",
     "build:staging": "NODE_ENV=staging npm run build",
-    
     "deploy:vercel": "vercel --prod",
     "deploy:preview": "vercel",
     "deploy:staging": "vercel --target staging",
-    
     "security:audit": "npm audit",
     "security:audit:fix": "npm audit fix",
     "security:check": "npm run typecheck && npm run lint && npm run test:ci",
-    
     "health:check": "node scripts/health-check.js",
     "health:db": "node scripts/db-health.js",
     "health:oauth": "node scripts/oauth-health.js",
-    
     "logs:vercel": "vercel logs",
     "logs:production": "vercel logs --prod",
-    
     "clean": "rm -rf .next && rm -rf node_modules/.cache",
     "clean:all": "rm -rf .next && rm -rf node_modules && npm install",
-    
     "postinstall": "prisma generate",
     "prebuild": "npm run typecheck && npm run lint",
     "prestart": "npm run db:generate",
-    
     "env:validate": "node scripts/validate-env.js",
     "env:example": "node scripts/generate-env-example.js",
     "env:backup": "cp .env.local .env.local.backup.$(date +%Y%m%d_%H%M%S)",
-    
     "setup:production": "npm run env:validate && npm run db:migrate:deploy && npm run build:production",
     "setup:development": "npm install && npm run db:push && npm run db:seed",
-    
     "maintenance:start": "node scripts/maintenance-mode.js --enable",
     "maintenance:stop": "node scripts/maintenance-mode.js --disable",
-    
     "metrics:collect": "node scripts/collect-metrics.js",
     "metrics:report": "node scripts/generate-metrics-report.js",
-    
     "backup:db": "node scripts/backup-database.js",
     "backup:env": "node scripts/backup-env.js",
-    
     "ngrok": "node scripts/start-ngrok.js",
     "ngrok:simple": "node scripts/simple-ngrok.js",
     "ngrok:latest": "node scripts/ngrok-latest.js",
@@ -122,7 +105,6 @@
     "clean:ngrok": "npm run ngrok:kill && timeout /t 2 /nobreak && npm run ngrok:latest",
     "check:ngrok": "node scripts/check-ngrok.js",
     "tunnel:status": "curl -s http://localhost:4040/api/tunnels || echo 'ngrok not running'",
-    
     "build:android": "npx cap add android && npx cap copy && npx cap open android",
     "build:ios": "npx cap add ios && npx cap copy && npx cap open ios",
     "build:pwa": "next build"
@@ -133,6 +115,7 @@
     "@prisma/client": "^6.8.2",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "bcryptjs": "^3.0.2",
+    "critters": "^0.0.23",
     "crypto-js": "^4.2.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.511.0",
