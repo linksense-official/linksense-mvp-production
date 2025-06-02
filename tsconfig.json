@@ -68,11 +68,12 @@
     "noPropertyAccessFromIndexSignature": false
   },
   "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts"
-  ],
+  "next-env.d.ts",
+  "**/*.ts",
+  "**/*.tsx",
+  ".next/types/**/*.ts",
+  "src/types/modules/**/*.d.ts"
+],
   "exclude": [
     "node_modules",
     ".next",
@@ -81,7 +82,12 @@
     "build",
     "coverage",
     "*.config.js",
-    "*.config.ts"
+    "*.config.ts",
+    "src/tests/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
   ],
   "ts-node": {
     "compilerOptions": {

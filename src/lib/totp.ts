@@ -29,22 +29,21 @@ export class TOTPService {
    * QRコード画像を生成（Base64）
    */
   async generateQRCode(otpAuthUrl: string): Promise<string> {
-    try {
-      const qrCodeDataURL = await QRCode.toDataURL(otpAuthUrl, {
-        width: 256,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-      return qrCodeDataURL;
-    } catch (error) {
-      console.error('QRコード生成エラー:', error);
-      throw new Error('QRコードの生成に失敗しました');
-    }
+  try {
+    const qrCodeDataURL = await QRCode.toDataURL(otpAuthUrl, {
+      width: 256,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    return qrCodeDataURL;
+  } catch (error) {
+    console.error('QRコード生成エラー:', error);
+    throw new Error('QRコードの生成に失敗しました');
   }
-
+}
   /**
    * TOTPトークンを検証
    */

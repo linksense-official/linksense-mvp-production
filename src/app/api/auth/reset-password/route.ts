@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { emailService } from '@/lib/email';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
@@ -83,13 +82,75 @@ export async function POST(request: NextRequest) {
       data: { used: true }
     });
 
-    // セキュリティアラートメール送信
-    await emailService.sendSecurityAlert(
-      updatedUser.email,
-      'パスワード変更',
-      `パスワードが正常に変更されました。変更日時: ${new Date().toLocaleString('ja-JP')}`,
-      updatedUser.name || undefined
-    );
+    // セキュリティアラートメール送信（環境変数チェック付き）
+    try {
+      const resendApiKey = process.env.RESEND_API_KEY;
+      
+      if (resendApiKey) {
+        // 動的インポートでResendを使用
+        const { Resend } = await import('resend');
+        const resend = new Resend(resendApiKey);
+        
+        const changeTime = new Date().toLocaleString('ja-JP', {
+          timeZone: 'Asia/Tokyo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        await resend.emails.send({
+          from: 'LinkSense Security <security@linksense-mvp.vercel.app>',
+          to: updatedUser.email,
+          subject: '【重要】パスワード変更完了のお知らせ',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #f8f9fa; padding: 20px; border-left: 4px solid #28a745;">
+                <h2 style="color: #28a745; margin: 0;">✅ パスワード変更完了</h2>
+              </div>
+              <div style="padding: 20px;">
+                <p>こんにちは${updatedUser.name ? ` ${updatedUser.name}さん` : ''}、</p>
+                <p>LinkSenseアカウントのパスワードが正常に変更されました。</p>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                  <strong>変更詳細:</strong><br>
+                  📅 変更日時: ${changeTime}<br>
+                  📧 アカウント: ${updatedUser.email}<br>
+                  🔒 変更内容: パスワード
+                </div>
+                
+                <p>もしこの変更に心当たりがない場合は、直ちに以下の対応を行ってください：</p>
+                <ul>
+                  <li>再度パスワードを変更する</li>
+                  <li>2要素認証を有効にする</li>
+                  <li>サポートチームに連絡する</li>
+                </ul>
+                
+                <p style="margin-top: 30px;">
+                  <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/login" 
+                     style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                    ログインページへ
+                  </a>
+                </p>
+              </div>
+              <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                LinkSense セキュリティチーム<br>
+                このメールは自動送信されています。
+              </p>
+            </div>
+          `
+        });
+        
+        console.log('✅ セキュリティアラートメール送信成功:', { email: updatedUser.email });
+      } else {
+        console.warn('⚠️ RESEND_API_KEY が設定されていません。セキュリティアラートメール送信をスキップします。');
+      }
+    } catch (emailError) {
+      console.error('❌ セキュリティアラートメール送信エラー:', emailError);
+      // メール送信エラーでもパスワード変更は成功しているので続行
+    }
 
     console.log('✅ パスワードリセット完了:', { 
       userId: updatedUser.id, 

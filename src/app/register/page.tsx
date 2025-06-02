@@ -315,38 +315,38 @@ const RegisterPage: React.FC = () => {
 
     try {
       const registerResult = await registerUser({
-  name: formData.name,
-  email: formData.email,
-  password: formData.password,
-  company: formData.company
-});
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        company: formData.company
+      });
 
-// 登録成功後に追加情報を保存（実際の実装では別のAPI呼び出しまたはローカルストレージ）
-if (registerResult.success) {
-  // 追加のユーザー情報をローカルストレージまたは別のAPIで保存
-  const additionalUserData = {
-    jobTitle: formData.jobTitle,
-    teamSize: formData.teamSize,
-    subscribeNewsletter: formData.subscribeNewsletter,
-    registrationSource: 'web',
-    passwordStrength: passwordStrength.score,
-    agreementTimestamp: new Date().toISOString()
-  };
-  
-  // ローカルストレージに一時保存（実際の実装では適切なAPI呼び出し）
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('pendingUserData', JSON.stringify(additionalUserData));
-  }
-  
-  setSuccess('アカウントが正常に作成されました。メール認証リンクを送信しました。');
-  setUiState(prev => ({ ...prev, emailVerificationSent: true }));
-  
-  setTimeout(() => {
-    router.push('/login?message=registration_success');
-  }, 3000);
-} else {
-  setError(registerResult.error || 'アカウント作成に失敗しました');
-}
+      // 登録成功後に追加情報を保存（実際の実装では別のAPI呼び出しまたはローカルストレージ）
+      if (registerResult.success) {
+        // 追加のユーザー情報をローカルストレージまたは別のAPIで保存
+        const additionalUserData = {
+          jobTitle: formData.jobTitle,
+          teamSize: formData.teamSize,
+          subscribeNewsletter: formData.subscribeNewsletter,
+          registrationSource: 'web',
+          passwordStrength: passwordStrength.score,
+          agreementTimestamp: new Date().toISOString()
+        };
+        
+        // ローカルストレージに一時保存（実際の実装では適切なAPI呼び出し）
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pendingUserData', JSON.stringify(additionalUserData));
+        }
+        
+        setSuccess('アカウントが正常に作成されました。メール認証リンクを送信しました。');
+        setUiState(prev => ({ ...prev, emailVerificationSent: true }));
+        
+        setTimeout(() => {
+          router.push('/login?message=registration_success');
+        }, 3000);
+      } else {
+        setError(registerResult.error || 'アカウント作成に失敗しました');
+      }
 
     } catch (error) {
       setError('アカウント作成中にエラーが発生しました。もう一度お試しください。');
@@ -355,8 +355,8 @@ if (registerResult.success) {
     }
   };
 
-  // ソーシャル登録
-  const handleSocialRegister = async (provider: string) => {
+  // ソーシャル登録（GitHubを削除）
+  const handleSocialRegister = async (provider: 'google' | 'azure-ad') => {
     setUiState(prev => ({ ...prev, loading: true }));
     
     try {
@@ -966,7 +966,7 @@ if (registerResult.success) {
               </div>
             )}
 
-            {/* ソーシャル登録 */}
+            {/* ソーシャル登録（GitHubを削除） */}
             {!uiState.emailVerificationSent && uiState.currentStep === 1 && (
               <div className="mt-8">
                 <div className="relative">
@@ -1007,18 +1007,6 @@ if (registerResult.success) {
                       <path fill="#ffb900" d="M13 13h10v10H13z"/>
                     </svg>
                     Microsoft 365で登録
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSocialRegister('github')}
-                    disabled={uiState.loading}
-                    className="w-full inline-flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                  >
-                    <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                    </svg>
-                    GitHub Enterpriseで登録
                   </button>
                 </div>
 

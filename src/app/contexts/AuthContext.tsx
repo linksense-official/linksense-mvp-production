@@ -45,11 +45,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isAuthenticated = (user !== null || isNextAuthAuthenticated) && !requiresTwoFactor;
 
-  // ソーシャルプロバイダー名の取得
+  // ソーシャルプロバイダー名の取得（GitHubを削除）
   const getSocialProviderName = (provider: string): string => {
     switch (provider) {
       case 'google': return 'Google';
-      case 'github': return 'GitHub';
       case 'azure-ad': return 'Microsoft';
       case 'credentials': return 'メールアドレス';
       case '2fa-verification': return '2要素認証';
@@ -57,41 +56,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // プロバイダー別のデフォルト部署を取得
+  // プロバイダー別のデフォルト部署を取得（GitHubを削除）
   const getDepartmentByProvider = (provider: string): string => {
     switch (provider) {
       case 'google': return 'Google Workspace';
-      case 'github': return '開発部';
       case 'azure-ad': return 'Microsoft 365';
       default: return '開発部';
     }
   };
 
-  // プロバイダー別のサブスクリプションプランを取得（型安全）
+  // プロバイダー別のサブスクリプションプランを取得（GitHubを削除）
   const getSubscriptionPlanByProvider = (provider: string): 'free' | 'basic' | 'premium' | 'enterprise' => {
     switch (provider) {
       case 'google': return 'premium';
-      case 'github': return 'premium';
       case 'azure-ad': return 'enterprise';
       default: return 'basic';
     }
   };
 
-  // プロバイダー別の機能を取得
+  // プロバイダー別の機能を取得（GitHubを削除）
   const getFeaturesByProvider = (provider: string): string[] => {
     switch (provider) {
       case 'google': return ['Google統合', 'カレンダー連携', 'ドライブ連携'];
-      case 'github': return ['GitHub統合', 'リポジトリ分析', 'コード品質監視'];
       case 'azure-ad': return ['Microsoft統合', 'Teams連携', 'SharePoint連携'];
       default: return ['基本機能', 'アラート機能'];
     }
   };
 
-  // プロバイダー別の制限を取得
+  // プロバイダー別の制限を取得（GitHubを削除）
   const getLimitsByProvider = (provider: string) => {
     switch (provider) {
       case 'google':
-      case 'github':
       case 'azure-ad':
         return {
           teamMembers: 100,

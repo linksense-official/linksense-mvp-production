@@ -1,33 +1,26 @@
 {
   "version": 2,
-  "alias": ["linksense-mvp.vercel.app"],
-  "regions": ["iad1"],
-  "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "installCommand": "npm ci",
-  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["nrt1"],
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/auth/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
   "env": {
     "NODE_ENV": "production",
-    "NEXT_PUBLIC_ENVIRONMENT": "production",
-    "NEXT_PUBLIC_APP_URL": "https://linksense-mvp.vercel.app",
-    "NEXTAUTH_URL": "https://linksense-mvp.vercel.app"
+    "NEXT_PUBLIC_ENVIRONMENT": "production"
   },
   "build": {
     "env": {
       "NODE_ENV": "production",
-      "NEXT_TELEMETRY_DISABLED": "1"
-    }
-  },
-  "functions": {
-    "app/api/**/*.ts": {
-      "maxDuration": 30
-    },
-    "app/api/auth/**/*.ts": {
-      "maxDuration": 60
-    },
-    "app/api/webhooks/**/*.ts": {
-      "maxDuration": 30
+      "NEXT_PUBLIC_ENVIRONMENT": "production"
     }
   },
   "headers": [
@@ -47,6 +40,10 @@
           "value": "1; mode=block"
         },
         {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        },
+        {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
@@ -60,38 +57,25 @@
       "source": "/api/(.*)",
       "headers": [
         {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://linksense-mvp.vercel.app"
         },
         {
-          "key": "Pragma",
-          "value": "no-cache"
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
         },
         {
-          "key": "Expires",
-          "value": "0"
-        }
-      ]
-    },
-    {
-      "source": "/api/auth/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-cache, no-store, must-revalidate"
-        },
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow"
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
         }
       ]
     }
   ],
   "redirects": [
     {
-      "source": "/auth/(.*)",
-      "destination": "/api/auth/$1",
-      "permanent": false
+      "source": "/home",
+      "destination": "/",
+      "permanent": true
     },
     {
       "source": "/signin",
@@ -106,22 +90,8 @@
   ],
   "rewrites": [
     {
-      "source": "/health",
-      "destination": "/api/health"
-    },
-    {
-      "source": "/metrics",
-      "destination": "/api/metrics"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/cleanup",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/security-scan",
-      "schedule": "0 12 * * *"
+      "source": "/api/health",
+      "destination": "/api/health-check"
     }
   ]
 }
