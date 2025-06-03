@@ -27,7 +27,6 @@ const INTEGRATION_SERVICES = {
   LINE_WORKS: 'line-works',
   DISCORD: 'discord',
   GOOGLE_MEET: 'google-meet',
-  CYBOZU_OFFICE: 'cybozu-office',
   ZOOM: 'zoom'
 } as const;
 
@@ -259,17 +258,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
             }
             break;
 
-          case 'cybozu-office':
-            console.log('サイボウズ Office統合を動的に作成中...');
-            try {
-              const CybozuIntegration = (await import('./cybozu-office-integration')).default;
-              integrationInstance = new CybozuIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('サイボウズ統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
           case 'zoom':
             console.log('Zoom統合を動的に作成中...');
             try {
@@ -410,7 +398,6 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       'line-works': 'LINE WORKS',
       'discord': 'Discord',
       'google-meet': 'Google Meet',
-      'cybozu-office': 'サイボウズ Office',
       'zoom': 'Zoom'
     };
     return displayNames[integrationId] || integrationId;
