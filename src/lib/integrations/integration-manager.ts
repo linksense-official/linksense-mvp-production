@@ -1,8 +1,9 @@
 // src/lib/integrations/integration-manager.ts
 // LinkSense MVP - 統合管理システム中核 - 本番版
-// 8サービス完全対応 + リアルタイム分析 + 非同期処理
+// 7サービス完全対応 + リアルタイム分析 + 非同期処理
 
 import BaseIntegration, { IntegrationFactory, IntegrationRegistry } from './base-integration';
+// ファイル先頭のインポート文を修正
 import type {
   Integration,
   IntegrationAnalytics,
@@ -17,12 +18,16 @@ import type {
   IntegrationStatusSummary,
   DEFAULT_INTEGRATION_CONFIG,
   AlertThresholds,
-  IntegrationServiceId
+  IntegrationServiceId,
+  IntegrationConfig,
+  IntegrationCategory,
+  IntegrationMarket // ✅ 追加: IntegrationMarket型をインポート
 } from '@/types/integrations';
 
+// ✅ 修正: 正確な7サービス定義
 const INTEGRATION_SERVICES = {
   SLACK: 'slack',
-  MICROSOFT_TEAMS: 'microsoft-teams',
+  MICROSOFT_TEAMS: 'teams', // ✅ 修正: 'microsoft-teams' → 'teams'
   CHATWORK: 'chatwork',
   LINE_WORKS: 'line-works',
   DISCORD: 'discord',
@@ -35,6 +40,15 @@ const DEFAULT_ALERT_THRESHOLDS: AlertThresholds = {
   responseTimeWarning: 300, // 5分
   engagementDropWarning: 20, // 20%減少
   inactivityWarning: 7 // 7日間
+};
+
+// ✅ 追加: デフォルト統合設定
+const DEFAULT_INTEGRATION_CONFIG_TEMPLATE: IntegrationConfig = {
+  scopes: ['read'],
+  permissions: ['basic'],
+  dataRetentionDays: 90,
+  syncIntervalMinutes: 60,
+  enabledFeatures: ['analytics', 'monitoring']
 };
 
 interface ModifiedIntegrationManager {
@@ -63,6 +77,7 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     this.registry = IntegrationRegistry.getInstance();
     this.settings = this.getDefaultSettings();
     this.initializeEventSystem();
+    this.preloadIntegrations(); // ✅ 追加: 事前ロード
   }
 
   static getInstance(): IntegrationManager {
@@ -70,6 +85,136 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       this.instance = new IntegrationManager();
     }
     return this.instance;
+  }
+
+  // ✅ 追加: 統合サービス事前ロード
+  private async preloadIntegrations(): Promise<void> {
+    const supportedServices = Object.values(INTEGRATION_SERVICES);
+    
+    for (const serviceId of supportedServices) {
+      try {
+        await this.ensureIntegrationLoaded(serviceId);
+      } catch (error) {
+        console.warn(`統合サービス事前ロード失敗 [${serviceId}]:`, error);
+      }
+    }
+    
+    console.log(`統合サービス事前ロード完了: ${supportedServices.length}サービス`);
+  }
+
+  // ✅ 修正: 統合サービス動的ロード保証（型エラー修正）
+  private async ensureIntegrationLoaded(integrationId: string): Promise<BaseIntegration | undefined> {
+    let integration = this.registry.get(integrationId);
+    
+    if (integration) {
+      return integration;
+    }
+
+    // ✅ 修正: デフォルト設定で統合サービスを作成（型エラー修正）
+    const defaultConfig: Integration = {
+  id: integrationId,
+  name: this.getServiceDisplayName(integrationId),
+  description: `${this.getServiceDisplayName(integrationId)}統合サービス`, // ✅ 追加
+  status: 'disconnected',
+  isEnabled: true,
+  config: { ...DEFAULT_INTEGRATION_CONFIG_TEMPLATE },
+  lastSync: undefined,
+  healthScore: 0,
+  category: this.getServiceCategory(integrationId), // ✅ 追加
+  market: this.getServiceMarket(integrationId), // ✅ 追加
+  features: this.getServiceFeatures(integrationId), // ✅ 追加
+  authType: 'oauth2' // ✅ 追加
+};
+
+    try {
+      let integrationInstance: BaseIntegration;
+
+      // ✅ 修正: 正確なサービスIDマッピング
+      switch (integrationId) {
+        case 'slack':
+          try {
+            const SlackIntegration = (await import('./slack-integration')).default;
+            integrationInstance = new SlackIntegration(defaultConfig);
+          } catch (importError) {
+            console.error('Slack統合インポートエラー:', importError);
+            return undefined; // ✅ 修正: null → undefined
+          }
+          break;
+
+        case 'teams': // ✅ 修正: 'microsoft-teams' → 'teams'
+          try {
+            const TeamsIntegration = (await import('./teams-integration')).default;
+            integrationInstance = new TeamsIntegration(defaultConfig);
+          } catch (importError) {
+            console.error('Teams統合インポートエラー:', importError);
+            return undefined; // ✅ 修正: null → undefined
+          }
+          break;
+
+        case 'chatwork':
+          try {
+            const ChatWorkIntegration = (await import('./chatwork-integration')).default;
+            integrationInstance = new ChatWorkIntegration(defaultConfig);
+          } catch (importError) {
+            console.error('ChatWork統合インポートエラー:', importError);
+            return undefined; // ✅ 修正: null → undefined
+          }
+          break;
+
+        case 'line-works':
+          try {
+            const LineWorksIntegration = (await import('./line-works-integration')).default;
+            integrationInstance = new LineWorksIntegration(defaultConfig);
+          } catch (importError) {
+            console.error('LINE WORKS統合インポートエラー:', importError);
+            return undefined; // ✅ 修正: null → undefined
+          }
+          break;
+
+        case 'discord':
+          try {
+            const DiscordIntegration = (await import('./discord-integration')).default;
+            integrationInstance = new DiscordIntegration(defaultConfig);
+          } catch (importError) {
+            console.error('Discord統合インポートエラー:', importError);
+            return undefined; // ✅ 修正: null → undefined
+          }
+          break;
+
+        case 'google-meet':
+          try {
+            const GoogleMeetIntegration = (await import('./google-meet-integration')).default;
+            integrationInstance = new GoogleMeetIntegration(defaultConfig);
+          } catch (importError) {
+            console.error('Google Meet統合インポートエラー:', importError);
+            return undefined; // ✅ 修正: null → undefined
+          }
+          break;
+
+        case 'zoom':
+          try {
+            const ZoomIntegration = (await import('./zoom-integration')).default;
+            integrationInstance = new ZoomIntegration(defaultConfig);
+          } catch (importError) {
+            console.error('Zoom統合インポートエラー:', importError);
+            return undefined; // ✅ 修正: null → undefined
+          }
+          break;
+
+        default:
+          console.error(`未対応の統合サービス: ${integrationId}`);
+          return undefined; // ✅ 修正: null → undefined
+      }
+
+      this.registry.add(integrationInstance);
+      this.integrations.set(integrationId, defaultConfig);
+      console.log(`${integrationId}統合を動的に追加しました`);
+      
+      return integrationInstance;
+    } catch (error) {
+      console.error(`${integrationId}統合動的作成エラー:`, error);
+      return undefined; // ✅ 修正: null → undefined
+    }
   }
 
   async initialize(integrations: Integration[]): Promise<boolean> {
@@ -80,13 +225,18 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       this.integrations.clear();
       this.clearSyncIntervals();
 
+      // ✅ 追加: サポート対象サービスを必ず登録
+      const supportedServices = Object.values(INTEGRATION_SERVICES);
+      for (const serviceId of supportedServices) {
+        await this.ensureIntegrationLoaded(serviceId);
+      }
+
+      // ユーザー設定の統合情報で更新
       for (const integrationConfig of integrations) {
         this.integrations.set(integrationConfig.id, integrationConfig);
 
-        const integration = IntegrationFactory.create(integrationConfig);
+        const integration = this.registry.get(integrationConfig.id);
         if (integration) {
-          this.registry.add(integration);
-          
           if (integrationConfig.status === 'connected') {
             await integration.initialize();
           }
@@ -107,9 +257,14 @@ export class IntegrationManager implements ModifiedIntegrationManager {
 
   async connect(integrationId: string, credentials: any): Promise<boolean> {
     try {
-      const integration = this.registry.get(integrationId);
+      // ✅ 修正: 統合サービスが存在しない場合は動的ロード
+      let integration = this.registry.get(integrationId);
       if (!integration) {
-        throw new Error(`統合サービス '${integrationId}' が見つかりません`);
+        integration = await this.ensureIntegrationLoaded(integrationId);
+      }
+      
+      if (!integration) {
+        throw new Error(`統合サービス '${integrationId}' の作成に失敗しました`);
       }
 
       console.log(`統合サービス接続開始: ${integrationId}`);
@@ -119,6 +274,7 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       
       if (success) {
         const integrationData = integration.getIntegration();
+        integrationData.status = 'connected';
         this.integrations.set(integrationId, integrationData);
 
         await this.sync(integrationId);
@@ -143,7 +299,9 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     try {
       const integration = this.registry.get(integrationId);
       if (!integration) {
-        throw new Error(`統合サービス '${integrationId}' が見つかりません`);
+        // 切断の場合は統合サービスが見つからなくても成功とする
+        console.warn(`統合サービス '${integrationId}' が見つかりません - 切断処理をスキップ`);
+        return true;
       }
 
       console.log(`統合サービス切断開始: ${integrationId}`);
@@ -173,152 +331,52 @@ export class IntegrationManager implements ModifiedIntegrationManager {
   }
 
   async sync(integrationId: string): Promise<IntegrationAnalytics | null> {
-  try {
-    console.log(`同期開始: ${integrationId}`);
-    console.log('登録済み統合サービス:', Array.from(this.registry.getAll().map(i => i.getIntegration().id)));
-    
-    let integration = this.registry.get(integrationId);
-    
-    if (!integration) {
-      console.warn(`統合サービス '${integrationId}' がレジストリに見つかりません - 動的作成を試行`);
+    try {
+      console.log(`同期開始: ${integrationId}`);
+      console.log('登録済み統合サービス:', Array.from(this.registry.getAll().map(i => i.getIntegration().id)));
       
-      const integrationConfig = this.integrations.get(integrationId);
-      if (!integrationConfig) {
-        console.error(`統合設定が見つかりません: ${integrationId}`);
-        return null;
-      }
-
-      try {
-        let integrationInstance: BaseIntegration;
-
-        switch (integrationId) {
-          case 'slack':
-            console.log('Slack統合を動的に作成中...');
-            try {
-              const SlackIntegration = (await import('./slack-integration')).default;
-              integrationInstance = new SlackIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('Slack統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
-          case 'microsoft-teams':
-            console.log('Microsoft Teams統合を動的に作成中...');
-            try {
-              const TeamsIntegration = (await import('./teams-integration')).default;
-              integrationInstance = new TeamsIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('Teams統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
-          case 'chatwork':
-            console.log('ChatWork統合を動的に作成中...');
-            try {
-              const ChatWorkIntegration = (await import('./chatwork-integration')).default;
-              integrationInstance = new ChatWorkIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('ChatWork統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
-          case 'line-works':
-            console.log('LINE WORKS統合を動的に作成中...');
-            try {
-              const LineWorksIntegration = (await import('./line-works-integration')).default;
-              integrationInstance = new LineWorksIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('LINE WORKS統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
-          case 'discord':
-            console.log('Discord統合を動的に作成中...');
-            try {
-              const DiscordIntegration = (await import('./discord-integration')).default;
-              integrationInstance = new DiscordIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('Discord統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
-          case 'google-meet':
-            console.log('Google Meet統合を動的に作成中...');
-            try {
-              const GoogleMeetIntegration = (await import('./google-meet-integration')).default;
-              integrationInstance = new GoogleMeetIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('Google Meet統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
-          case 'zoom':
-            console.log('Zoom統合を動的に作成中...');
-            try {
-              const ZoomIntegration = (await import('./zoom-integration')).default;
-              integrationInstance = new ZoomIntegration(integrationConfig);
-            } catch (importError) {
-              console.error('Zoom統合インポートエラー:', importError);
-              return null;
-            }
-            break;
-
-          default:
-            console.error(`未対応の統合サービス: ${integrationId}`);
-            return null;
-        }
-
-        this.registry.add(integrationInstance);
-        console.log(`${integrationId}統合を動的に追加しました`);
-        integration = this.registry.get(integrationId);
-      } catch (importError) {
-        console.error(`${integrationId}統合動的作成エラー:`, importError);
-        return null;
+      // ✅ 修正: 統合サービス動的ロード保証
+      let integration = this.registry.get(integrationId);
+      if (!integration) {
+        integration = await this.ensureIntegrationLoaded(integrationId);
       }
       
       if (!integration) {
-        console.error(`${integrationId}統合の作成に失敗しました`);
+        console.error(`統合サービスの作成に失敗: ${integrationId}`);
         return null;
       }
-    }
 
-    if (!integration.isEnabled()) {
-      console.log(`統合サービス無効のため同期スキップ: ${integrationId}`);
-      return null;
-    }
-
-    console.log(`データ同期開始: ${integrationId}`);
-    this.emit('sync_started', { integrationId });
-
-    const syncResult = await integration.sync();
-    
-    if (syncResult.success) {
-      const analytics = await this.getAnalytics(integrationId);
-      if (analytics) {
-        this.analytics.set(integrationId, analytics);
+      if (!integration.isEnabled()) {
+        console.log(`統合サービス無効のため同期スキップ: ${integrationId}`);
+        return null;
       }
 
-      console.log(`データ同期成功: ${integrationId} (${syncResult.recordsProcessed}件処理)`);
-      this.emit('sync_completed', { integrationId, syncResult });
+      console.log(`データ同期開始: ${integrationId}`);
+      this.emit('sync_started', { integrationId });
 
-      return analytics;
-    } else {
-      console.error(`データ同期失敗: ${integrationId}`, syncResult.errors);
-      this.emit('sync_failed', { integrationId, errors: syncResult.errors });
+      const syncResult = await integration.sync();
+      
+      if (syncResult.success) {
+        const analytics = await this.getAnalytics(integrationId);
+        if (analytics) {
+          this.analytics.set(integrationId, analytics);
+        }
+
+        console.log(`データ同期成功: ${integrationId} (${syncResult.recordsProcessed}件処理)`);
+        this.emit('sync_completed', { integrationId, syncResult });
+
+        return analytics;
+      } else {
+        console.error(`データ同期失敗: ${integrationId}`, syncResult.errors);
+        this.emit('sync_failed', { integrationId, errors: syncResult.errors });
+        return null;
+      }
+    } catch (error) {
+      console.error(`データ同期エラー [${integrationId}]:`, error);
+      this.emit('sync_error', { integrationId, error: error instanceof Error ? error.message : String(error) });
       return null;
     }
-  } catch (error) {
-    console.error(`データ同期エラー [${integrationId}]:`, error);
-    this.emit('sync_error', { integrationId, error: error instanceof Error ? error.message : String(error) });
-    return null;
   }
-}
 
   async syncAll(): Promise<IntegrationAnalytics[]> {
     console.log('全統合サービス同期開始...');
@@ -358,7 +416,12 @@ export class IntegrationManager implements ModifiedIntegrationManager {
         return cached;
       }
 
-      const integration = this.registry.get(integrationId);
+      // ✅ 修正: 統合サービス動的ロード保証
+      let integration = this.registry.get(integrationId);
+      if (!integration) {
+        integration = await this.ensureIntegrationLoaded(integrationId);
+      }
+      
       if (!integration) {
         console.error(`統合サービスが見つかりません: ${integrationId}`);
         return null;
@@ -390,23 +453,69 @@ export class IntegrationManager implements ModifiedIntegrationManager {
     }
   }
 
+  // ✅ 修正: 正確なサービス表示名
   private getServiceDisplayName(integrationId: string): string {
     const displayNames: { [key: string]: string } = {
       'slack': 'Slack',
-      'microsoft-teams': 'Microsoft Teams',
+      'teams': 'Microsoft Teams', // ✅ 修正
       'chatwork': 'ChatWork',
       'line-works': 'LINE WORKS',
       'discord': 'Discord',
       'google-meet': 'Google Meet',
       'zoom': 'Zoom'
     };
+    
     return displayNames[integrationId] || integrationId;
+  }
+  
+  // ✅ ここに3つのヘルパーメソッドを追加
+  private getServiceCategory(integrationId: string): IntegrationCategory {
+  const categoryMap: { [key: string]: IntegrationCategory } = {
+    'slack': 'communication',        // ✅ 修正: 'chat' → 'communication'
+    'teams': 'meeting',              // ✅ 修正: 'video' → 'meeting'
+    'chatwork': 'communication',     // ✅ 修正: 'chat' → 'communication'
+    'line-works': 'communication',   // ✅ 修正: 'chat' → 'communication'
+    'discord': 'communication',      // ✅ 修正: 'chat' → 'communication'
+    'google-meet': 'meeting',        // ✅ 修正: 'video' → 'meeting'
+    'zoom': 'meeting'                // ✅ 修正: 'video' → 'meeting'
+  };
+  return categoryMap[integrationId] || 'communication';
+}
+
+// ✅ 修正: 正確なIntegrationMarket値を使用
+private getServiceMarket(integrationId: string): IntegrationMarket {
+  const marketMap: { [key: string]: IntegrationMarket } = {
+    'slack': 'global',
+    'teams': 'global',
+    'chatwork': 'japan',
+    'line-works': 'japan',
+    'discord': 'global',
+    'google-meet': 'global',
+    'zoom': 'global'
+  };
+  return marketMap[integrationId] || 'global';
+}
+
+  private getServiceFeatures(integrationId: string): string[] {
+    const featuresMap: { [key: string]: string[] } = {
+      'slack': ['リアルタイムメッセージ分析', 'チャンネル参加率測定', 'エンゲージメント指標'],
+      'teams': ['会議参加率分析', 'カメラ・マイク使用状況', 'チーム結束度測定'],
+      'chatwork': ['タスク管理分析', 'メッセージ応答時間測定', 'グループチャット活動'],
+      'line-works': ['高速コミュニケーション分析', 'スタンプ利用分析', 'モバイル利用パターン'],
+      'discord': ['コミュニティ参加分析', 'サーバー利用状況', 'エンゲージメント測定'],
+      'google-meet': ['Googleカレンダー統合分析', '会議品質監視', '参加者エンゲージメント'],
+      'zoom': ['会議参加時間分析', '画面共有利用状況', 'ブレイクアウトルーム活用']
+    };
+    return featuresMap[integrationId] || ['基本分析機能'];
   }
 
   async getHealthScore(integrationId?: string): Promise<number> {
     try {
       if (integrationId) {
-        const integration = this.registry.get(integrationId);
+        let integration = this.registry.get(integrationId);
+        if (!integration) {
+          integration = await this.ensureIntegrationLoaded(integrationId);
+        }
         if (!integration) return 0;
         
         return await integration.getHealthScore();
@@ -758,7 +867,7 @@ export class IntegrationManager implements ModifiedIntegrationManager {
       listeners.forEach(listener => {
         try {
           listener(data);
-        } catch (error) {
+         } catch (error) {
           console.error(`イベントリスナーエラー [${event}]:`, error);
         }
       });

@@ -123,7 +123,7 @@ const IntegrationsPage = () => {
     ]
   },
   {
-    id: 'microsoft-teams',
+    id: 'teams',
     name: 'Microsoft Teams',
     description: 'Microsoft 365統合コラボレーションスイート',
     status: 'disconnected',
@@ -495,13 +495,13 @@ const handleConnect = async (integration: IntegrationService) => {
       oauth_integration_mode: 'true'
     });
 
-    // ✅ 修正: 正しいNextAuth.js OAuth認証フローを使用
+    // ✅ 修正: NextAuth.js OAuth認証フローを使用
     let authUrl: string;
     
     // サービスIDをNextAuth.jsプロバイダー名にマッピング
     const providerMapping: { [key: string]: string } = {
       'slack': 'slack',
-      'microsoft-teams': 'azure-ad', // Microsoft Teams は Azure AD を使用
+      'Microsoft Teams': 'azure-ad', // Microsoft Teams は Azure AD を使用
       'chatwork': 'chatwork',
       'line-works': 'lineworks',
       'zoom': 'zoom',
@@ -511,8 +511,12 @@ const handleConnect = async (integration: IntegrationService) => {
     
     const providerId = providerMapping[integration.id] || integration.id;
     
+    // ✅ 修正: 正しいNextAuth.js OAuth認証URLを構築
+    const baseUrl = window.location.origin;
+    const callbackUrl = encodeURIComponent(`${baseUrl}/integrations?mode=integration&source=oauth&service=${integration.id}`);
+    
     // NextAuth.js標準のOAuth認証URLを構築
-    authUrl = `/api/auth/signin/${providerId}?callbackUrl=${encodeURIComponent('/integrations?mode=integration&source=oauth')}`;
+    authUrl = `${baseUrl}/api/auth/signin/${providerId}?callbackUrl=${callbackUrl}`;
     
     console.log(`🚀 OAuth認証ページにリダイレクト: ${integration.name}`);
     console.log(`🔗 リダイレクト先: ${authUrl}`);
