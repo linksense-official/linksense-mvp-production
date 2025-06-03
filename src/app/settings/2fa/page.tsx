@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle, Shield, Copy, Download, Eye, EyeOff, Loader2, Smartphone, Key, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/app/contexts/AuthContext';
