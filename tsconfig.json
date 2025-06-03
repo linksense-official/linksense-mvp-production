@@ -27,14 +27,8 @@
       }
     ],
     "baseUrl": ".",
-   "paths": {
-  "@/*": ["./src/*"],
-  "@/components/*": ["./src/components/*"],
-  "@/components/ui/*": ["./src/components/ui/*"],
-  "@/lib/*": ["./src/lib/*"],
-  "@/types/*": ["./src/types/*"],
-  "@/app/*": ["./src/app/*"],
-  "@/contexts/*": ["./src/app/contexts/*"]
+  "paths": {
+  "@/*": ["./src/*"]
 },
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": false,

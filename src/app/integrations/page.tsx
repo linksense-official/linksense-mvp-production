@@ -495,8 +495,24 @@ const handleConnect = async (integration: IntegrationService) => {
       oauth_integration_mode: 'true'
     });
 
-    // NextAuth.js 標準OAuth認証フローを使用
-    const authUrl = `/api/auth/signin/${integration.id}?callbackUrl=${encodeURIComponent('/integrations?mode=integration&source=oauth')}`;
+    // ✅ 修正: 正しいNextAuth.js OAuth認証フローを使用
+    let authUrl: string;
+    
+    // サービスIDをNextAuth.jsプロバイダー名にマッピング
+    const providerMapping: { [key: string]: string } = {
+      'slack': 'slack',
+      'microsoft-teams': 'azure-ad', // Microsoft Teams は Azure AD を使用
+      'chatwork': 'chatwork',
+      'line-works': 'lineworks',
+      'zoom': 'zoom',
+      'google-meet': 'google',
+      'discord': 'discord'
+    };
+    
+    const providerId = providerMapping[integration.id] || integration.id;
+    
+    // NextAuth.js標準のOAuth認証URLを構築
+    authUrl = `/api/auth/signin/${providerId}?callbackUrl=${encodeURIComponent('/integrations?mode=integration&source=oauth')}`;
     
     console.log(`🚀 OAuth認証ページにリダイレクト: ${integration.name}`);
     console.log(`🔗 リダイレクト先: ${authUrl}`);

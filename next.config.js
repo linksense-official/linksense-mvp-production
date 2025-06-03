@@ -60,8 +60,16 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'unpkg.com',
       },
+      // 統合サービス画像対応
+      {
+        protocol: 'https',
+        hostname: 'slack.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.discordapp.com',
+      },
     ],
-    // domains は非推奨なので remotePatterns を使用
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
@@ -167,7 +175,7 @@ const nextConfig = {
       },
       {
         key: 'X-Frame-Options',
-        value: 'DENY'
+        value: 'SAMEORIGIN' // ✅ 修正: DENY → SAMEORIGIN（OAuth認証用）
       },
       {
         key: 'X-Content-Type-Options',
@@ -189,31 +197,64 @@ const nextConfig = {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com",
           "img-src 'self' data: https: blob:",
+          // ✅ 修正: connect-src を統合サービス対応に拡張
           "connect-src 'self'",
           "  https://api.github.com",
-          "  https://graph.microsoft.com", 
+          "  https://graph.microsoft.com",
+          "  https://login.microsoftonline.com", 
           "  https://accounts.google.com",
+          "  https://www.googleapis.com",
+          "  https://oauth2.googleapis.com",
           "  https://vitals.vercel-insights.com",
+          // ChatWork API
           "  https://api.chatwork.com",
+          "  https://www.chatwork.com",
+          // Slack API
           "  https://slack.com",
           "  https://api.slack.com",
+          "  https://hooks.slack.com",
+          // LINE WORKS API
           "  https://www.worksapis.com",
           "  https://auth.worksmobile.com",
+          "  https://apis.worksmobile.com",
+          // Zoom API
           "  https://api.zoom.us",
           "  https://zoom.us",
+          "  https://marketplace.zoom.us",
+          // Discord API
           "  https://discord.com",
           "  https://discordapp.com",
           "  https://api.discord.com",
           "  https://cdn.discordapp.com",
+          // Microsoft Teams / Azure AD
+          "  https://teams.microsoft.com",
+          "  https://api.teams.microsoft.com",
+          // NextAuth.js OAuth providers
+          "  https://github.com",
+          "  https://api.github.com",
+          // ✅ 修正: frame-src を OAuth 認証対応に拡張
+          "frame-src 'self'",
+          "  https://js.stripe.com",
+          "  https://accounts.google.com",
           "  https://login.microsoftonline.com",
+          "  https://slack.com",
+          "  https://discord.com",
+          "  https://zoom.us",
+          "  https://auth.worksmobile.com",
           "  https://www.chatwork.com",
-          "frame-src 'self' https://js.stripe.com",
           "object-src 'none'",
           "base-uri 'self'",
           "form-action 'self'",
+          "  https://accounts.google.com",
+          "  https://login.microsoftonline.com",
+          "  https://slack.com",
+          "  https://discord.com",
+          "  https://zoom.us",
+          "  https://auth.worksmobile.com",
+          "  https://api.chatwork.com",
           "frame-ancestors 'none'",
           "upgrade-insecure-requests"
-        ].join('; ')
+        ].join(' ')
       }
     ];
 
