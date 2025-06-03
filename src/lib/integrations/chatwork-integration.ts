@@ -375,51 +375,59 @@ export class ChatWorkIntegration extends BaseIntegration {
 
   // ✅ API呼び出しオーバーライド
   protected async makeApiCall<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<any> {
-    const url = `${this.apiBaseUrl}${endpoint}`;
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<any> {
+  try {
+    // ✅ 修正: 外部API直接呼び出しを内部API経由に変更
+    const url = `/api/integrations/chatwork/proxy`;
     
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-ChatWorkToken': this.integration.credentials?.apiKey || '',
-      ...options.headers
+    const requestBody = {
+      endpoint: endpoint,
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      body: options.body
     };
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers
-      });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
 
-      // レート制限情報更新
-      const remaining = response.headers.get('X-RateLimit-Remaining');
-      if (remaining) {
-        this.rateLimitRemaining = parseInt(remaining, 10);
-      }
-
-      const resetTime = response.headers.get('X-RateLimit-Reset');
-      if (resetTime) {
-        this.rateLimitReset = new Date(parseInt(resetTime, 10) * 1000);
-      }
-
-      const data = await response.json();
-
-      return {
-        success: response.ok,
-        data: response.ok ? data : undefined,
-        error: response.ok ? undefined : data.message || 'ChatWork API呼び出しエラー',
-        code: response.status.toString(),
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'ChatWorkネットワークエラー',
-        timestamp: new Date()
-      };
+    if (!response.ok) {
+      throw new Error(`API呼び出しエラー: ${response.status}`);
     }
+
+    const result = await response.json();
+
+    // レート制限情報更新
+    if (result.rateLimitRemaining !== undefined) {
+      this.rateLimitRemaining = result.rateLimitRemaining;
+    }
+
+    if (result.rateLimitReset) {
+      this.rateLimitReset = new Date(result.rateLimitReset);
+    }
+
+    return {
+      success: result.success,
+      data: result.data,
+      error: result.error,
+      code: result.code || '200',
+      timestamp: new Date()
+    };
+  } catch (error) {
+    console.error('ChatWork API呼び出しエラー:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'ChatWorkネットワークエラー',
+      timestamp: new Date()
+    };
   }
+}
 
   /**
    * レート制限処理（ChatWork特化）

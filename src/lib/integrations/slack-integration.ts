@@ -110,40 +110,44 @@ export class SlackIntegration extends BaseIntegration {
     }
   }
 
-  // ✅ Slack API呼び出し（認証付き）
- private async makeSlackApiCall<T = any>(endpoint: string, options: RequestInit = {}): Promise<{ success: boolean; data?: T; error?: string }> {
+  // ✅ Slack API呼び出し（認証付き） - サーバーサイド経由に修正
+private async makeSlackApiCall<T = any>(endpoint: string, options: RequestInit = {}): Promise<{ success: boolean; data?: T; error?: string }> {
   try {
     if (!this.accessToken) {
       console.log('⚠️ アクセストークンが設定されていません - スキップ');
       return { success: false, error: 'アクセストークンが設定されていません' };
     }
 
-    const url = endpoint.startsWith('http') ? endpoint : `${SLACK_API_BASE}/${endpoint}`;
+    // ✅ 修正: 外部API直接呼び出しを内部API経由に変更
+    const url = `/api/integrations/slack/proxy`;
     
-    const defaultHeaders = {
-      'Authorization': `Bearer ${this.accessToken}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
+    const requestBody = {
+      endpoint: endpoint,
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      body: options.body,
+      accessToken: this.accessToken
     };
 
     const response = await fetch(url, {
-      ...options,
+      method: 'POST',
       headers: {
-        ...defaultHeaders,
-        ...options.headers
-      }
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      return { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
+      throw new Error(`Slack API Proxy エラー: ${response.status}`);
     }
 
-    const data = await response.json();
+    const result = await response.json();
 
-    if (!data.ok) {
-      return { success: false, error: data.error || 'Slack API エラー' };
-    }
-
-    return { success: true, data };
+    return {
+      success: result.success,
+      data: result.data,
+      error: result.error
+    };
   } catch (error) {
     console.error(`Slack API呼び出しエラー (${endpoint}):`, error);
     return { 
