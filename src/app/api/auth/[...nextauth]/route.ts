@@ -2,31 +2,37 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import AzureADProvider from 'next-auth/providers/azure-ad';
-import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { emailService } from '@/lib/email';
 import type { User, Account, Profile, Session, AuthOptions } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
+import type { AzureADProfile } from 'next-auth/providers/azure-ad';
+import crypto from 'crypto';
+
+// 🔧 環境変数デバッグ（開発時のみ）
+if (process.env.NODE_ENV === 'development') {
+  console.log('🔧 NextAuth Environment Check:');
+  console.log('- NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
+  console.log('- NEXTAUTH_SECRET:', process.env.NEXTAUTH_SECRET ? '✅ 設定済み' : '❌ 未設定');
+  console.log('- AZURE_AD_CLIENT_ID:', process.env.AZURE_AD_CLIENT_ID ? '✅ 設定済み' : '❌ 未設定');
+  console.log('- GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✅ 設定済み' : '❌ 未設定');
+  console.log('- DATABASE_URL:', process.env.DATABASE_URL ? '✅ 設定済み' : '❌ 未設定');
+}
 
 // 環境設定
 const isProduction = process.env.NODE_ENV === 'production';
-const baseUrl = process.env.NEXTAUTH_URL || (isProduction ? 'https://linksense-mvp.vercel.app' : 'http://localhost:3000');
+const baseUrl = process.env.NEXTAUTH_URL || 
+  (isProduction 
+    ? 'https://linksense-mvp.vercel.app' 
+    : 'http://localhost:3000'
+  );
 
-// データベース接続確認
-const isDatabaseAvailable = async (): Promise<boolean> => {
-  try {
-    if (!process.env.DATABASE_URL) {
-      console.warn('DATABASE_URL not configured');
-      return false;
-    }
-    await prisma.$queryRaw`SELECT 1`;
-    return true;
-  } catch (error) {
-    console.error('Database connection failed:', error);
-    return false;
-  }
-};
+// デバッグ用ログ追加
+console.log('🔧 NextAuth Base URL:', baseUrl);
+console.log('🔧 Environment:', process.env.NODE_ENV);
+console.log('🔧 NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
 
 // 拡張User型
 interface ExtendedUser extends User {
@@ -38,6 +44,8 @@ interface ExtendedUser extends User {
   requiresTwoFactor?: boolean;
   provider?: string;
   providerId?: string;
+  emailVerified?: Date | null;
+  requiresEmailVerification?: boolean;
 }
 
 // IP取得ユーティリティ
@@ -63,7 +71,53 @@ function getUserAgent(req?: NextRequest): string {
   return req?.headers.get('user-agent') || 'unknown';
 }
 
-// ログイン履歴記録（データベース依存なし）
+// メール認証トークン生成（userIdベース）
+async function generateEmailVerificationToken(userId: string): Promise<string> {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24時間後
+
+  try {
+    // 既存トークンを削除
+    await prisma.emailVerificationToken.deleteMany({
+      where: { userId }
+    });
+
+    // 新しいトークン作成
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId,
+        token,
+        expires
+      }
+    });
+
+    return token;
+  } catch (error) {
+    console.error('メール認証トークン生成エラー:', error);
+    throw new Error('トークン生成に失敗しました');
+  }
+}
+
+// メール認証送信
+async function sendVerificationEmail(userId: string, email: string, name?: string): Promise<boolean> {
+  try {
+    const token = await generateEmailVerificationToken(userId);
+    const success = await emailService.sendVerificationEmail(email, token, name);
+    
+    if (success) {
+      console.log(`✅ 認証メール送信成功: ${email}`);
+    } else {
+      console.error(`❌ 認証メール送信失敗: ${email}`);
+    }
+    
+    return success;
+  } catch (error) {
+    console.error('認証メール送信エラー:', error);
+    return false;
+  }
+}
+
+// ログイン履歴記録
 async function recordLoginHistory(
   userId: string,
   ipAddress: string,
@@ -74,12 +128,6 @@ async function recordLoginHistory(
   metadata?: Record<string, any>
 ) {
   try {
-    const dbAvailable = await isDatabaseAvailable();
-    if (!dbAvailable) {
-      console.log('Login attempt logged (DB unavailable):', { userId, success, reason, provider });
-      return;
-    }
-
     await prisma.loginHistory.create({
       data: {
         userId,
@@ -102,9 +150,6 @@ async function recordLoginHistory(
 // 最終ログイン更新
 async function updateLastLogin(userId: string, ipAddress: string) {
   try {
-    const dbAvailable = await isDatabaseAvailable();
-    if (!dbAvailable) return;
-
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -121,9 +166,6 @@ async function updateLastLogin(userId: string, ipAddress: string) {
 // ログイン試行回数増加
 async function incrementLoginAttempts(email: string, ipAddress: string) {
   try {
-    const dbAvailable = await isDatabaseAvailable();
-    if (!dbAvailable) return;
-
     const user = await prisma.user.findUnique({
       where: { email }
     });
@@ -148,9 +190,7 @@ async function incrementLoginAttempts(email: string, ipAddress: string) {
 
 // NextAuth設定
 const authConfig: AuthOptions = {
-  // データベースが利用可能な場合のみアダプターを使用
-  ...(process.env.DATABASE_URL && { adapter: PrismaAdapter(prisma) }),
-  
+  // アダプターなし（JWTのみ使用）
   session: {
     strategy: 'jwt',
     maxAge: isProduction ? 24 * 60 * 60 : 30 * 24 * 60 * 60,
@@ -190,36 +230,105 @@ const authConfig: AuthOptions = {
   providers: [
     // Google OAuth
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [
-      GoogleProvider({
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        allowDangerousEmailAccountLinking: true,
-        authorization: {
-          params: {
-            prompt: "consent",
-            access_type: "offline",
-            response_type: "code",
-            scope: "openid email profile",
-          }
-        },
-      })
-    ] : []),
-
-    // Azure AD OAuth
+  GoogleProvider({
+  clientId: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  allowDangerousEmailAccountLinking: true,
+  authorization: {
+    params: {
+      prompt: "consent",
+      access_type: "offline",
+      response_type: "code",
+      scope: "openid email profile",
+    }
+  },
+})
+] : []),
+    // Azure AD OAuth（Microsoft 365）
     ...(process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET && process.env.AZURE_AD_TENANT_ID ? [
-      AzureADProvider({
-        clientId: process.env.AZURE_AD_CLIENT_ID,
-        clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
-        tenantId: process.env.AZURE_AD_TENANT_ID,
-        allowDangerousEmailAccountLinking: true,
-        authorization: {
-          params: {
-            scope: "openid email profile",
-            prompt: "select_account",
+  AzureADProvider({
+  clientId: process.env.AZURE_AD_CLIENT_ID,
+  clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
+  tenantId: process.env.AZURE_AD_TENANT_ID,
+  allowDangerousEmailAccountLinking: true,
+  authorization: {
+    params: {
+      scope: "openid email profile User.Read",
+      prompt: "select_account",
+      response_type: "code",
+    }
+  },
+  token: {
+    url: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/oauth2/v2.0/token`,
+  },
+    userinfo: {
+      url: "https://graph.microsoft.com/v1.0/me",
+      async request({ tokens, provider }) {
+        try {
+          console.log('🔧 Microsoft Graph API 呼び出し開始');
+          
+          const response = await fetch("https://graph.microsoft.com/v1.0/me", {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            console.error('❌ Microsoft Graph API エラー:', response.status, response.statusText);
+            throw new Error(`Microsoft Graph API request failed: ${response.status}`);
           }
-        },
-      })
-    ] : []),
+          
+          const user = await response.json();
+          console.log('✅ Microsoft Graph API レスポンス:', user);
+          
+          return {
+            sub: user.id || user.oid || 'unknown',
+            oid: user.oid || user.id,
+            email: user.mail || user.userPrincipalName,
+            name: user.displayName,
+            preferred_username: user.userPrincipalName,
+            nickname: user.displayName || user.userPrincipalName,
+            picture: undefined,
+            id: user.id,
+            displayName: user.displayName,
+            mail: user.mail,
+            userPrincipalName: user.userPrincipalName,
+          } as unknown as AzureADProfile;
+        } catch (error) {
+          console.error('❌ Microsoft Graph API 呼び出しエラー:', error);
+          throw error;
+        }
+      },
+    },
+    profile(profile: AzureADProfile, tokens) {
+      console.log('🔧 Microsoft365 プロファイル処理:', profile);
+      
+      const userId = (profile as any).oid || profile.sub || (profile as any).id || '';
+      const email = (profile as any).email || (profile as any).mail || (profile as any).preferred_username || '';
+      const name = (profile as any).name || (profile as any).displayName || email;
+      
+      if (!userId) {
+        console.error('❌ Microsoft365: ユーザーIDが取得できません', profile);
+        throw new Error('Microsoft365: ユーザーIDが取得できません');
+      }
+      
+      if (!email) {
+        console.error('❌ Microsoft365: メールアドレスが取得できません', profile);
+        throw new Error('Microsoft365: メールアドレスが取得できません');
+      }
+      
+      console.log('✅ Microsoft365 認証成功:', { userId, email, name });
+      
+      return {
+        id: userId,
+        email: email,
+        name: name,
+        image: undefined,
+      };
+    },
+  })
+] : []),
 
     // Credentials Provider
     CredentialsProvider({
@@ -238,22 +347,19 @@ const authConfig: AuthOptions = {
         const userAgent = getUserAgent(req as NextRequest);
 
         try {
-          // データベースが利用できない場合はデモ認証
-          const dbAvailable = await isDatabaseAvailable();
-          if (!dbAvailable) {
-            console.warn('Database not available, using demo authentication');
-            if (credentials.email === 'demo@example.com' && credentials.password === 'demo123') {
-              return {
-                id: 'demo-user-id',
-                email: 'demo@example.com',
-                name: 'Demo User',
-                company: 'Demo Company',
-                twoFactorEnabled: false,
-                requiresTwoFactor: false,
-                provider: 'credentials'
-              };
-            }
-            return null;
+          // デモアカウント
+          if (credentials.email === 'demo@example.com' && credentials.password === 'demo123') {
+            return {
+              id: 'demo-user-id',
+              email: 'demo@example.com',
+              name: 'Demo User',
+              company: 'Demo Company',
+              twoFactorEnabled: false,
+              requiresTwoFactor: false,
+              provider: 'credentials',
+              emailVerified: new Date(),
+              requiresEmailVerification: false,
+            };
           }
 
           const user = await prisma.user.findUnique({
@@ -282,6 +388,22 @@ const authConfig: AuthOptions = {
             return null;
           }
 
+          // メール認証確認
+          if (!user.emailVerified) {
+            await recordLoginHistory(user.id, ipAddress, userAgent, false, 'メール認証が必要です', 'credentials');
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name || user.email,
+              company: user.company || undefined,
+              twoFactorEnabled: false,
+              requiresTwoFactor: false,
+              provider: 'credentials',
+              emailVerified: null,
+              requiresEmailVerification: true,
+            };
+          }
+
           // 2FA確認
           if (user.twoFactorEnabled) {
             await recordLoginHistory(user.id, ipAddress, userAgent, false, '2FA認証待ち', 'credentials');
@@ -292,7 +414,9 @@ const authConfig: AuthOptions = {
               company: user.company || undefined,
               twoFactorEnabled: true,
               requiresTwoFactor: true,
-              provider: 'credentials'
+              provider: 'credentials',
+              emailVerified: user.emailVerified,
+              requiresEmailVerification: false,
             };
           }
 
@@ -307,7 +431,9 @@ const authConfig: AuthOptions = {
             company: user.company || undefined,
             twoFactorEnabled: false,
             requiresTwoFactor: false,
-            provider: 'credentials'
+            provider: 'credentials',
+            emailVerified: user.emailVerified,
+            requiresEmailVerification: false,
           };
         } catch (error) {
           console.error('認証エラー:', error);
@@ -321,6 +447,7 @@ const authConfig: AuthOptions = {
   pages: {
     signIn: '/login',
     error: '/login',
+    verifyRequest: '/verify-email',
   },
 
   callbacks: {
@@ -332,6 +459,8 @@ const authConfig: AuthOptions = {
         token.requiresTwoFactor = (user as ExtendedUser).requiresTwoFactor;
         token.provider = account?.provider || (user as ExtendedUser).provider;
         token.providerId = account?.providerAccountId || (user as ExtendedUser).providerId;
+        token.emailVerified = (user as ExtendedUser).emailVerified;
+        token.requiresEmailVerification = (user as ExtendedUser).requiresEmailVerification;
         
         if (isProduction) {
           token.securityLevel = 'production';
@@ -345,12 +474,14 @@ const authConfig: AuthOptions = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.company = token.company as string;
-        session.user.twoFactorEnabled = token.twoFactorEnabled as boolean;
-        session.user.requiresTwoFactor = token.requiresTwoFactor as boolean;
+        (session.user as any).company = token.company as string;
+        (session.user as any).twoFactorEnabled = token.twoFactorEnabled as boolean;
+        (session.user as any).requiresTwoFactor = token.requiresTwoFactor as boolean;
+        (session.user as any).emailVerified = token.emailVerified as Date;
         
         (session.user as any).provider = token.provider as string;
         (session.user as any).providerId = token.providerId as string;
+        (session.user as any).requiresEmailVerification = token.requiresEmailVerification as boolean;
         
         if (isProduction) {
           (session.user as any).securityLevel = token.securityLevel;
@@ -361,71 +492,211 @@ const authConfig: AuthOptions = {
     },
 
     async signIn({ user, account, profile }) {
-      try {
-        // 2FA必要時は一時停止
-        if ((user as ExtendedUser).requiresTwoFactor) {
-          return false;
-        }
+  try {
+    // 2FA必要時は一時停止
+    if ((user as ExtendedUser).requiresTwoFactor) {
+      console.log('2FA認証が必要です:', user.email);
+      return '/login?error=TwoFactorRequired';
+    }
 
-        // ソーシャルログイン許可（GoogleとAzure ADのみ）
-        if (account && ['google', 'azure-ad'].includes(account.provider)) {
-          if (!user.email) {
-            console.error('ソーシャルログイン: メールアドレスが取得できません');
-            return false;
-          }
-
-          console.log(`ソーシャルログイン許可: ${user.email} - ${account.provider}`);
-          return true;
-        }
-
-        return true;
-      } catch (error) {
-        console.error('サインインコールバックエラー:', error);
-        return false;
+    // メール認証必要時は一時停止
+    if ((user as ExtendedUser).requiresEmailVerification) {
+      console.log('メール認証が必要です:', user.email);
+      // 認証メール再送信
+      if (user.id) {
+        await sendVerificationEmail(user.id, user.email!, user.name || undefined);
       }
-    },
+      return '/login?error=EmailVerificationRequired';
+    }
+
+    // ソーシャルログインの処理（Google と Azure AD のみ）
+    if (account && ['google', 'azure-ad'].includes(account.provider)) {
+      console.log(`🔧 ${account.provider} ログイン処理開始:`, {
+        email: user.email,
+        name: user.name,
+        providerId: account.providerAccountId,
+      });
+
+      if (!user.email) {
+        console.error('❌ ソーシャルログイン: メールアドレスが取得できません', { 
+          provider: account.provider, 
+          profile: profile,
+          user: user 
+        });
+        return `/login?error=NoEmail&provider=${account.provider}`;
+      }
+
+      try {
+        // 既存ユーザーを確認
+        let existingUser = await prisma.user.findUnique({
+          where: { email: user.email }
+        });
+
+        let isNewUser = false;
+
+        if (!existingUser) {
+          // 新規ユーザー作成
+          console.log(`新規ユーザー作成開始: ${user.email}`);
+          
+          existingUser = await prisma.user.create({
+            data: {
+              email: user.email,
+              name: user.name || user.email,
+              image: user.image,
+              emailVerified: new Date(), // ソーシャルログインは自動認証
+              role: 'user',
+            }
+          });
+
+          isNewUser = true;
+          console.log(`✅ 新規ユーザー作成成功: ${user.email} (ID: ${existingUser.id})`);
+
+          // ウェルカムメール送信
+          try {
+            await emailService.sendWelcomeEmail(user.email, user.name || undefined);
+            console.log(`✅ ウェルカムメール送信成功: ${user.email}`);
+          } catch (emailError) {
+            console.error('ウェルカムメール送信エラー:', emailError);
+            // メール送信失敗してもログインは継続
+          }
+        } else {
+          console.log(`既存ユーザーログイン: ${user.email} (ID: ${existingUser.id})`);
+          
+          // ソーシャルログイン時は自動的にメール認証済みにする
+          if (!existingUser.emailVerified) {
+            await prisma.user.update({
+              where: { id: existingUser.id },
+              data: { emailVerified: new Date() }
+            });
+            console.log(`✅ メール認証ステータス更新: ${user.email}`);
+          }
+        }
+
+        // アカウント連携を確認・作成
+        const existingAccount = await prisma.account.findUnique({
+          where: {
+            provider_providerAccountId: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            }
+          }
+        });
+
+        if (!existingAccount) {
+          console.log(`アカウント連携作成開始: ${account.provider} - ${user.email}`);
+          
+          await prisma.account.create({
+            data: {
+              userId: existingUser.id,
+              type: account.type,
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              refresh_token: account.refresh_token,
+              access_token: account.access_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+              session_state: account.session_state,
+            }
+          });
+
+          console.log(`✅ アカウント連携作成成功: ${account.provider} - ${user.email}`);
+        } else {
+          console.log(`既存アカウント連携確認: ${account.provider} - ${user.email}`);
+        }
+
+        // ユーザー情報を更新
+        user.id = existingUser.id;
+
+        // ログイン履歴記録
+        await recordLoginHistory(
+          existingUser.id,
+          'unknown', // ソーシャルログインではIP取得困難
+          'unknown',
+          true,
+          'ソーシャルログイン成功',
+          account.provider,
+          {
+            providerId: account.providerAccountId,
+            isNewUser: isNewUser,
+            profileData: profile
+          }
+        );
+
+        console.log(`✅ ${account.provider} ログイン成功: ${user.email}`);
+        return true;
+      } catch (dbError) {
+        console.error(`❌ ${account.provider} ログイン処理エラー:`, dbError);
+        return '/login?error=DatabaseError';
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('サインインコールバックエラー:', error);
+    return '/login?error=CallbackError';
+  }
+},
 
     async redirect({ url, baseUrl }) {
-      if (isProduction) {
-        const allowedUrls = [
-          baseUrl,
-          'https://linksense-mvp.vercel.app',
-        ];
-        
-        if (url.startsWith("/")) {
-          return `${baseUrl}${url}`;
-        }
-        
-        try {
-          const urlObj = new URL(url);
-          const isAllowed = allowedUrls.some(allowedUrl => 
-            urlObj.origin === new URL(allowedUrl).origin
-          );
-          
-          if (isAllowed) {
-            return url;
-          } else {
-            console.warn('REDIRECT_BLOCKED:', { url, baseUrl });
-            return baseUrl;
-          }
-        } catch {
-          return baseUrl;
-        }
-      }
-      
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      else if (new URL(url).origin === baseUrl) return url;
-      return baseUrl;
+  console.log('🔧 Redirect処理:', { url, baseUrl, actualBaseUrl: process.env.NEXTAUTH_URL });
+  
+  // エラーパラメータがある場合はログインページに戻す
+  if (url.includes('error=')) {
+    console.log('🔧 エラーリダイレクト:', url);
+    return url.startsWith('/') ? `${baseUrl}${url}` : url;
+  }
+
+  if (isProduction) {
+    const allowedUrls = [
+      baseUrl,
+      'https://linksense-mvp.vercel.app',
+      // 🔧 修正: 現在のVercelデプロイメントURLも許可
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    ].filter(Boolean);
+    
+    console.log('🔧 許可されたURL:', allowedUrls);
+    
+    if (url.startsWith("/")) {
+      const finalUrl = `${baseUrl}${url}`;
+      console.log('✅ 相対URLリダイレクト:', finalUrl);
+      return finalUrl;
     }
+    
+    try {
+      const urlObj = new URL(url);
+      const isAllowed = allowedUrls.some(allowedUrl => 
+        urlObj.origin === new URL(allowedUrl!).origin
+      );
+      
+      if (isAllowed) {
+        console.log('✅ 許可されたURLリダイレクト:', url);
+        return url;
+      } else {
+        console.warn('⚠️ REDIRECT_BLOCKED:', { url, baseUrl, allowedUrls });
+        return `${baseUrl}/dashboard`;
+      }
+    } catch (error) {
+      console.error('❌ URLパースエラー:', error);
+      return `${baseUrl}/dashboard`;
+    }
+  }
+  
+  // 開発環境
+  if (url.startsWith("/")) return `${baseUrl}${url}`;
+  else if (new URL(url).origin === baseUrl) return url;
+  return baseUrl;
+}
   },
 
   events: {
     async signIn({ user, account, isNewUser }) {
       const provider = account?.provider || 'unknown';
-      console.log(`ユーザー ${user.email} が ${provider} でログインしました`);
+      console.log(`✅ ユーザー ${user.email} が ${provider} でログインしました`);
       
       if (isNewUser) {
-        console.log(`新規ユーザー ${user.email} が ${provider} で作成されました`);
+        console.log(`🎉 新規ユーザー ${user.email} が ${provider} で作成されました`);
         
         try {
           if (user.id) {
@@ -455,30 +726,8 @@ const authConfig: AuthOptions = {
       }
     },
 
-    async createUser({ user }) {
-      console.log(`新規ユーザーが作成されました: ${user.email}`);
-      
-      try {
-        const dbAvailable = await isDatabaseAvailable();
-        if (dbAvailable) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: {
-              emailVerified: new Date(),
-            }
-          });
-        }
-
-        if (isProduction) {
-          console.info('NEW_USER_CREATED:', {
-            userId: user.id,
-            email: user.email,
-            timestamp: new Date().toISOString(),
-          });
-        }
-      } catch (error) {
-        console.error('新規ユーザーメール認証設定エラー:', error);
-      }
+    async signOut({ token }) {
+      console.log(`ユーザーがログアウトしました: ${token?.email}`);
     },
   },
 
@@ -495,7 +744,9 @@ const authConfig: AuthOptions = {
         console.warn('NEXTAUTH_WARNING:', { code, timestamp: new Date().toISOString() });
       },
       debug(code: string, metadata?: any) {
-        // 本番環境ではdebugログは出力しない
+        if (process.env.NEXTAUTH_DEBUG === 'true') {
+          console.debug('NEXTAUTH_DEBUG:', { code, metadata, timestamp: new Date().toISOString() });
+        }
       },
     },
   }),
@@ -503,53 +754,7 @@ const authConfig: AuthOptions = {
 
 const handler = NextAuth(authConfig);
 
+// authOptionsをエクスポート
+export const authOptions = authConfig;
+
 export { handler as GET, handler as POST };
-
-// ヘルスチェック関数
-export async function healthCheck() {
-  try {
-    const requiredEnvVars = [
-      'NEXTAUTH_SECRET',
-      'NEXTAUTH_URL',
-    ];
-    
-    const missingRequiredEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
-    
-    if (missingRequiredEnvVars.length > 0) {
-      return {
-        status: 'error',
-        message: `Missing required environment variables: ${missingRequiredEnvVars.join(', ')}`,
-        timestamp: new Date().toISOString(),
-      };
-    }
-
-    // データベース接続チェック
-    const dbAvailable = await isDatabaseAvailable();
-    
-    // OAuthプロバイダー確認
-    const configuredProviders = [];
-    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-      configuredProviders.push('google');
-    }
-    if (process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET && process.env.AZURE_AD_TENANT_ID) {
-      configuredProviders.push('azure-ad');
-    }
-    
-    return {
-      status: 'ok',
-      environment: process.env.NODE_ENV,
-      timestamp: new Date().toISOString(),
-      database: dbAvailable ? 'connected' : 'unavailable',
-      providers: configuredProviders,
-      authUrl: process.env.NEXTAUTH_URL,
-      hasSecret: !!process.env.NEXTAUTH_SECRET,
-      databaseUrl: !!process.env.DATABASE_URL,
-    };
-  } catch (error) {
-    return {
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}

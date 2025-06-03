@@ -1,126 +1,217 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { prisma } from '@/lib/prisma';
+
+/**
+ * LINE WORKS OAuth認証コールバック処理
+ * 
+ * LINE WORKS APIとの統合を処理し、認証情報を安全に保存します。
+ * LINEスタイルビジネスコミュニケーション分析機能との連携を提供。
+ */
+
+interface LineWorksTokenResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface LineWorksUserInfo {
+  userId: string;
+  displayName: string;
+  email: string;
+  mobile: string;
+  telephone: string;
+  department: string;
+  position: string;
+  domainId: string;
+  locale: string;
+  timezone: string;
+  employeeNumber: string;
+  statusMessage: string;
+  avatarUrl: string;
+}
+
+interface LineWorksOrgInfo {
+  domainId: string;
+  domainName: string;
+  companyName: string;
+  countryCode: string;
+  language: string;
+  timezone: string;
+  contractType: string;
+  userCount: number;
+}
 
 const LINE_WORKS_CLIENT_ID = process.env.LINE_WORKS_CLIENT_ID;
 const LINE_WORKS_CLIENT_SECRET = process.env.LINE_WORKS_CLIENT_SECRET;
 
+// Redirect URI生成（統合ページ対応）
 const getRedirectUri = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://linksense-mvp.vercel.app/api/auth/line-works/callback';
-  }
-  
-  if (process.env.NGROK_URL) {
-    return `${process.env.NGROK_URL}/api/auth/line-works/callback`;
-  }
-  
-  return 'http://localhost:3000/api/auth/line-works/callback';
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return `${baseUrl}/api/auth/line-works/callback`;
 };
 
 export async function GET(request: NextRequest) {
+  console.log('🔄 LINE WORKS OAuth コールバック処理開始');
+  
   try {
+    // セッション確認
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      console.error('❌ 未認証ユーザーのアクセス');
+      return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
+    }
+
+    // URLパラメータ取得
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
-    console.log('=== LINE WORKS OAuth コールバック ===');
-    console.log('Code:', code ? '取得済み' : '未取得');
-    console.log('State:', state);
-    console.log('Error:', error);
-    console.log('Error Description:', errorDescription);
+    console.log('📋 LINE WORKSコールバックパラメータ:', { 
+      code: code ? '取得済み' : '未取得', 
+      state, 
+      error,
+      errorDescription 
+    });
 
-    // ✅ OAuth エラーハンドリング
+    // エラーハンドリング
     if (error) {
       console.error('❌ LINE WORKS OAuth エラー:', error, errorDescription);
-      const errorMessage = errorDescription || error;
-      return redirectToIntegrations('line_works_oauth_failed', `LINE WORKS認証エラー: ${errorMessage}`);
+      const errorMessage = encodeURIComponent(`LINE WORKS認証エラー: ${errorDescription || error}`);
+      return NextResponse.redirect(
+        new URL(`/integrations?error=${errorMessage}`, request.url)
+      );
     }
 
     if (!code) {
-      console.error('❌ LINE WORKS認証コードが取得できませんでした');
-      return redirectToIntegrations('line_works_oauth_failed', 'LINE WORKS認証コードが不足しています');
+      console.error('❌ 認証コードが見つかりません');
+      return NextResponse.redirect(
+        new URL('/integrations?error=missing_code', request.url)
+      );
     }
 
-    // ✅ State検証（セキュリティ向上）
+    if (!LINE_WORKS_CLIENT_ID || !LINE_WORKS_CLIENT_SECRET) {
+      console.error('❌ LINE WORKS環境変数が設定されていません');
+      return NextResponse.redirect(
+        new URL('/integrations?error=config_missing', request.url)
+      );
+    }
+
+    // State検証（セキュリティ強化）
     const storedState = request.cookies.get('line_works_oauth_state')?.value;
-    if (!storedState || storedState !== state) {
+    if (state && (!storedState || storedState !== state)) {
       console.error('❌ State検証失敗:', { stored: storedState, received: state });
-      return redirectToIntegrations('line_works_oauth_failed', 'セキュリティ検証に失敗しました');
+      return NextResponse.redirect(
+        new URL('/integrations?error=state_verification_failed', request.url)
+      );
     }
 
-    // ✅ LINE WORKS アクセストークン取得
-    console.log('🔄 LINE WORKS アクセストークン取得開始...');
+    // アクセストークン取得
+    console.log('🔑 LINE WORKS アクセストークン取得開始');
     const tokenResponse = await exchangeCodeForToken(code);
     
     if (!tokenResponse.access_token) {
-      console.error('❌ LINE WORKS アクセストークン取得失敗:', tokenResponse.error || 'Unknown error');
-      return redirectToIntegrations('line_works_oauth_failed', 'LINE WORKSアクセストークンの取得に失敗しました');
+      console.error('❌ LINE WORKSアクセストークン取得失敗:', tokenResponse.error);
+      return NextResponse.redirect(
+        new URL('/integrations?error=token_exchange_failed', request.url)
+      );
     }
 
-    // ✅ ユーザー情報取得
-    console.log('🔄 LINE WORKS ユーザー情報取得開始...');
+    console.log('✅ LINE WORKSアクセストークン取得成功');
+
+    // ユーザー情報取得
+    console.log('👤 LINE WORKS ユーザー情報取得開始');
     const userInfo = await getUserInfo(tokenResponse.access_token);
     
     if (!userInfo) {
-      console.error('❌ LINE WORKS ユーザー情報取得失敗');
-      return redirectToIntegrations('line_works_oauth_failed', 'LINE WORKSユーザー情報の取得に失敗しました');
+      console.error('❌ LINE WORKSユーザー情報取得失敗');
+      return NextResponse.redirect(
+        new URL('/integrations?error=user_info_failed', request.url)
+      );
     }
 
-    // ✅ 組織情報取得
-    console.log('🔄 LINE WORKS 組織情報取得開始...');
+    // 組織情報取得
+    console.log('🏢 LINE WORKS 組織情報取得開始');
     const orgInfo = await getOrganizationInfo(tokenResponse.access_token);
 
-    console.log('✅ LINE WORKS統合成功:', userInfo.displayName || userInfo.userId);
-
-    // ✅ 統合マネージャーに登録
-    await registerIntegration(tokenResponse, userInfo, orgInfo);
-
-    // ✅ 成功時のリダイレクト
-    const baseUrl = process.env.NGROK_URL || request.nextUrl.origin;
-    const successUrl = new URL('/integrations', baseUrl);
-    successUrl.searchParams.set('success', 'line_works_connected');
-    successUrl.searchParams.set('user', userInfo.displayName || userInfo.userId || 'Unknown');
-    successUrl.searchParams.set('organization', orgInfo?.domainName || 'Unknown Organization');
-
-    const response = NextResponse.redirect(successUrl.toString());
-    
-    // ✅ OAuth state cookie削除
-    response.cookies.delete('line_works_oauth_state');
-    
-    // ✅ アクセストークンを安全に保存
-    response.cookies.set(`line_works_access_token`, tokenResponse.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: tokenResponse.expires_in || 3600 // 1時間
+    console.log('✅ LINE WORKSユーザー・組織情報取得成功:', {
+      displayName: userInfo.displayName,
+      userId: userInfo.userId,
+      department: userInfo.department,
+      domainName: orgInfo?.domainName,
+      companyName: orgInfo?.companyName
     });
 
-    // ✅ リフレッシュトークンも保存（長期間有効）
-    if (tokenResponse.refresh_token) {
-      response.cookies.set(`line_works_refresh_token`, tokenResponse.refresh_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 30 * 24 * 60 * 60 // 30日間
-      });
-    }
+    // データベース保存
+    console.log('💾 LINE WORKS統合情報をデータベースに保存開始');
     
-    console.log('✅ LINE WORKS OAuth認証完了、リダイレクト:', successUrl.toString());
-    
+    await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: session.user.id,
+          service: 'line-works'
+        }
+      },
+      update: {
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: orgInfo?.domainId || userInfo.domainId,
+        teamName: orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization',
+        updatedAt: new Date()
+      },
+      create: {
+        userId: session.user.id,
+        service: 'line-works',
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: orgInfo?.domainId || userInfo.domainId,
+        teamName: orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization'
+      }
+    });
+
+    console.log('✅ LINE WORKS統合情報保存完了');
+
+    // 成功時のリダイレクト
+    const successUrl = new URL('/integrations', request.url);
+    successUrl.searchParams.set('success', 'line_works_connected');
+    successUrl.searchParams.set('service', 'LINE WORKS');
+    successUrl.searchParams.set('user', userInfo.displayName || userInfo.userId);
+    successUrl.searchParams.set('organization', orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization');
+
+    // OAuth state cookie削除
+    const response = NextResponse.redirect(successUrl);
+    response.cookies.delete('line_works_oauth_state');
+
+    console.log('🎉 LINE WORKS OAuth認証完了 - 統合ページにリダイレクト');
     return response;
 
   } catch (error) {
-    console.error('❌ LINE WORKS OAuth コールバック処理エラー:', error);
-    return redirectToIntegrations('line_works_oauth_failed', 'LINE WORKSコールバック処理でエラーが発生しました');
+    console.error('❌ LINE WORKS OAuth処理中にエラー:', error);
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'LINE WORKS統合処理中に予期しないエラーが発生しました';
+    
+    return NextResponse.redirect(
+      new URL(`/integrations?error=${encodeURIComponent(errorMessage)}`, request.url)
+    );
   }
 }
 
-// ✅ LINE WORKS トークン交換処理
-async function exchangeCodeForToken(code: string) {
+async function exchangeCodeForToken(code: string): Promise<LineWorksTokenResponse> {
   try {
     const redirectUri = getRedirectUri();
     
-    console.log('LINE WORKS Token exchange用 Redirect URI:', redirectUri);
+    console.log('🔄 LINE WORKS Token exchange開始:', { redirectUri });
     
     const response = await fetch('https://auth.worksmobile.com/oauth2/v2.0/token', {
       method: 'POST',
@@ -136,9 +227,13 @@ async function exchangeCodeForToken(code: string) {
       })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: LineWorksTokenResponse = await response.json();
     
-    console.log('LINE WORKS Token exchange response:', { 
+    console.log('📋 LINE WORKS Token exchange レスポンス:', { 
       success: !!data.access_token,
       token_type: data.token_type,
       expires_in: data.expires_in,
@@ -154,14 +249,15 @@ async function exchangeCodeForToken(code: string) {
     return data;
   } catch (error) {
     console.error('❌ LINE WORKS Token exchange エラー:', error);
-    return { error: 'token_exchange_failed' };
+    return { 
+      error: error instanceof Error ? error.message : 'token_exchange_failed' 
+    };
   }
 }
 
-// ✅ LINE WORKS ユーザー情報取得
-async function getUserInfo(accessToken: string) {
+async function getUserInfo(accessToken: string): Promise<LineWorksUserInfo | null> {
   try {
-    console.log('🔄 LINE WORKS ユーザー情報取得開始...');
+    console.log('🔄 LINE WORKS ユーザー情報取得開始');
     
     const response = await fetch('https://www.worksapis.com/v1.0/users/me', {
       headers: {
@@ -171,17 +267,18 @@ async function getUserInfo(accessToken: string) {
     });
 
     if (!response.ok) {
-      console.error('❌ LINE WORKS API エラー:', response.status, response.statusText);
-      return null;
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const userInfo = await response.json();
+    const userInfo: LineWorksUserInfo = await response.json();
     
-    console.log('✅ LINE WORKS ユーザー情報取得成功:', {
+    console.log('📋 LINE WORKS ユーザー情報レスポンス:', {
       userId: userInfo.userId,
       displayName: userInfo.displayName,
       email: userInfo.email,
-      department: userInfo.department
+      department: userInfo.department,
+      position: userInfo.position,
+      domainId: userInfo.domainId
     });
     
     return userInfo;
@@ -191,10 +288,9 @@ async function getUserInfo(accessToken: string) {
   }
 }
 
-// ✅ LINE WORKS 組織情報取得
-async function getOrganizationInfo(accessToken: string) {
+async function getOrganizationInfo(accessToken: string): Promise<LineWorksOrgInfo | null> {
   try {
-    console.log('🔄 LINE WORKS 組織情報取得開始...');
+    console.log('🔄 LINE WORKS 組織情報取得開始');
     
     const response = await fetch('https://www.worksapis.com/v1.0/domains/me', {
       headers: {
@@ -204,76 +300,27 @@ async function getOrganizationInfo(accessToken: string) {
     });
 
     if (!response.ok) {
-      console.error('❌ LINE WORKS 組織API エラー:', response.status, response.statusText);
-      return null;
+      console.warn('⚠️ LINE WORKS 組織情報取得失敗（権限不足の可能性）:', response.status);
+      return null; // 組織情報が取得できなくても統合は継続
     }
 
-    const orgInfo = await response.json();
+    const orgInfo: LineWorksOrgInfo = await response.json();
     
-    console.log('✅ LINE WORKS 組織情報取得成功:', {
+    console.log('📋 LINE WORKS 組織情報レスポンス:', {
       domainId: orgInfo.domainId,
       domainName: orgInfo.domainName,
-      companyName: orgInfo.companyName
+      companyName: orgInfo.companyName,
+      userCount: orgInfo.userCount
     });
     
     return orgInfo;
   } catch (error) {
-    console.error('❌ LINE WORKS 組織情報取得エラー:', error);
-    return null;
+    console.warn('⚠️ LINE WORKS 組織情報取得エラー（統合は継続）:', error);
+    return null; // エラーが発生しても統合は継続
   }
 }
 
-// ✅ 統合マネージャーに登録
-async function registerIntegration(tokenResponse: any, userInfo: any, orgInfo: any) {
-  try {
-    console.log('🔄 LINE WORKS統合をマネージャーに登録中...');
-    
-    // 統合マネージャーに登録するためのデータ準備
-    const integrationData = {
-      id: 'line-works',
-      name: 'LINE WORKS',
-      status: 'connected' as const,
-      credentials: {
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token,
-        clientId: LINE_WORKS_CLIENT_ID,
-        clientSecret: LINE_WORKS_CLIENT_SECRET,
-        expiresAt: new Date(Date.now() + (tokenResponse.expires_in * 1000))
-      },
-      lastSync: new Date(),
-      healthScore: 85,
-      isEnabled: true,
-      settings: {
-        enableNotifications: true,
-        syncInterval: 60
-      },
-      userInfo: {
-        userId: userInfo.userId,
-        displayName: userInfo.displayName,
-        email: userInfo.email
-      },
-      organizationInfo: orgInfo
-    };
-
-    // LocalStorageに保存（実際の実装では、統合マネージャーのAPIを使用）
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('line_works_integration', JSON.stringify(integrationData));
-    }
-
-    console.log('✅ LINE WORKS統合マネージャー登録完了');
-  } catch (error) {
-    console.error('❌ LINE WORKS統合マネージャー登録エラー:', error);
-  }
-}
-
-// ✅ エラー時リダイレクト処理
-function redirectToIntegrations(error: string, message: string) {
-  const baseUrl = process.env.NGROK_URL || 'http://localhost:3000';
-  const errorUrl = new URL('/integrations', baseUrl);
-  errorUrl.searchParams.set('error', error);
-  errorUrl.searchParams.set('message', message);
-  
-  console.log('❌ LINE WORKS OAuth エラーリダイレクト:', errorUrl.toString());
-  
-  return NextResponse.redirect(errorUrl.toString());
+export async function POST(request: NextRequest) {
+  // POST メソッドでも同様の処理をサポート
+  return GET(request);
 }

@@ -222,25 +222,45 @@ const EnterpriseLoginPage: React.FC = () => {
       console.log('セッション期限切れによるログアウト');
     }
 
-    // OAuth エラーハンドリング強化
-    if (errorParam) {
-      const errorMessages: Record<string, string> = {
-        'OAuthSignin': 'ソーシャルログインサービスに接続できませんでした。しばらく時間をおいて再度お試しください。',
-        'OAuthCallback': 'ソーシャルログインの認証プロセスでエラーが発生しました。',
-        'OAuthCreateAccount': 'アカウントの作成に失敗しました。このメールアドレスは既に使用されている可能性があります。',
-        'EmailCreateAccount': 'このメールアドレスは既に別のアカウントで使用されています。',
-        'Callback': '認証処理中にシステムエラーが発生しました。システム管理者にお問い合わせください。',
-        'OAuthAccountNotLinked': 'このメールアドレスは既に別の認証方法で登録されています。元の方法でログインしてください。',
-        'EmailSignin': 'メール認証リンクが無効または期限切れです。',
-        'CredentialsSignin': 'メールアドレスまたはパスワードが正しくありません。',
-        'SessionRequired': 'このページにアクセスするにはログインが必要です。',
-        'AccessDenied': 'アクセスが拒否されました。アカウントの権限を確認してください。',
-        'Verification': 'メール認証が必要です。受信箱を確認してください。'
-      };
-      
-      setError(errorMessages[errorParam] || '認証エラーが発生しました。再度お試しください。');
-      console.error(`OAuth認証エラー: ${errorParam}`);
-    }
+   // OAuth エラーハンドリング強化（Microsoft365対応）
+if (errorParam) {
+  const errorMessages: Record<string, string> = {
+    // 既存のエラー
+    'OAuthSignin': 'ソーシャルログインサービスに接続できませんでした。しばらく時間をおいて再度お試しください。',
+    'OAuthCallback': 'ソーシャルログインの認証プロセスでエラーが発生しました。',
+    'OAuthCreateAccount': 'アカウントの作成に失敗しました。このメールアドレスは既に使用されている可能性があります。',
+    'EmailCreateAccount': 'このメールアドレスは既に別のアカウントで使用されています。',
+    'Callback': '認証処理中にシステムエラーが発生しました。システム管理者にお問い合わせください。',
+    'OAuthAccountNotLinked': 'このメールアドレスは既に別の認証方法で登録されています。元の方法でログインしてください。',
+    'EmailSignin': 'メール認証リンクが無効または期限切れです。',
+    'CredentialsSignin': 'メールアドレスまたはパスワードが正しくありません。',
+    'SessionRequired': 'このページにアクセスするにはログインが必要です。',
+    'AccessDenied': 'アクセスが拒否されました。アカウントの権限を確認してください。',
+    'Verification': 'メール認証が必要です。受信箱を確認してください。',
+    
+    // 新しいエラー（Microsoft365 & メール認証対応）
+    'TwoFactorRequired': '2要素認証が必要です。認証アプリで生成されたコードを入力してください。',
+    'EmailVerificationRequired': 'メールアドレスの認証が必要です。受信箱を確認して認証リンクをクリックしてください。認証メールを再送信しました。',
+    'NoEmail': 'ソーシャルログインからメールアドレスを取得できませんでした。別の方法でログインしてください。',
+    'DatabaseError': 'データベース接続エラーが発生しました。しばらく時間をおいて再度お試しください。',
+    'CallbackError': '認証コールバック処理中にエラーが発生しました。再度ログインを試してください。',
+    
+    // Microsoft365 特有のエラー
+    'AzureADError': 'Microsoft 365認証でエラーが発生しました。組織の管理者にお問い合わせください。',
+    'GraphAPIError': 'Microsoft Graph APIでエラーが発生しました。しばらく時間をおいて再度お試しください。',
+    'TenantError': '組織のテナント設定に問題があります。システム管理者にお問い合わせください。'
+  };
+  
+  const errorMessage = errorMessages[errorParam] || '認証エラーが発生しました。再度お試しください。';
+  setError(errorMessage);
+  console.error(`認証エラー: ${errorParam}`, { errorMessage, timestamp: new Date().toISOString() });
+  
+  // 特定のエラーに対する追加アクション
+  if (errorParam === 'EmailVerificationRequired') {
+    // メール認証が必要な場合の特別な表示（後で実装予定）
+    console.log('メール認証が必要 - 認証メール再送信済み');
+  }
+}
     
     return () => {
       if (timer) clearTimeout(timer);

@@ -85,7 +85,7 @@ export default function HomePage() {
             チーム健全性分析で組織力を最大化
           </h1>
           <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            8つの主要コミュニケーションプラットフォームを統合し、
+            7つの主要コミュニケーションプラットフォームを統合し、
             データドリブンな洞察でチームのパフォーマンスと健全性を向上させます。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -140,7 +140,7 @@ export default function HomePage() {
             </CardHeader>
             <CardContent>
               <CardDescription className="text-gray-600 text-center leading-relaxed">
-                Slack、Teams、Zoom等の8つのプラットフォームを統合し、
+                Slack、Teams、Zoom等の7つのプラットフォームを統合し、
                 統一された視点でチーム状況を把握できます。
               </CardDescription>
             </CardContent>
@@ -175,7 +175,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-items-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-6 items-center justify-items-center">
             <div className="flex flex-col items-center space-y-2">
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
                 <MessageSquare className="w-8 h-8 text-gray-600" />
@@ -217,12 +217,6 @@ export default function HomePage() {
                 <Users className="w-8 h-8 text-gray-600" />
               </div>
               <span className="text-sm font-medium text-gray-700">Discord</span>
-            </div>
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                <Shield className="w-8 h-8 text-gray-600" />
-              </div>
-              <span className="text-sm font-medium text-gray-700">サイボウズ Office</span>
             </div>
           </div>
         </div>
@@ -311,7 +305,7 @@ export default function HomePage() {
               <div className="text-gray-400">導入企業数</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-green-400 mb-2">8/8</div>
+              <div className="text-3xl font-bold text-green-400 mb-2">7/7</div>
               <div className="text-gray-400">統合サービス完成</div>
             </div>
             <div>

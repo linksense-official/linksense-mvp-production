@@ -1,106 +1,189 @@
-// src/app/api/auth/teams/callback/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { prisma } from '@/lib/prisma';
 
-const TEAMS_CLIENT_ID = process.env.TEAMS_CLIENT_ID;
-const TEAMS_CLIENT_SECRET = process.env.TEAMS_CLIENT_SECRET;
+/**
+ * Microsoft Teams OAuth認証コールバック処理
+ * 
+ * Microsoft Graph APIとの統合を処理し、認証情報を安全に保存します。
+ * Teams会議・チャット分析機能との連携を提供。
+ */
 
-// ✅ Teams用Redirect URI関数（Slack実装パターンを踏襲）
+interface TeamsTokenResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  scope?: string;
+  refresh_token?: string;
+  id_token?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface TeamsUserInfo {
+  id: string;
+  displayName: string;
+  userPrincipalName: string;
+  mail?: string;
+  companyName?: string;
+  department?: string;
+  jobTitle?: string;
+  officeLocation?: string;
+}
+
+const TEAMS_CLIENT_ID = process.env.AZURE_AD_CLIENT_ID; // Microsoft Teams は Azure AD を使用
+const TEAMS_CLIENT_SECRET = process.env.AZURE_AD_CLIENT_SECRET;
+const TEAMS_TENANT_ID = process.env.AZURE_AD_TENANT_ID;
+
+// Redirect URI生成（統合ページ対応）
 const getRedirectUri = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://linksense-mvp.vercel.app/api/auth/teams/callback';
-  }
-  
-  if (process.env.NGROK_URL) {
-    return `${process.env.NGROK_URL}/api/auth/teams/callback`;
-  }
-  
-  return 'http://localhost:3000/api/auth/teams/callback';
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return `${baseUrl}/api/auth/teams/callback`;
 };
 
 export async function GET(request: NextRequest) {
+  console.log('🔄 Microsoft Teams OAuth コールバック処理開始');
+  
   try {
+    // セッション確認
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      console.error('❌ 未認証ユーザーのアクセス');
+      return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
+    }
+
+    // URLパラメータ取得
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
-    console.log('=== Microsoft Teams OAuth コールバック ===');
-    console.log('Code:', code ? '取得済み' : '未取得');
-    console.log('State:', state);
-    console.log('Error:', error);
-    console.log('Error Description:', errorDescription);
+    console.log('📋 Teamsコールバックパラメータ:', { 
+      code: code ? '取得済み' : '未取得', 
+      state, 
+      error,
+      errorDescription 
+    });
 
-    // ✅ OAuth エラーハンドリング
+    // エラーハンドリング
     if (error) {
       console.error('❌ Microsoft Teams OAuth エラー:', error, errorDescription);
-      const errorMessage = errorDescription || error;
-      return redirectToSettings('teams_oauth_failed', `Teams認証エラー: ${errorMessage}`);
+      const errorMessage = encodeURIComponent(`Teams認証エラー: ${errorDescription || error}`);
+      return NextResponse.redirect(
+        new URL(`/integrations?error=${errorMessage}`, request.url)
+      );
     }
 
     if (!code) {
-      console.error('❌ Teams認証コードが取得できませんでした');
-      return redirectToSettings('teams_oauth_failed', 'Teams認証コードが不足しています');
+      console.error('❌ 認証コードが見つかりません');
+      return NextResponse.redirect(
+        new URL('/integrations?error=missing_code', request.url)
+      );
     }
 
-    // ✅ State検証（セキュリティ向上）
-    const storedState = request.cookies.get('teams_oauth_state')?.value;
-    if (!storedState || storedState !== state) {
-      console.error('❌ State検証失敗:', { stored: storedState, received: state });
-      return redirectToSettings('teams_oauth_failed', 'セキュリティ検証に失敗しました');
+    if (!TEAMS_CLIENT_ID || !TEAMS_CLIENT_SECRET || !TEAMS_TENANT_ID) {
+      console.error('❌ Microsoft Teams環境変数が設定されていません');
+      return NextResponse.redirect(
+        new URL('/integrations?error=config_missing', request.url)
+      );
     }
 
-    // ✅ Microsoft Graph アクセストークン取得
-    console.log('🔄 Microsoft Graph アクセストークン取得開始...');
+    // アクセストークン取得
+    console.log('🔑 Microsoft Teams アクセストークン取得開始');
     const tokenResponse = await exchangeCodeForToken(code);
     
     if (!tokenResponse.access_token) {
-      console.error('❌ Teams アクセストークン取得失敗:', tokenResponse.error || 'Unknown error');
-      return redirectToSettings('teams_oauth_failed', 'Teamsアクセストークンの取得に失敗しました');
+      console.error('❌ Teamsアクセストークン取得失敗:', tokenResponse.error);
+      return NextResponse.redirect(
+        new URL('/integrations?error=token_exchange_failed', request.url)
+      );
     }
 
-    // ✅ ユーザー情報取得
-    console.log('🔄 Teams ユーザー情報取得開始...');
+    console.log('✅ Teamsアクセストークン取得成功');
+
+    // ユーザー情報取得
+    console.log('👤 Teams ユーザー情報取得開始');
     const userInfo = await getUserInfo(tokenResponse.access_token);
     
     if (!userInfo) {
-      console.error('❌ Teams ユーザー情報取得失敗');
-      return redirectToSettings('teams_oauth_failed', 'Teamsユーザー情報の取得に失敗しました');
+      console.error('❌ Teamsユーザー情報取得失敗');
+      return NextResponse.redirect(
+        new URL('/integrations?error=user_info_failed', request.url)
+      );
     }
 
-    console.log('✅ Microsoft Teams統合成功:', userInfo.displayName || userInfo.userPrincipalName);
+    console.log('✅ Teamsユーザー情報取得成功:', {
+      displayName: userInfo.displayName,
+      userPrincipalName: userInfo.userPrincipalName,
+      companyName: userInfo.companyName
+    });
 
-    // ✅ 成功時のリダイレクト（Slack実装パターンを踏襲）
-    const baseUrl = process.env.NGROK_URL || request.nextUrl.origin;
-    const successUrl = new URL('/settings', baseUrl);
-    successUrl.searchParams.set('tab', 'integrations');
+    // データベース保存
+    console.log('💾 Teams統合情報をデータベースに保存開始');
+    
+    await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: session.user.id,
+          service: 'microsoft-teams'
+        }
+      },
+      update: {
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: userInfo.companyName || 'unknown',
+        teamName: userInfo.companyName || userInfo.userPrincipalName.split('@')[1] || 'Unknown Organization',
+        updatedAt: new Date()
+      },
+      create: {
+        userId: session.user.id,
+        service: 'microsoft-teams',
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: userInfo.companyName || 'unknown',
+        teamName: userInfo.companyName || userInfo.userPrincipalName.split('@')[1] || 'Unknown Organization'
+      }
+    });
+
+    console.log('✅ Teams統合情報保存完了');
+
+    // 成功時のリダイレクト
+    const successUrl = new URL('/integrations', request.url);
     successUrl.searchParams.set('success', 'teams_connected');
-    successUrl.searchParams.set('user', userInfo.displayName || userInfo.userPrincipalName || 'Unknown');
+    successUrl.searchParams.set('service', 'Microsoft Teams');
+    successUrl.searchParams.set('user', userInfo.displayName);
     successUrl.searchParams.set('organization', userInfo.companyName || 'Unknown Organization');
 
-    const response = NextResponse.redirect(successUrl.toString());
-    
-    // ✅ OAuth state cookie削除
-    response.cookies.delete('teams_oauth_state');
-    
-    console.log('✅ Teams OAuth認証完了、リダイレクト:', successUrl.toString());
-    
-    return response;
+    console.log('🎉 Microsoft Teams OAuth認証完了 - 統合ページにリダイレクト');
+    return NextResponse.redirect(successUrl);
 
   } catch (error) {
-    console.error('❌ Microsoft Teams OAuth コールバック処理エラー:', error);
-    return redirectToSettings('teams_oauth_failed', 'Teamsコールバック処理でエラーが発生しました');
+    console.error('❌ Microsoft Teams OAuth処理中にエラー:', error);
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Microsoft Teams統合処理中に予期しないエラーが発生しました';
+    
+    return NextResponse.redirect(
+      new URL(`/integrations?error=${encodeURIComponent(errorMessage)}`, request.url)
+    );
   }
 }
 
-// ✅ Microsoft Graph トークン交換処理
-async function exchangeCodeForToken(code: string) {
+async function exchangeCodeForToken(code: string): Promise<TeamsTokenResponse> {
   try {
     const redirectUri = getRedirectUri();
     
-    console.log('Microsoft Graph Token exchange用 Redirect URI:', redirectUri);
+    console.log('🔄 Microsoft Graph Token exchange開始:', { redirectUri });
     
-    const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    // Microsoft Graph OAuth 2.0 エンドポイント
+    const tokenUrl = `https://login.microsoftonline.com/${TEAMS_TENANT_ID}/oauth2/v2.0/token`;
+    
+    const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -115,9 +198,13 @@ async function exchangeCodeForToken(code: string) {
       })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: TeamsTokenResponse = await response.json();
     
-    console.log('Microsoft Graph Token exchange response:', { 
+    console.log('📋 Microsoft Graph Token exchange レスポンス:', { 
       success: !!data.access_token,
       token_type: data.token_type,
       expires_in: data.expires_in,
@@ -133,14 +220,15 @@ async function exchangeCodeForToken(code: string) {
     return data;
   } catch (error) {
     console.error('❌ Microsoft Graph Token exchange エラー:', error);
-    return { error: 'token_exchange_failed' };
+    return { 
+      error: error instanceof Error ? error.message : 'token_exchange_failed' 
+    };
   }
 }
 
-// ✅ Microsoft Graph ユーザー情報取得
-async function getUserInfo(accessToken: string) {
+async function getUserInfo(accessToken: string): Promise<TeamsUserInfo | null> {
   try {
-    console.log('🔄 Microsoft Graph ユーザー情報取得開始...');
+    console.log('🔄 Microsoft Graph ユーザー情報取得開始');
     
     const response = await fetch('https://graph.microsoft.com/v1.0/me', {
       headers: {
@@ -150,17 +238,17 @@ async function getUserInfo(accessToken: string) {
     });
 
     if (!response.ok) {
-      console.error('❌ Microsoft Graph API エラー:', response.status, response.statusText);
-      return null;
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const userInfo = await response.json();
+    const userInfo: TeamsUserInfo = await response.json();
     
-    console.log('✅ Microsoft Graph ユーザー情報取得成功:', {
+    console.log('📋 Microsoft Graph ユーザー情報レスポンス:', {
       displayName: userInfo.displayName,
       userPrincipalName: userInfo.userPrincipalName,
       companyName: userInfo.companyName,
-      id: userInfo.id
+      department: userInfo.department,
+      jobTitle: userInfo.jobTitle
     });
     
     return userInfo;
@@ -170,15 +258,7 @@ async function getUserInfo(accessToken: string) {
   }
 }
 
-// ✅ エラー時リダイレクト処理（Slack実装パターンを踏襲）
-function redirectToSettings(error: string, message: string) {
-  const baseUrl = process.env.NGROK_URL || 'http://localhost:3000';
-  const errorUrl = new URL('/settings', baseUrl);
-  errorUrl.searchParams.set('tab', 'integrations');
-  errorUrl.searchParams.set('error', error);
-  errorUrl.searchParams.set('message', message);
-  
-  console.log('❌ Teams OAuth エラーリダイレクト:', errorUrl.toString());
-  
-  return NextResponse.redirect(errorUrl.toString());
+export async function POST(request: NextRequest) {
+  // POST メソッドでも同様の処理をサポート
+  return GET(request);
 }

@@ -99,7 +99,7 @@ const translations = {
     
     // 統合設定
     'integrations.title': '統合管理',
-    'integrations.description': 'チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（13サービス対応）',
+    'integrations.description': 'チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（7サービス対応）',
     'integrations.teams.banner': 'Microsoft Teams統合が利用可能になりました！',
     'integrations.teams.banner.description': 'Microsoft 365環境向けの高度なチーム健全性分析。会議参加、チャット活動、コラボレーションパターンを分析します。',
     'integrations.new': '新機能',
@@ -231,7 +231,7 @@ const translations = {
     
     // Integration Settings
     'integrations.title': 'Integration Management',
-    'integrations.description': 'Connect and manage communication platforms for team health analysis (13 services supported)',
+    'integrations.description': 'Connect and manage communication platforms for team health analysis (7 services supported)',
     'integrations.teams.banner': 'Microsoft Teams integration is now available!',
     'integrations.teams.banner.description': 'Advanced team health analysis for Microsoft 365 environments. Analyze meeting participation, chat activity, and collaboration patterns.',
     'integrations.new': 'New',
@@ -398,19 +398,19 @@ const showNotification = (message: string, type: 'success' | 'error' | 'warning'
 const integrations: Integration[] = [
   // 最優先グローバルツール（Slack & Teams）
  {
-  id: 'slack',
-  name: 'Slack',
-  description: 'チームコミュニケーションとメッセージ分析',
-  category: 'communication',
-  market: 'global',
-  isConnected: false,
-  isConnecting: false,
-  isSyncing: false,
-  features: ['メッセージ頻度分析', '応答時間測定', 'チャンネル活動', '感情分析'],
-  setupUrl: '/api/auth/slack',
-  icon: <MessageSquare className="w-5 h-5" />,
-  priority: 1
-},
+    id: 'slack',
+    name: 'Slack',
+    description: 'チームコミュニケーションとメッセージ分析',
+    category: 'communication',
+    market: 'global',
+    isConnected: false,
+    isConnecting: false,
+    isSyncing: false,
+    features: ['メッセージ頻度分析', '応答時間測定', 'チャンネル活動', '感情分析'],
+    setupUrl: '/api/auth/slack',
+    icon: <MessageSquare className="w-5 h-5" />,
+    priority: 1
+  },
   {
     id: 'microsoft-teams',
     name: 'Microsoft Teams',
@@ -437,10 +437,11 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['タスク管理統合', 'メッセージ分析', 'ファイル共有状況'],
+    setupUrl: '/api/auth/chatwork',
     icon: <BarChart3 className="w-5 h-5" />,
     priority: 3
   },
-   {
+  {
     id: 'line-works',
     name: 'LINE WORKS',
     description: 'LINEビジネスコミュニケーション分析',
@@ -450,21 +451,9 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['トーク分析', 'カレンダー統合', 'アドレス帳活用'],
+    setupUrl: '/api/auth/line-works',
     icon: <MessageSquare className="w-5 h-5" />,
     priority: 4
-  },
-  {
-    id: 'cybozu-office',
-    name: 'Cybozu Office',
-    description: 'サイボウズグループウェア分析',
-    category: 'communication',
-    market: 'japan',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['スケジュール分析', 'ワークフロー効率', 'ファイル管理'],
-    icon: <Database className="w-5 h-5" />,
-    priority: 5
   },
 
   // 残りのグローバルツール
@@ -478,8 +467,9 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['会議参加率', '発言時間', 'カメラ使用率', '会議満足度'],
+    setupUrl: '/api/auth/zoom',
     icon: <Zap className="w-5 h-5" />,
-    priority: 6
+    priority: 5
   },
   {
     id: 'google-meet',
@@ -491,8 +481,9 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['会議時間分析', '参加者エンゲージメント', 'Googleカレンダー統合'],
+    setupUrl: '/api/auth/google-meet',
     icon: <Globe className="w-5 h-5" />,
-    priority: 7
+    priority: 6
   },
   {
     id: 'discord',
@@ -504,75 +495,9 @@ const integrations: Integration[] = [
     isConnecting: false,
     isSyncing: false,
     features: ['ボイスチャット時間', 'サーバー活動', 'コミュニティ健全性'],
+    setupUrl: '/api/auth/discord',
     icon: <Users className="w-5 h-5" />,
-    priority: 8
-  },
-
-  // アメリカ市場特化
-  {
-    id: 'cisco-webex',
-    name: 'Cisco Webex',
-    description: 'エンタープライズビデオ会議分析',
-    category: 'communication',
-    market: 'us',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['会議品質分析', 'セキュリティ監視', 'エンタープライズ統合'],
-    icon: <Shield className="w-5 h-5" />,
-    priority: 9
-  },
-  {
-    id: 'gotomeeting',
-    name: 'GoToMeeting',
-    description: 'ビジネスオンライン会議分析',
-    category: 'communication',
-    market: 'us',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['会議効率分析', '録画管理', 'レポート生成'],
-    icon: <BarChart3 className="w-5 h-5" />,
-    priority: 10
-  },
-  {
-    id: 'ringcentral',
-    name: 'RingCentral',
-    description: 'クラウドコミュニケーションプラットフォーム分析',
-    category: 'communication',
-    market: 'us',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['通話分析', 'メッセージング', 'ビデオ会議統合'],
-    icon: <Database className="w-5 h-5" />,
-    priority: 11
-  },
-  {
-    id: 'workplace-meta',
-    name: 'Workplace from Meta',
-    description: 'Metaエンタープライズソーシャルプラットフォーム分析',
-    category: 'communication',
-    market: 'us',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['エンタープライズソーシャル分析', 'エンゲージメント測定', 'グループ活動'],
-    icon: <Users className="w-5 h-5" />,
-    priority: 12
-  },
-  {
-    id: 'mattermost',
-    name: 'Mattermost',
-    description: 'オープンソースチームコラボレーション分析',
-    category: 'communication',
-    market: 'us',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['セルフホスト対応', 'セキュリティ重視', 'カスタマイズ可能'],
-    icon: <Shield className="w-5 h-5" />,
-    priority: 13
+    priority: 7
   }
 ];
 
@@ -2314,7 +2239,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">統合管理</h3>
                   <p className="text-sm text-gray-600 mb-6">
-                    チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（13サービス対応）
+                    チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（7サービス対応）
                   </p>
                 </div>
 
@@ -2523,7 +2448,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-sm font-medium text-blue-800 flex items-center space-x-2">
                         <BarChart3 className="w-4 h-4" />
-                        <span>接続ステータス（13サービス対応）</span>
+                        <span>接続ステータス（7サービス対応）</span>
                       </h4>
                       <button
                         onClick={async () => {

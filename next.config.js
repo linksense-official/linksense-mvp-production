@@ -150,7 +150,7 @@ const nextConfig = {
     NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version,
   },
 
-  // セキュリティヘッダー（強化版）
+  // セキュリティヘッダー（統合サービス対応版）
   async headers() {
     const securityHeaders = [
       {
@@ -189,7 +189,24 @@ const nextConfig = {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com",
           "img-src 'self' data: https: blob:",
-          "connect-src 'self' https://api.github.com https://graph.microsoft.com https://accounts.google.com https://vitals.vercel-insights.com",
+          "connect-src 'self'",
+          "  https://api.github.com",
+          "  https://graph.microsoft.com", 
+          "  https://accounts.google.com",
+          "  https://vitals.vercel-insights.com",
+          "  https://api.chatwork.com",
+          "  https://slack.com",
+          "  https://api.slack.com",
+          "  https://www.worksapis.com",
+          "  https://auth.worksmobile.com",
+          "  https://api.zoom.us",
+          "  https://zoom.us",
+          "  https://discord.com",
+          "  https://discordapp.com",
+          "  https://api.discord.com",
+          "  https://cdn.discordapp.com",
+          "  https://login.microsoftonline.com",
+          "  https://www.chatwork.com",
           "frame-src 'self' https://js.stripe.com",
           "object-src 'none'",
           "base-uri 'self'",

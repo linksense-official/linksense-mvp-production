@@ -317,7 +317,7 @@ class EnterpriseDataService {
           dashboardData: null,
           dataSourceInfo: {
             isRealData: true,
-            source: '統合ワークスペース（8プラットフォーム統合）',
+            source: '統合ワークスペース（7プラットフォーム統合）',
             lastUpdated: new Date().toISOString(),
             connectionStatus: 'disconnected',
             recordCount: 0,
@@ -373,7 +373,7 @@ class EnterpriseDataService {
   }
 
   private static async fetchMultiPlatformAnalytics() {
-  const platforms = ['slack', 'teams', 'chatwork', 'line-works', 'zoom', 'discord', 'cybozu', 'google-meet'];
+  const platforms = ['slack', 'teams', 'chatwork', 'line-works', 'zoom', 'discord', 'google-meet'];
   const results = {
     analytics: [] as any[],
     healthScores: [] as number[],
@@ -446,11 +446,11 @@ private static calculateDataPoints(analytics: any): number {
       trends: this.calculateTrends(averageHealthScore),
       lastAnalysisDate: new Date().toISOString(),
       integrationStatus: {
-        connectedPlatforms: integrationData.connectedPlatforms,
-        totalPlatforms: 8,
-        dataQuality: this.assessDataQuality(integrationData.totalDataPoints),
-        lastSyncTime: new Date().toISOString()
-      }
+  connectedPlatforms: integrationData.connectedPlatforms,
+  totalPlatforms: 7,
+  dataQuality: this.assessDataQuality(integrationData.totalDataPoints),
+  lastSyncTime: new Date().toISOString()
+}
     };
 
     const systemHealth: SystemHealth = {
@@ -467,7 +467,7 @@ private static calculateDataPoints(analytics: any): number {
       insights,
       dataSourceInfo: {
         isRealData: true,
-        source: `統合ワークスペース（${integrationData.connectedPlatforms.length}/8プラットフォーム接続）`,
+        source: `統合ワークスペース（${integrationData.connectedPlatforms.length}/7プラットフォーム接続）`,
         lastUpdated: new Date().toISOString(),
         connectionStatus: 'connected',
         recordCount: teamSize,
@@ -964,7 +964,7 @@ const DashboardPage: React.FC = () => {
             </p>
             <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
               <Database className="h-4 w-4" />
-              <span>8プラットフォーム統合確認中</span>
+              <span>7プラットフォーム統合確認中</span>
             </div>
           </div>
         </div>
@@ -1060,10 +1060,10 @@ const DashboardPage: React.FC = () => {
                       <Database className="h-5 w-5 mr-2" />
                       ChatWork
                     </div>
-                    <div className="flex items-center justify-center p-3 bg-gray-50 rounded-lg">
-                      <Network className="h-5 w-5 mr-2" />
-                      その他5つ
-                    </div>
+                   <div className="flex items-center justify-center p-3 bg-gray-50 rounded-lg">
+  <Network className="h-5 w-5 mr-2" />
+  その他4つ
+</div>
                   </div>
                   <div className="space-y-4">
                     <Button 
@@ -1119,7 +1119,7 @@ const DashboardPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Network className="h-4 w-4" />
-                  <span>{dashboardStats.integrationStatus.connectedPlatforms.length}/8プラットフォーム接続</span>
+                  <span>{dashboardStats.integrationStatus.connectedPlatforms.length}/7プラットフォーム接続</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
