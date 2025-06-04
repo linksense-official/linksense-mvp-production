@@ -103,6 +103,10 @@ export const metadata: Metadata = {
   verification: {
     google: process.env.GOOGLE_SITE_VERIFICATION,
   },
+  // ✅ Zoom Domain Verification を metadata に追加
+  other: {
+    'zoom-domain-verification': 'ZOOM_verify_af34206311a84c71a59fb3f82f504d98'
+  }
 }
 
 export const viewport: Viewport = {
@@ -117,7 +121,6 @@ export const viewport: Viewport = {
   colorScheme: 'light dark',
 }
 
-
 export default function RootLayout({
   children,
 }: {
@@ -126,20 +129,17 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
+        {/* ✅ Zoom Domain Verification - 静的meta tag */}
+        <meta name="zoom-domain-verification" content="ZOOM_verify_af34206311a84c71a59fb3f82f504d98" />
+        
         {/* PWA最適化メタタグ */}
-        <meta name="mobile-web-app-capable" content="yes" ></meta>
-        <meta name="apple-mobile-web-app-capable" content="yes" ></meta>
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" ></meta>
-        <meta name="apple-mobile-web-app-title" content="LinkSense" ></meta>
-        <meta name="application-name" content="LinkSense" ></meta>
-        <meta name="msapplication-TileColor" content="#2563eb" ></meta>
-        <meta name="msapplication-config" content="/browserconfig.xml" ></meta>
-        <script dangerouslySetInnerHTML={{
-  __html: `
-    document.head.insertAdjacentHTML('beforeend', '<meta name="zoom-domain-verification" content="ZOOM_verify_af34206311a84c71a59fb3f82f504d98"></meta>');
-  `
-}} />
-
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="LinkSense" />
+        <meta name="application-name" content="LinkSense" />
+        <meta name="msapplication-TileColor" content="#2563eb" />
+        <meta name="msapplication-config" content="/browserconfig.xml" />
         
         {/* セキュリティヘッダー */}
         <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
