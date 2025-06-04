@@ -133,7 +133,8 @@ export default function RootLayout({
         <meta name="application-name" content="LinkSense" />
         <meta name="msapplication-TileColor" content="#2563eb" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
-        <meta name="zoom-domain-verification" content="ZOOM_verify_af34206311a84c71a59fb3f82f504d98" />
+        <meta name="zoom-domain-verification" content="ZOOM_verify_af34206311a84c71a59fb3f82f504d98"></meta>
+
         
         {/* セキュリティヘッダー */}
         <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
