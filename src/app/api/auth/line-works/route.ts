@@ -9,14 +9,7 @@ const getRedirectUri = () => {
 };
 
 // ✅ LINE WORKS OAuth スコープ設定
-const LINE_WORKS_SCOPES = [
-  'user:read',           // ユーザー情報読み取り
-  'group:read',          // グループ情報読み取り
-  'message:read',        // メッセージ読み取り
-  'calendar:read',       // カレンダー読み取り
-  'drive:read',          // ドライブ読み取り
-  'directory:read'       // ディレクトリ読み取り
-].join(' ');
+const LINE_WORKS_SCOPES = 'user.read';
 
 export async function GET(request: NextRequest) {
   try {
