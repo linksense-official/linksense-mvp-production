@@ -3,7 +3,6 @@ import './globals.css'
 import { AuthProvider } from './contexts/AuthContext'
 import Layout from '@/components/layout/Layout'
 import NextAuthProvider from '@/components/providers/nextauth-provider'
-import ZoomVerification from '@/components/ZoomVerification'
 
 export const metadata: Metadata = {
   title: {
