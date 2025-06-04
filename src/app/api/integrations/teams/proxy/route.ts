@@ -1,14 +1,14 @@
 // src/app/api/integrations/teams/proxy/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+// import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 const TEAMS_API_BASE = 'https://graph.microsoft.com/v1.0';
 
 export async function POST(request: NextRequest) {
   try {
     // セッション確認
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
     if (!session?.user) {
       return NextResponse.json(
         { success: false, error: '認証が必要です' },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+// import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
   
   try {
     // セッション確認
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
     if (!session?.user?.id) {
       console.error('❌ 未認証ユーザーのアクセス');
       return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
@@ -325,7 +325,7 @@ async function fetchDiscordGuilds(accessToken: string): Promise<DiscordGuildInfo
 export async function POST(request: NextRequest) {
   try {
     // セッション確認
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession();
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
