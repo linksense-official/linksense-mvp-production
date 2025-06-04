@@ -3,6 +3,7 @@ import './globals.css'
 import { AuthProvider } from './contexts/AuthContext'
 import Layout from '@/components/layout/Layout'
 import NextAuthProvider from '@/components/providers/nextauth-provider'
+import ZoomVerification from '@/components/ZoomVerification'
 
 export const metadata: Metadata = {
   title: {
@@ -117,6 +118,7 @@ export const viewport: Viewport = {
   colorScheme: 'light dark',
 }
 
+
 export default function RootLayout({
   children,
 }: {
@@ -133,7 +135,11 @@ export default function RootLayout({
         <meta name="application-name" content="LinkSense" ></meta>
         <meta name="msapplication-TileColor" content="#2563eb" ></meta>
         <meta name="msapplication-config" content="/browserconfig.xml" ></meta>
-        <meta name="zoom-domain-verification" content="ZOOM_verify_af34206311a84c71a59fb3f82f504d98"></meta>
+        <script dangerouslySetInnerHTML={{
+  __html: `
+    document.head.insertAdjacentHTML('beforeend', '<meta name="zoom-domain-verification" content="ZOOM_verify_af34206311a84c71a59fb3f82f504d98"></meta>');
+  `
+}} />
 
         
         {/* セキュリティヘッダー */}
