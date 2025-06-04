@@ -6,17 +6,8 @@ const TEAMS_CLIENT_SECRET = process.env.TEAMS_CLIENT_SECRET;
 
 // ✅ Teams用Redirect URI設定（Slack実装パターンを踏襲）
 const getRedirectUri = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://linksense-mvp.vercel.app/api/auth/teams/callback';
-  }
-  
-  // ✅ 開発環境では ngrok URL のみ使用
-  if (process.env.NGROK_URL) {
-    return `${process.env.NGROK_URL}/api/auth/teams/callback`;
-  }
-  
-  // ✅ フォールバック（使用されない）
-  return 'http://localhost:3000/api/auth/teams/callback';
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return `${baseUrl}/api/auth/teams/callback`;
 };
 
 // ✅ Microsoft Graph API用スコープ設定
@@ -92,9 +83,8 @@ export async function GET(request: NextRequest) {
     console.error('❌ Microsoft Teams OAuth開始エラー:', error);
     
     // ✅ エラー時のリダイレクト（Slack実装パターンを踏襲）
-    const baseUrl = process.env.NGROK_URL || 'http://localhost:3000';
-    const errorUrl = new URL('/settings', baseUrl);
-    errorUrl.searchParams.set('tab', 'integrations');
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+const errorUrl = new URL('/integrations', baseUrl);
     errorUrl.searchParams.set('error', 'teams_oauth_failed');
     errorUrl.searchParams.set('message', 'Teams OAuth認証の開始に失敗しました');
     

@@ -224,6 +224,20 @@ const EnterpriseLoginPage: React.FC = () => {
 
    // OAuth エラーハンドリング強化（Microsoft365対応）
 if (errorParam) {
+  // URLパラメータから追加情報を取得
+  const provider = searchParams.get('provider');
+  const errorDescription = searchParams.get('error_description');
+  const state = searchParams.get('state');
+  
+  console.log('🔧 OAuth認証エラー詳細分析:', {
+    error: errorParam,
+    provider: provider,
+    errorDescription: errorDescription,
+    state: state,
+    fullURL: window.location.href,
+    timestamp: new Date().toISOString()
+  });
+
   const errorMessages: Record<string, string> = {
     // 既存のエラー
     'OAuthSignin': 'ソーシャルログインサービスに接続できませんでした。しばらく時間をおいて再度お試しください。',
@@ -248,17 +262,80 @@ if (errorParam) {
     // Microsoft365 特有のエラー
     'AzureADError': 'Microsoft 365認証でエラーが発生しました。組織の管理者にお問い合わせください。',
     'GraphAPIError': 'Microsoft Graph APIでエラーが発生しました。しばらく時間をおいて再度お試しください。',
-    'TenantError': '組織のテナント設定に問題があります。システム管理者にお問い合わせください。'
+    'TenantError': '組織のテナント設定に問題があります。システム管理者にお問い合わせください。',
+    
+    // Slack 特有のエラー
+    'SlackAuthError': 'Slack認証でエラーが発生しました。Slackワークスペースの設定を確認してください。',
+    'SlackTokenError': 'Slackアクセストークンの取得に失敗しました。再度ログインを試してください。',
+    'SlackScopeError': 'Slack認証の権限設定に問題があります。管理者にお問い合わせください。',
+    
+    // 統合サービス共通エラー
+    'TokenExchangeError': 'アクセストークンの交換に失敗しました。再度ログインを試してください。',
+    'ProfileFetchError': 'ユーザープロファイルの取得に失敗しました。サービスの設定を確認してください。',
+    'ServiceUnavailable': 'サービスが一時的に利用できません。しばらく時間をおいて再度お試しください。'
   };
   
-  const errorMessage = errorMessages[errorParam] || '認証エラーが発生しました。再度お試しください。';
+  // プロバイダー固有のエラーメッセージ生成
+  let errorMessage = errorMessages[errorParam];
+  
+  if (!errorMessage) {
+    if (provider) {
+      const providerNames: Record<string, string> = {
+        'slack': 'Slack',
+        'azure-ad': 'Microsoft 365',
+        'google': 'Google',
+        'discord': 'Discord',
+        'zoom': 'Zoom',
+        'chatwork': 'ChatWork',
+        'lineworks': 'LINE WORKS'
+      };
+      
+      const providerName = providerNames[provider] || provider;
+      errorMessage = `${providerName}認証でエラーが発生しました。再度お試しください。`;
+    } else {
+      errorMessage = '認証エラーが発生しました。再度お試しください。';
+    }
+  }
+  
   setError(errorMessage);
-  console.error(`認証エラー: ${errorParam}`, { errorMessage, timestamp: new Date().toISOString() });
+  console.error(`🚨 OAuth認証エラー: ${errorParam}`, { 
+    errorMessage, 
+    provider,
+    errorDescription,
+    timestamp: new Date().toISOString() 
+  });
   
   // 特定のエラーに対する追加アクション
   if (errorParam === 'EmailVerificationRequired') {
-    // メール認証が必要な場合の特別な表示（後で実装予定）
-    console.log('メール認証が必要 - 認証メール再送信済み');
+    console.log('✉️ メール認証が必要 - 認証メール再送信済み');
+  }
+  
+  // Slack固有のエラー処理
+  if (provider === 'slack') {
+    console.log('🔧 Slack認証エラー - 詳細診断:', {
+      error: errorParam,
+      description: errorDescription,
+      possibleCauses: [
+        'Slack App設定のRedirect URI不一致',
+        'Slack Appのスコープ設定問題',
+        'Slackワークスペースの権限不足',
+        'Slack APIレート制限'
+      ]
+    });
+  }
+  
+  // Azure AD固有のエラー処理
+  if (provider === 'azure-ad') {
+    console.log('🔧 Microsoft 365認証エラー - 詳細診断:', {
+      error: errorParam,
+      description: errorDescription,
+      possibleCauses: [
+        'Azure ADテナント設定問題',
+        'アプリケーション登録の設定不備',
+        'ユーザー権限不足',
+        '条件付きアクセスポリシー'
+      ]
+    });
   }
 }
     

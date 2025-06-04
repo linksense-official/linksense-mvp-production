@@ -4,15 +4,8 @@ const CHATWORK_CLIENT_ID = process.env.CHATWORK_CLIENT_ID;
 const CHATWORK_CLIENT_SECRET = process.env.CHATWORK_CLIENT_SECRET;
 
 const getRedirectUri = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://linksense-mvp.vercel.app/api/auth/chatwork/callback';
-  }
-  
-  if (process.env.NGROK_URL) {
-    return `${process.env.NGROK_URL}/api/auth/chatwork/callback`;
-  }
-  
-  return 'http://localhost:3000/api/auth/chatwork/callback';
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return `${baseUrl}/api/auth/chatwork/callback`;
 };
 
 // ✅ ChatWork OAuth スコープ設定
@@ -84,7 +77,7 @@ export async function GET(request: NextRequest) {
     console.error('❌ ChatWork OAuth開始エラー:', error);
     
     // ✅ エラー時のリダイレクト
-    const baseUrl = process.env.NGROK_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const errorUrl = new URL('/integrations', baseUrl);
     errorUrl.searchParams.set('error', 'chatwork_oauth_failed');
     errorUrl.searchParams.set('message', 'ChatWork OAuth認証の開始に失敗しました');

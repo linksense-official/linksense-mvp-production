@@ -9,7 +9,7 @@ import crypto from 'crypto';
 // ✅ Zoom OAuth設定
 const ZOOM_CLIENT_ID = process.env.ZOOM_CLIENT_ID;
 const ZOOM_CLIENT_SECRET = process.env.ZOOM_CLIENT_SECRET;
-const ZOOM_REDIRECT_URI = process.env.ZOOM_REDIRECT_URI || 'http://localhost:3000/api/auth/zoom/callback';
+const ZOOM_REDIRECT_URI = process.env.ZOOM_REDIRECT_URI || `${process.env.NEXTAUTH_URL}/api/auth/zoom/callback`;
 
 // ✅ 必要なスコープ（Zoom特化）
 const ZOOM_SCOPES = [

@@ -4,15 +4,8 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 const getRedirectUri = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://linksense-mvp.vercel.app/api/auth/google-meet/callback';
-  }
-  
-  if (process.env.NGROK_URL) {
-    return `${process.env.NGROK_URL}/api/auth/google-meet/callback`;
-  }
-  
-  return 'http://localhost:3000/api/auth/google-meet/callback';
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return `${baseUrl}/api/auth/google-meet/callback`;
 };
 
 // ✅ Google Meet用スコープ設定（Google Calendar + Meet API）
@@ -88,7 +81,7 @@ export async function GET(request: NextRequest) {
     console.error('❌ Google Meet OAuth開始エラー:', error);
     
     // ✅ エラー時のリダイレクト
-    const baseUrl = process.env.NGROK_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const errorUrl = new URL('/integrations', baseUrl);
     errorUrl.searchParams.set('error', 'google_meet_oauth_failed');
     errorUrl.searchParams.set('message', 'Google Meet OAuth認証の開始に失敗しました');

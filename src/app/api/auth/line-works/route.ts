@@ -4,15 +4,8 @@ const LINE_WORKS_CLIENT_ID = process.env.LINE_WORKS_CLIENT_ID;
 const LINE_WORKS_CLIENT_SECRET = process.env.LINE_WORKS_CLIENT_SECRET;
 
 const getRedirectUri = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://linksense-mvp.vercel.app/api/auth/line-works/callback';
-  }
-  
-  if (process.env.NGROK_URL) {
-    return `${process.env.NGROK_URL}/api/auth/line-works/callback`;
-  }
-  
-  return 'http://localhost:3000/api/auth/line-works/callback';
+  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return `${baseUrl}/api/auth/line-works/callback`;
 };
 
 // ✅ LINE WORKS OAuth スコープ設定
@@ -87,7 +80,7 @@ export async function GET(request: NextRequest) {
     console.error('❌ LINE WORKS OAuth開始エラー:', error);
     
     // ✅ エラー時のリダイレクト
-    const baseUrl = process.env.NGROK_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const errorUrl = new URL('/integrations', baseUrl);
     errorUrl.searchParams.set('error', 'line_works_oauth_failed');
     errorUrl.searchParams.set('message', 'LINE WORKS OAuth認証の開始に失敗しました');
