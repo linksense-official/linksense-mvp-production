@@ -126,13 +126,13 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <head>
         {/* PWA最適化メタタグ */}
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="LinkSense" />
-        <meta name="application-name" content="LinkSense" />
-        <meta name="msapplication-TileColor" content="#2563eb" />
-        <meta name="msapplication-config" content="/browserconfig.xml" />
+        <meta name="mobile-web-app-capable" content="yes" ></meta>
+        <meta name="apple-mobile-web-app-capable" content="yes" ></meta>
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" ></meta>
+        <meta name="apple-mobile-web-app-title" content="LinkSense" ></meta>
+        <meta name="application-name" content="LinkSense" ></meta>
+        <meta name="msapplication-TileColor" content="#2563eb" ></meta>
+        <meta name="msapplication-config" content="/browserconfig.xml" ></meta>
         <meta name="zoom-domain-verification" content="ZOOM_verify_af34206311a84c71a59fb3f82f504d98"></meta>
 
         
