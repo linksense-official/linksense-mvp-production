@@ -75,39 +75,22 @@ export default function IntegrationsPage() {
   const [connecting, setConnecting] = useState<string | null>(null)
 
   const handleConnect = async (service: ServiceConfig) => {
-    setConnecting(service.id)
-    
-    try {
-      if (service.isNextAuth) {
-        await signIn(service.id, { callbackUrl: '/integrations' })
-      } else if (service.id === 'chatwork') {
-        // ChatWork専用処理
-        const response = await fetch('/api/auth/chatwork', {
-          method: 'GET',
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.redirectUrl) {
-            // ChatWork認証画面に遷移
-            window.location.href = data.redirectUrl;
-            return; // ここで処理を終了
-          } else {
-            throw new Error('リダイレクトURLが取得できませんでした');
-          }
-        } else {
-          throw new Error('ChatWork認証開始に失敗しました');
-        }
-      } else {
-        window.location.href = service.authUrl
-      }
-    } catch (error) {
-      console.error(`${service.name}認証エラー:`, error)
-      setConnecting(null)
-      alert(`${service.name}の認証に失敗しました。再度お試しください。`)
+  setConnecting(service.id)
+  
+  try {
+    if (service.isNextAuth) {
+      await signIn(service.id, { callbackUrl: '/integrations' })
+    } else if (service.id === 'chatwork') {
+      // ChatWork APIトークン方式
+      window.location.href = service.authUrl;
+    } else {
+      window.location.href = service.authUrl
     }
+  } catch (error) {
+    console.error(`${service.name}認証エラー:`, error)
+    setConnecting(null)
   }
+}
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
