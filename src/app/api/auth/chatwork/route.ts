@@ -1,108 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
-  console.log('=== ChatWork統合処理開始 ===');
-  
   try {
-    const apiToken = process.env.CHATWORK_API_TOKEN;
+    const clientId = process.env.CHATWORK_CLIENT_ID;
+    const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/chatwork/callback`;
     
-    // ChatWork API呼び出し
-    const response = await fetch('https://api.chatwork.com/v2/me', {
-      method: 'GET',
-      headers: {
-        'X-ChatWorkToken': apiToken!,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ChatWork API Error:', errorText);
+    console.log('ChatWork OAuth開始:', { clientId: clientId ? '設定済み' : '未設定', redirectUri });
+    
+    if (!clientId) {
       return NextResponse.redirect(
-        new URL('/integrations?error=chatwork_api_error', request.url)
+        new URL('/integrations?error=chatwork_client_id_missing', request.url)
       );
     }
 
-    const userInfo = await response.json();
-    console.log('ChatWork API成功:', userInfo.name);
+    // セキュアなstate生成
+    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-    // 既存のUserレコードを全て取得して確認
-    const allUsers = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true
-      },
-      take: 5 // 最初の5件のみ
+    // ChatWork OAuth認証URL生成
+    const authUrl = new URL('https://oauth.chatwork.com/authorize');
+    authUrl.searchParams.append('client_id', clientId);
+    authUrl.searchParams.append('response_type', 'code');
+    authUrl.searchParams.append('redirect_uri', redirectUri);
+    authUrl.searchParams.append('scope', 'users.profile.me:read rooms.all:read');
+    authUrl.searchParams.append('state', state);
+
+    console.log('ChatWork認証URL生成完了:', authUrl.toString());
+
+    // stateをCookieに保存
+    const response = NextResponse.redirect(authUrl.toString());
+    response.cookies.set('chatwork_oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600 // 10分間有効
     });
 
-    console.log('既存Userレコード一覧:', allUsers);
-
-    // 最初の既存ユーザーを使用（テスト用）
-    let targetUserId = null;
-    
-    if (allUsers.length > 0) {
-      targetUserId = allUsers[0].id;
-      console.log('使用するUserID:', targetUserId);
-    } else {
-      // ユーザーが存在しない場合は、ChatWorkのメールアドレスでユーザーを検索
-      const userEmail = userInfo.login_mail;
-      if (userEmail) {
-        const existingUser = await prisma.user.findUnique({
-          where: { email: userEmail }
-        });
-        
-        if (existingUser) {
-          targetUserId = existingUser.id;
-          console.log('メールアドレスで見つかったUserID:', targetUserId);
-        }
-      }
-    }
-
-    if (!targetUserId) {
-      return NextResponse.redirect(
-        new URL('/integrations?debug=no_users_found&message=データベースにユーザーが存在しません', request.url)
-      );
-    }
-
-    // Integrationレコードを作成
-    console.log('Integrationレコード作成開始...');
-    await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: targetUserId,
-          service: 'chatwork'
-        }
-      },
-      update: {
-        accessToken: apiToken!,
-        isActive: true,
-        teamId: userInfo.organization_id?.toString() || 'unknown',
-        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User',
-        updatedAt: new Date()
-      },
-      create: {
-        userId: targetUserId,
-        service: 'chatwork',
-        accessToken: apiToken!,
-        isActive: true,
-        teamId: userInfo.organization_id?.toString() || 'unknown',
-        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User'
-      }
-    });
-
-    console.log('ChatWork統合完了');
-    
-    // 成功時のリダイレクト
-    return NextResponse.redirect(
-      new URL(`/integrations?success=chatwork_connected&user=${encodeURIComponent(userInfo.name)}&service=ChatWork`, request.url)
-    );
+    return response;
 
   } catch (error) {
-    console.error('ChatWork統合エラー:', error);
+    console.error('ChatWork OAuth開始エラー:', error);
     return NextResponse.redirect(
-      new URL(`/integrations?error=chatwork_integration_failed&message=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`, request.url)
+      new URL('/integrations?error=chatwork_oauth_start_failed', request.url)
     );
   }
 }

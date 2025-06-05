@@ -81,9 +81,9 @@ export default function IntegrationsPage() {
     if (service.isNextAuth) {
       await signIn(service.id, { callbackUrl: '/integrations' })
     } else if (service.id === 'chatwork') {
-      // ChatWork APIトークン方式
-      window.location.href = service.authUrl;
-    } else {
+  // ChatWork OAuth認証（直接リダイレクト）
+  window.location.href = service.authUrl;
+} else {
       window.location.href = service.authUrl
     }
   } catch (error) {
