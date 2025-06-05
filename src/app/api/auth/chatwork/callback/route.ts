@@ -56,28 +56,30 @@ export async function GET(request: NextRequest) {
   
   try {
     // セッション確認
-   const session = await getServerSession(authOptions);
-if (!session?.user?.id) {
-  console.error('❌ 未認証ユーザーのアクセス');
-  return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
-}
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      console.error('❌ 未認証ユーザーのアクセス');
+      return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
+    }
 
     // URLパラメータ取得
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
 
     console.log('📋 ChatWorkコールバックパラメータ:', { 
       code: code ? '取得済み' : '未取得', 
       state, 
-      error 
+      error,
+      errorDescription 
     });
 
     // エラーハンドリング
     if (error) {
-      console.error('❌ ChatWork OAuth エラー:', error);
-      const errorMessage = encodeURIComponent(`ChatWork認証エラー: ${error}`);
+      console.error('❌ ChatWork OAuth エラー:', error, errorDescription);
+      const errorMessage = encodeURIComponent(`ChatWork認証エラー: ${errorDescription || error}`);
       return NextResponse.redirect(
         new URL(`/integrations?error=${errorMessage}`, request.url)
       );
@@ -96,15 +98,6 @@ if (!session?.user?.id) {
         new URL('/integrations?error=config_missing', request.url)
       );
     }
-
-    // State検証（セキュリティ強化）- 一時的にコメントアウト
-// const storedState = request.cookies.get('chatwork_oauth_state')?.value;
-// if (state && (!storedState || storedState !== state)) {
-//   console.error('❌ State検証失敗:', { stored: storedState, received: state });
-//   return NextResponse.redirect(
-//     new URL('/integrations?error=state_verification_failed', request.url)
-//   );
-// }
 
     // アクセストークン取得
     console.log('🔑 ChatWork アクセストークン取得開始');
@@ -151,7 +144,7 @@ if (!session?.user?.id) {
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
         isActive: true,
-        teamId: userInfo.organization_id.toString(),
+        teamId: userInfo.organization_id?.toString() || 'unknown',
         teamName: userInfo.organization_name || 'Unknown Organization',
         updatedAt: new Date()
       },
@@ -161,7 +154,7 @@ if (!session?.user?.id) {
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
         isActive: true,
-        teamId: userInfo.organization_id.toString(),
+        teamId: userInfo.organization_id?.toString() || 'unknown',
         teamName: userInfo.organization_name || 'Unknown Organization'
       }
     });
@@ -173,14 +166,10 @@ if (!session?.user?.id) {
     successUrl.searchParams.set('success', 'chatwork_connected');
     successUrl.searchParams.set('service', 'ChatWork');
     successUrl.searchParams.set('user', userInfo.name);
-    successUrl.searchParams.set('organization', userInfo.organization_name);
-
-    // OAuth state cookie削除
-    const response = NextResponse.redirect(successUrl);
-    response.cookies.delete('chatwork_oauth_state');
+    successUrl.searchParams.set('organization', userInfo.organization_name || 'Unknown Organization');
 
     console.log('🎉 ChatWork OAuth認証完了 - 統合ページにリダイレクト');
-    return response;
+    return NextResponse.redirect(successUrl);
 
   } catch (error) {
     console.error('❌ ChatWork OAuth処理中にエラー:', error);
