@@ -6,6 +6,7 @@ export async function GET() {
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ? '✅ 設定済み' : '❌ 未設定',
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '❌ 未設定',
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? '✅ 設定済み' : '❌ 未設定',
+    CHATWORK_API_TOKEN: process.env.CHATWORK_API_TOKEN ? '✅ 設定済み' : '❌ 未設定',
     NODE_ENV: process.env.NODE_ENV || '❌ 未設定',
     VERCEL_URL: process.env.VERCEL_URL || '❌ 未設定',
   }
@@ -19,7 +20,8 @@ export async function GET() {
     allEnvKeys: Object.keys(process.env).filter(key => 
       key.includes('NEXTAUTH') || 
       key.includes('GOOGLE') || 
-      key.includes('CLIENT')
+      key.includes('CLIENT') ||
+      key.includes('CHATWORK')
     ),
   })
 }
