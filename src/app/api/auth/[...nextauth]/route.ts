@@ -37,10 +37,15 @@ export const authOptions: AuthOptions = {
     
     // Azure AD (Teams) OAuth
     AzureADProvider({
-      clientId: process.env.AZURE_AD_CLIENT_ID!,
-      clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-      tenantId: process.env.AZURE_AD_TENANT_ID!,
-    }),
+  clientId: process.env.AZURE_AD_CLIENT_ID!,
+  clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+  tenantId: process.env.AZURE_AD_TENANT_ID!,
+  authorization: {
+    params: {
+      scope: 'openid profile email offline_access User.Read Calendars.Read Team.ReadBasic.All Channel.ReadBasic.All ChannelMessage.Read.All ChatMessage.Read.All'
+    }
+  }
+}),
   ],
   
   debug: process.env.NODE_ENV === 'development',

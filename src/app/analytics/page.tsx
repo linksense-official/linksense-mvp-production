@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { integrationManager } from '@/lib/integrations/integration-manager';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,10 +17,14 @@ import {
   TrendingDown,
   BarChart3,
   Brain,
-  Zap
+  Zap,
+  MessageSquare,
+  Video,
+  Calendar,
+  Network
 } from 'lucide-react';
 
-// ✅ Card コンポーネント直接定義
+// Card コンポーネント定義
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div className={`bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden ${className}`}>
     {children}
@@ -52,572 +55,429 @@ const CardContent: React.FC<{ children: React.ReactNode; className?: string }> =
   </div>
 );
 
-
-interface DataSourceInfo {
-  isRealData: boolean;
-  source: string;
-  lastUpdated: string;
-  connectionStatus: 'connected' | 'disconnected' | 'error';
-  recordCount: number;
-}
-
-interface AnalyticsOverview {
-  totalMembers: number;
-  activeTeams: number;
-  avgHealthScore: number;
-  trendDirection: 'up' | 'down' | 'stable';
-  lastAnalysisTime: string;
-  dataQuality: number;
-}
-
-interface HealthTrend {
-  month: string;
-  overall: number;
-  stress: number;
-  satisfaction: number;
-  engagement: number;
-  productivity: number;
-  collaboration: number;
-  workLifeBalance: number;
-  dataPoints: number;
-}
-
-interface DepartmentComparison {
-  department: string;
-  healthScore: number;
-  memberCount: number;
-  change: number;
-  riskLevel: 'low' | 'medium' | 'high';
-  slackActivity: number;
-  avgResponseTime: number;
-}
-
-interface RiskFactor {
-  id: string;
-  factor: string;
-  impact: 'high' | 'medium' | 'low';
-  affectedMembers: number;
-  description: string;
-  confidence: number;
-  dataSource: string;
-  detectedAt: string;
-  severity: number;
-  recommendations: string[];
-}
-
-interface Prediction {
-  id: string;
-  metric: string;
-  current: number;
-  predicted: number;
-  confidence: number;
-  timeframe: string;
-  trend: 'improving' | 'declining' | 'stable';
-  algorithm: string;
-  dataPoints: number;
-  accuracy: number;
-}
-
-interface HeatmapData {
-  day: string;
-  hour: number;
-  value: number;
-  slackMessages: number;
-  activeUsers: number;
-}
-
-interface AdvancedMetrics {
-  communicationPatterns: {
-    peakHours: number[];
-    quietHours: number[];
-    averageResponseTime: number;
-    collaborationIndex: number;
+// 6サービス統合データ型定義
+interface UnifiedAnalyticsData {
+  overview: {
+    totalMessages: number;
+    totalMeetings: number;
+    totalActivities: number;
+    connectedServices: number;
+    dataQuality: number;
+    lastUpdated: string;
   };
-  workloadAnalysis: {
-    overworkedMembers: number;
-    underutilizedMembers: number;
-    workloadBalance: number;
-    burnoutRisk: number;
+  serviceBreakdown: {
+    [service: string]: {
+      name: string;
+      icon: string;
+      messageCount: number;
+      meetingCount: number;
+      isConnected: boolean;
+      lastActivity: string;
+    };
   };
-  teamDynamics: {
-    cohesionScore: number;
-    diversityIndex: number;
-    leadershipEffectiveness: number;
-    conflictIndicators: number;
+  crossServiceAnalysis: {
+    collaborationScore: number;
+    communicationEfficiency: number;
+    platformUsageBalance: number;
+    userEngagement: number;
   };
+  timelineData: Array<{
+    date: string;
+    totalActivity: number;
+    serviceActivity: { [service: string]: number };
+  }>;
+  riskFactors: Array<{
+    id: string;
+    title: string;
+    description: string;
+    severity: 'low' | 'medium' | 'high';
+    affectedServices: string[];
+    confidence: number;
+  }>;
+  predictions: Array<{
+    metric: string;
+    current: number;
+    predicted: number;
+    confidence: number;
+    trend: 'improving' | 'declining' | 'stable';
+  }>;
 }
 
-interface AnalyticsData {
-  overview: AnalyticsOverview;
-  healthTrends: HealthTrend[];
-  departmentComparison: DepartmentComparison[];
-  riskFactors: RiskFactor[];
-  predictions: Prediction[];
-  heatmapData: HeatmapData[];
-  advancedMetrics: AdvancedMetrics;
-  dataSourceInfo: DataSourceInfo;
-}
-
-// 実データ取得サービス
-class RealDataAnalyticsService {
-  static async fetchRealAnalytics(): Promise<{ analyticsData: AnalyticsData | null, dataSourceInfo: DataSourceInfo }> {
+// 6サービス統合データ取得サービス
+class UnifiedAnalyticsService {
+  static async fetchUnifiedAnalytics(): Promise<UnifiedAnalyticsData | null> {
     try {
-      console.log('📊 実際のSlackワークスペースから分析データを取得中...');
-      
-      // 実際のSlackワークスペースからデータ取得を試行
-      const slackAnalytics = await this.fetchActualSlackAnalytics();
-      const slackUsers = await this.fetchActualSlackUsers();
-      
-      if (!slackAnalytics && slackUsers.length === 0) {
-        // 実際のSlackワークスペースが空の場合
-        console.log('✅ 実際のSlackワークスペース確認完了: 分析データなし');
-        return {
-          analyticsData: null,
-          dataSourceInfo: {
-            isRealData: true,
-            source: '実際のSlackワークスペース',
-            lastUpdated: new Date().toISOString(),
-            connectionStatus: 'connected',
-            recordCount: 0
-          }
-        };
+      console.log('📊 6サービス統合分析データ取得開始...');
+
+      // 統合データAPI呼び出し
+      const [messagesResponse, meetingsResponse, activitiesResponse] = await Promise.all([
+        fetch('/api/data-integration/unified?type=messages&limit=1000&includeMetadata=true'),
+        fetch('/api/data-integration/unified?type=meetings&limit=100&includeMetadata=true'),
+        fetch('/api/data-integration/unified?type=activities&limit=500&includeMetadata=true')
+      ]);
+
+      const messagesData = messagesResponse.ok ? await messagesResponse.json() : null;
+      const meetingsData = meetingsResponse.ok ? await meetingsResponse.json() : null;
+      const activitiesData = activitiesResponse.ok ? await activitiesResponse.json() : null;
+
+      // 統合状況確認
+      const statusResponse = await fetch('/api/integrations/status');
+      const statusData = statusResponse.ok ? await statusResponse.json() : null;
+
+      if (!messagesData && !meetingsData && !activitiesData) {
+        return null;
       }
-      
-      // 実際のSlackデータから分析データを生成
-      const realAnalyticsData = await this.convertSlackDataToAnalytics(slackAnalytics, slackUsers);
-      
-      console.log('✅ 実際のSlackワークスペースから分析データ取得完了');
-      return {
-        analyticsData: realAnalyticsData,
-        dataSourceInfo: {
-          isRealData: true,
-          source: '実際のSlackワークスペース',
-          lastUpdated: new Date().toISOString(),
-          connectionStatus: 'connected',
-          recordCount: slackUsers.length
-        }
-      };
+
+      // 統合分析データ生成
+      return this.generateUnifiedAnalytics(messagesData, meetingsData, activitiesData, statusData);
+
     } catch (error) {
-      console.error('❌ 実際のSlackワークスペースからの分析データ取得エラー:', error);
-      return {
-        analyticsData: null,
-        dataSourceInfo: {
-          isRealData: true,
-          source: '実際のSlackワークスペース',
-          lastUpdated: new Date().toISOString(),
-          connectionStatus: 'error',
-          recordCount: 0
-        }
-      };
-    }
-  }
-  
-  static async fetchActualSlackAnalytics(): Promise<any> {
-    try {
-      // 実際のSlack統合から分析データ取得
-      const analytics = await integrationManager.getAnalytics('slack');
-      return analytics;
-    } catch (error) {
-      console.error('❌ 実際のSlack分析データ取得エラー:', error);
+      console.error('❌ 6サービス統合分析データ取得エラー:', error);
       return null;
     }
   }
-  
-  static async fetchActualSlackUsers(): Promise<any[]> {
-    try {
-      // 実際のSlack統合からユーザー取得
-      const slackIntegrations = Array.from(integrationManager.integrations.values())
-        .filter(integration => integration.id === 'slack');
-      
-      if (slackIntegrations.length > 0 && slackIntegrations[0].status === 'connected') {
-        // 実際のSlack APIからユーザー取得（現在は空配列を返す）
-        return [];
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('❌ 実際のSlackユーザー取得エラー:', error);
-      return [];
-    }
-  }
-  
-  static async convertSlackDataToAnalytics(slackAnalytics: any, slackUsers: any[]): Promise<AnalyticsData> {
-    // 実際のSlackデータから分析データを生成
-    const healthScore = slackAnalytics ? await integrationManager.getHealthScore('slack') : 75;
-    const now = new Date();
-    
-    const overview: AnalyticsOverview = {
-      totalMembers: slackUsers.length || 15,
-      activeTeams: Math.max(1, Math.floor(slackUsers.length / 3)),
-      avgHealthScore: healthScore,
-      trendDirection: this.calculateTrendDirection(healthScore),
-      lastAnalysisTime: now.toISOString(),
-      dataQuality: 95
-    };
-    
-    const healthTrends: HealthTrend[] = this.generateHealthTrends(healthScore);
-    const departmentComparison: DepartmentComparison[] = this.generateDepartmentComparison(healthScore, slackUsers.length);
-    const riskFactors: RiskFactor[] = this.generateRiskFactors(slackAnalytics, slackUsers.length);
-    const predictions: Prediction[] = this.generatePredictions(healthScore);
-    const heatmapData: HeatmapData[] = this.generateHeatmapData();
-    const advancedMetrics: AdvancedMetrics = this.generateAdvancedMetrics(healthScore);
-    
-    return {
-      overview,
-      healthTrends,
-      departmentComparison,
-      riskFactors,
-      predictions,
-      heatmapData,
-      advancedMetrics,
-      dataSourceInfo: {
-        isRealData: true,
-        source: '実際のSlackワークスペース',
-        lastUpdated: now.toISOString(),
-        connectionStatus: 'connected',
-        recordCount: slackUsers.length
-      }
-    };
-  }
-  
-  static calculateTrendDirection(healthScore: number): 'up' | 'down' | 'stable' {
-    if (healthScore >= 80) return 'up';
-    if (healthScore <= 70) return 'down';
-    return 'stable';
-  }
-  
-  static generateHealthTrends(baseScore: number): HealthTrend[] {
-    const months = ['1月', '2月', '3月', '4月', '5月'];
-    
-    return months.map((month, index) => {
-      const variation = (Math.random() - 0.5) * 10;
-      const overall = Math.max(60, Math.min(100, baseScore + variation));
-      
-      return {
-        month,
-        overall: Math.round(overall),
-        stress: Math.round(100 - overall + Math.random() * 10),
-        satisfaction: Math.round(overall + Math.random() * 10),
-        engagement: Math.round(overall - 5 + Math.random() * 10),
-        productivity: Math.round(overall + Math.random() * 8),
-        collaboration: Math.round(overall - 3 + Math.random() * 12),
-        workLifeBalance: Math.round(overall + 2 + Math.random() * 6),
-        dataPoints: Math.floor(Math.random() * 500) + 200
-      };
-    });
-  }
-  
-  static generateDepartmentComparison(baseScore: number, totalUsers: number): DepartmentComparison[] {
-    const departments = [
-      { name: 'エンジニアリング', ratio: 0.4 },
-      { name: 'デザイン', ratio: 0.2 },
-      { name: 'マーケティング', ratio: 0.3 },
-      { name: 'QA', ratio: 0.1 }
-    ];
-    
-    return departments.map(dept => {
-      const variation = (Math.random() - 0.5) * 10;
-      const healthScore = Math.max(60, Math.min(100, baseScore + variation));
-      
-      return {
-        department: dept.name,
-        healthScore: Math.round(healthScore),
-        memberCount: Math.max(1, Math.floor(totalUsers * dept.ratio)),
-        change: Math.round((Math.random() - 0.5) * 10),
-        riskLevel: healthScore < 70 ? 'high' : healthScore < 80 ? 'medium' : 'low',
-        slackActivity: Math.floor(Math.random() * 100) + 50,
-        avgResponseTime: Math.floor(Math.random() * 120) + 30
-      };
-    });
-  }
-  
-  static generateRiskFactors(slackAnalytics: any, userCount: number): RiskFactor[] {
-    const riskFactors = [
-      {
-        factor: '実データ検知: コミュニケーション頻度低下',
-        impact: 'high' as const,
-        description: 'Slackメッセージ分析により、チーム間のコミュニケーション頻度が30%低下しています',
-        dataSource: 'slack',
-        severity: 85,
-        recommendations: [
-          'チーム定期ミーティングの頻度増加',
-          'Slackチャンネル活性化施策',
-          'コミュニケーションガイドライン見直し'
-        ]
+
+  static generateUnifiedAnalytics(
+    messagesData: any, 
+    meetingsData: any, 
+    activitiesData: any, 
+    statusData: any
+  ): UnifiedAnalyticsData {
+    const messages = messagesData?.data || [];
+    const meetings = meetingsData?.data || [];
+    const activities = activitiesData?.data || [];
+
+    // サービス別データ集計
+    const serviceBreakdown = {
+      google: {
+        name: 'Google Meet',
+        icon: '📹',
+        messageCount: 0,
+        meetingCount: meetings.filter((m: any) => m.service === 'google').length,
+        isConnected: statusData?.accounts?.google ? true : false,
+        lastActivity: this.getLastActivity(meetings, 'google')
       },
-      {
-        factor: '実データ検知: 応答時間遅延',
-        impact: 'medium' as const,
-        description: '平均応答時間が過去1週間で40%増加、チーム連携に影響の可能性',
-        dataSource: 'slack',
-        severity: 65,
-        recommendations: [
-          '緊急度別対応ルール策定',
-          'レスポンス時間目標設定',
-          'ワークロード分散検討'
-        ]
+      slack: {
+        name: 'Slack',
+        icon: '💬',
+        messageCount: messages.filter((m: any) => m.service === 'slack').length,
+        meetingCount: 0,
+        isConnected: statusData?.accounts?.slack ? true : false,
+        lastActivity: this.getLastActivity(messages, 'slack')
+      },
+      discord: {
+        name: 'Discord',
+        icon: '🎮',
+        messageCount: messages.filter((m: any) => m.service === 'discord').length,
+        meetingCount: 0,
+        isConnected: statusData?.accounts?.discord ? true : false,
+        lastActivity: this.getLastActivity(messages, 'discord')
+      },
+      teams: {
+        name: 'Microsoft Teams',
+        icon: '🏢',
+        messageCount: messages.filter((m: any) => m.service === 'teams').length,
+        meetingCount: meetings.filter((m: any) => m.service === 'teams').length,
+        isConnected: statusData?.accounts?.['azure-ad'] ? true : false,
+        lastActivity: this.getLastActivity([...messages, ...meetings], 'teams')
+      },
+      chatwork: {
+        name: 'ChatWork',
+        icon: '💼',
+        messageCount: messages.filter((m: any) => m.service === 'chatwork').length,
+        meetingCount: 0,
+        isConnected: statusData?.accounts?.chatwork ? true : false,
+        lastActivity: this.getLastActivity(messages, 'chatwork')
+      },
+      'line-works': {
+        name: 'LINE WORKS',
+        icon: '📱',
+        messageCount: messages.filter((m: any) => m.service === 'line-works').length,
+        meetingCount: 0,
+        isConnected: statusData?.accounts?.['line-works'] ? true : false,
+        lastActivity: this.getLastActivity(messages, 'line-works')
       }
-    ];
-    
-    return riskFactors.map((risk, index) => ({
-      id: `real_risk_${index + 1}`,
-      ...risk,
-      affectedMembers: Math.max(1, Math.floor(userCount * 0.3)),
-      confidence: Math.floor(Math.random() * 20) + 80,
-      detectedAt: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString()
-    }));
+    };
+
+    // クロスサービス分析
+    const connectedServices = Object.values(serviceBreakdown).filter(s => s.isConnected).length;
+    const totalMessages = messages.length;
+    const totalMeetings = meetings.length;
+
+    const crossServiceAnalysis = {
+      collaborationScore: this.calculateCollaborationScore(messages, meetings),
+      communicationEfficiency: this.calculateCommunicationEfficiency(messages),
+      platformUsageBalance: this.calculatePlatformBalance(serviceBreakdown),
+      userEngagement: this.calculateUserEngagement(activities)
+    };
+
+    // タイムライン分析
+    const timelineData = this.generateTimelineData(messages, meetings);
+
+    // リスク要因分析
+    const riskFactors = this.analyzeRiskFactors(serviceBreakdown, crossServiceAnalysis);
+
+    // 予測分析
+    const predictions = this.generatePredictions(crossServiceAnalysis, timelineData);
+
+    return {
+      overview: {
+        totalMessages,
+        totalMeetings,
+        totalActivities: activities.length,
+        connectedServices,
+        dataQuality: this.calculateDataQuality(messagesData, meetingsData, activitiesData),
+        lastUpdated: new Date().toISOString()
+      },
+      serviceBreakdown,
+      crossServiceAnalysis,
+      timelineData,
+      riskFactors,
+      predictions
+    };
   }
-  
-  static generatePredictions(currentHealth: number): Prediction[] {
+
+  static getLastActivity(data: any[], service: string): string {
+    const serviceData = data.filter(item => item.service === service);
+    if (serviceData.length === 0) return '活動なし';
+    
+    const latest = serviceData.reduce((latest, item) => {
+      const itemTime = new Date(item.timestamp || item.startTime);
+      const latestTime = new Date(latest.timestamp || latest.startTime);
+      return itemTime > latestTime ? item : latest;
+    });
+    
+    return new Date(latest.timestamp || latest.startTime).toLocaleString('ja-JP');
+  }
+
+  static calculateCollaborationScore(messages: any[], meetings: any[]): number {
+    // クロスプラットフォーム利用度を基に算出
+    const userServices: { [userId: string]: Set<string> } = {};
+    
+    [...messages, ...meetings].forEach(item => {
+      const userId = item.author?.id || item.organizer?.id;
+      if (userId) {
+        if (!userServices[userId]) userServices[userId] = new Set();
+        userServices[userId].add(item.service);
+      }
+    });
+
+    const multiPlatformUsers = Object.values(userServices).filter(services => services.size > 1).length;
+    const totalUsers = Object.keys(userServices).length;
+    
+    return totalUsers > 0 ? Math.round((multiPlatformUsers / totalUsers) * 100) : 0;
+  }
+
+  static calculateCommunicationEfficiency(messages: any[]): number {
+    if (messages.length === 0) return 0;
+    
+    // レスポンス時間とメッセージ頻度から効率性を算出
+    const avgMessageLength = messages.reduce((sum, m) => sum + (m.content?.length || 0), 0) / messages.length;
+    const reactionRate = messages.reduce((sum, m) => sum + (m.reactions?.length || 0), 0) / messages.length;
+    
+    return Math.min(100, Math.round((avgMessageLength / 100) * 30 + reactionRate * 20 + 50));
+  }
+
+  static calculatePlatformBalance(serviceBreakdown: any): number {
+    const activities = Object.values(serviceBreakdown).map((s: any) => s.messageCount + s.meetingCount);
+    const total = activities.reduce((sum: number, count: number) => sum + count, 0);
+    
+    if (total === 0) return 0;
+    
+    // 使用分散度を計算（均等に使われているほど高スコア）
+    const variance = activities.reduce((sum: number, count: number) => {
+      const ratio = count / total;
+      return sum + Math.pow(ratio - 1/activities.length, 2);
+    }, 0);
+    
+    return Math.round((1 - variance) * 100);
+  }
+
+  static calculateUserEngagement(activities: any[]): number {
+    if (activities.length === 0) return 0;
+    
+    // アクティビティの多様性と頻度から算出
+    const activityTypes = new Set(activities.map(a => a.type));
+    const diversityScore = (activityTypes.size / 5) * 50; // 最大5タイプ想定
+    const frequencyScore = Math.min(50, activities.length / 10); // 頻度スコア
+    
+    return Math.round(diversityScore + frequencyScore);
+  }
+
+  static generateTimelineData(messages: any[], meetings: any[]): any[] {
+    const timelineMap: { [date: string]: any } = {};
+    
+    [...messages, ...meetings].forEach(item => {
+      const date = new Date(item.timestamp || item.startTime).toISOString().split('T')[0];
+      if (!timelineMap[date]) {
+        timelineMap[date] = {
+          date,
+          totalActivity: 0,
+          serviceActivity: {}
+        };
+      }
+      
+      timelineMap[date].totalActivity++;
+      timelineMap[date].serviceActivity[item.service] = (timelineMap[date].serviceActivity[item.service] || 0) + 1;
+    });
+    
+    return Object.values(timelineMap).slice(-7); // 過去7日間
+  }
+
+  static analyzeRiskFactors(serviceBreakdown: any, crossServiceAnalysis: any): any[] {
+    const risks = [];
+    
+    // 未接続サービスリスク
+    const disconnectedServices = Object.entries(serviceBreakdown)
+      .filter(([_, service]: [string, any]) => !service.isConnected)
+      .map(([key, _]) => key);
+    
+    if (disconnectedServices.length > 0) {
+      risks.push({
+        id: 'disconnected_services',
+        title: 'サービス統合不完全',
+        description: `${disconnectedServices.length}個のサービスが未接続です`,
+        severity: disconnectedServices.length > 3 ? 'high' : 'medium',
+        affectedServices: disconnectedServices,
+        confidence: 95
+      });
+    }
+    
+    // コラボレーションスコア低下リスク
+    if (crossServiceAnalysis.collaborationScore < 30) {
+      risks.push({
+        id: 'low_collaboration',
+        title: 'クロスプラットフォーム協働不足',
+        description: 'ユーザーが複数サービスを活用できていません',
+        severity: 'high',
+        affectedServices: Object.keys(serviceBreakdown),
+        confidence: 88
+      });
+    }
+    
+    // プラットフォームバランス不良
+    if (crossServiceAnalysis.platformUsageBalance < 40) {
+      risks.push({
+        id: 'platform_imbalance',
+        title: 'プラットフォーム利用偏重',
+        description: '特定のサービスに依存しすぎています',
+        severity: 'medium',
+        affectedServices: Object.keys(serviceBreakdown),
+        confidence: 75
+      });
+    }
+    
+    return risks;
+  }
+
+  static generatePredictions(crossServiceAnalysis: any, timelineData: any[]): any[] {
     return [
       {
-        id: 'pred_health_1m',
-        metric: '全体健全性スコア',
-        current: currentHealth,
-        predicted: Math.max(65, Math.round(currentHealth - Math.random() * 8)),
-        confidence: 88,
-        timeframe: '1ヶ月後',
-        trend: 'declining' as const,
-        algorithm: 'LSTM Neural Network',
-        dataPoints: 1250,
-        accuracy: 87.5
+        metric: 'コラボレーションスコア',
+        current: crossServiceAnalysis.collaborationScore,
+        predicted: Math.max(0, crossServiceAnalysis.collaborationScore + (Math.random() - 0.5) * 10),
+        confidence: 82,
+        trend: crossServiceAnalysis.collaborationScore > 70 ? 'stable' : 'improving'
       },
       {
-        id: 'pred_engagement_2w',
-        metric: 'エンゲージメント率',
-        current: 75,
-        predicted: 72,
-        confidence: 82,
-        timeframe: '2週間後',
-        trend: 'declining' as const,
-        algorithm: 'Random Forest',
-        dataPoints: 890,
-        accuracy: 83.2
+        metric: 'プラットフォーム活用効率',
+        current: crossServiceAnalysis.platformUsageBalance,
+        predicted: Math.min(100, crossServiceAnalysis.platformUsageBalance + 5),
+        confidence: 78,
+        trend: 'improving'
       }
     ];
   }
-  
-  static generateHeatmapData(): HeatmapData[] {
-    const days = ['月', '火', '水', '木', '金'];
-    const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-    const heatmapData = [];
+
+  static calculateDataQuality(messagesData: any, meetingsData: any, activitiesData: any): number {
+    let qualityScore = 0;
+    let checks = 0;
     
-    for (const day of days) {
-      for (const hour of hours) {
-        const baseActivity = hour === 12 ? 40 : hour < 12 || hour > 17 ? 60 + Math.random() * 30 : 80 + Math.random() * 20;
-        
-        heatmapData.push({
-          day,
-          hour,
-          value: Math.round(baseActivity),
-          slackMessages: Math.floor(Math.random() * 50) + 10,
-          activeUsers: Math.floor(Math.random() * 12) + 8
-        });
-      }
+    if (messagesData?.success) {
+      qualityScore += messagesData.data?.length > 0 ? 25 : 10;
+      checks++;
+    }
+    if (meetingsData?.success) {
+      qualityScore += meetingsData.data?.length > 0 ? 25 : 10;
+      checks++;
+    }
+    if (activitiesData?.success) {
+      qualityScore += activitiesData.data?.length > 0 ? 25 : 10;
+      checks++;
     }
     
-    return heatmapData;
-  }
-  
-  static generateAdvancedMetrics(healthScore: number): AdvancedMetrics {
-    return {
-      communicationPatterns: {
-        peakHours: [10, 11, 14, 15],
-        quietHours: [12, 18, 19],
-        averageResponseTime: 45,
-        collaborationIndex: healthScore / 100
-      },
-      workloadAnalysis: {
-        overworkedMembers: Math.floor(Math.random() * 3) + 1,
-        underutilizedMembers: Math.floor(Math.random() * 2) + 1,
-        workloadBalance: healthScore / 100,
-        burnoutRisk: (100 - healthScore) / 100
-      },
-      teamDynamics: {
-        cohesionScore: healthScore / 100,
-        diversityIndex: 0.68,
-        leadershipEffectiveness: (healthScore + 10) / 100,
-        conflictIndicators: (100 - healthScore) / 200
-      }
-    };
+    return checks > 0 ? Math.round(qualityScore + 25) : 0; // ベースライン25%
   }
 }
 
-// 修正されたAnalyticsService
-class AnalyticsService {
-  static async fetchAnalytics(): Promise<{ analyticsData: AnalyticsData | null, dataSourceInfo: DataSourceInfo }> {
-    const { analyticsData, dataSourceInfo } = await RealDataAnalyticsService.fetchRealAnalytics();
-    
-    if (analyticsData) {
-      // 実データがある場合
-      return { analyticsData, dataSourceInfo };
-    } else {
-      // 実データが0の場合（モックデータなし）
-      return { analyticsData: null, dataSourceInfo };
-    }
-  }
-}
-
-// DataSourceIndicatorコンポーネント
-const DataSourceIndicator: React.FC<{ dataSourceInfo: DataSourceInfo }> = ({ dataSourceInfo }) => {
-  const getIndicatorConfig = () => {
-    if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'connected') {
-      return {
-        color: 'bg-green-100 text-green-800 border-green-200',
-        icon: '✅',
-        text: '実際のSlackワークスペースに接続済み',
-        description: `${dataSourceInfo.recordCount}件の分析データを生成`
-      };
-    } else if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'error') {
-      return {
-        color: 'bg-red-100 text-red-800 border-red-200',
-        icon: '❌',
-        text: 'Slackワークスペース接続エラー',
-        description: 'データ取得に失敗しました'
-      };
-    } else {
-      return {
-        color: 'bg-gray-100 text-gray-800 border-gray-200',
-        icon: '📋',
-        text: 'Slackワークスペース未接続',
-        description: 'Slack統合を設定してください'
-      };
-    }
+// サービスアイコンマッピング
+const getServiceIcon = (service: string) => {
+  const icons: { [key: string]: string } = {
+    google: '📹',
+    slack: '💬',
+    discord: '🎮',
+    teams: '🏢',
+    chatwork: '💼',
+    'line-works': '📱'
   };
-
-  const config = getIndicatorConfig();
-
-  return (
-    <Alert className={`mb-6 ${config.color}`}>
-      <Info className="h-4 w-4" />
-      <AlertTitle className="flex items-center gap-2">
-        <span>{config.icon}</span>
-        {config.text}
-      </AlertTitle>
-      <AlertDescription>
-        {config.description} • 最終更新: {new Date(dataSourceInfo.lastUpdated).toLocaleString('ja-JP')}
-      </AlertDescription>
-    </Alert>
-  );
+  return icons[service] || '🔗';
 };
 
-const AnalyticsPage = () => {
+// メインコンポーネント
+const UnifiedAnalyticsPage = () => {
   const { user } = useAuth();
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [dataSourceInfo, setDataSourceInfo] = useState<DataSourceInfo | null>(null);
+  const [data, setData] = useState<UnifiedAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeView, setActiveView] = useState('overview');
 
-  // 実データ取得関数
-  const fetchRealAnalyticsData = async () => {
+  // データ取得
+  const fetchData = useCallback(async () => {
     try {
       setError(null);
-      console.log('📊 分析データ取得開始...');
+      console.log('📊 6サービス統合分析開始...');
       
-      const { analyticsData, dataSourceInfo } = await AnalyticsService.fetchAnalytics();
-      
+      const analyticsData = await UnifiedAnalyticsService.fetchUnifiedAnalytics();
       setData(analyticsData);
-      setDataSourceInfo(dataSourceInfo);
       setLoading(false);
       
       if (analyticsData) {
-        console.log('✅ 分析データ取得完了:', analyticsData.overview.totalMembers, '名分析');
+        console.log('✅ 6サービス統合分析完了:', analyticsData.overview);
       } else {
-        console.log('✅ 分析データ確認完了: データなし');
+        console.log('ℹ️ 統合データなし');
       }
       
     } catch (err) {
-      console.error('❌ 分析データ取得エラー:', err);
-      setError('分析データの取得に失敗しました');
-      setDataSourceInfo({
-        isRealData: true,
-        source: '実際のSlackワークスペース',
-        lastUpdated: new Date().toISOString(),
-        connectionStatus: 'error',
-        recordCount: 0
-      });
+      console.error('❌ 統合分析エラー:', err);
+      setError('統合分析データの取得に失敗しました');
       setLoading(false);
     }
-  };
-
-  // データ取得
-  useEffect(() => {
-    const loadAnalyticsData = async () => {
-      try {
-        setLoading(true);
-        await fetchRealAnalyticsData();
-      } catch (err) {
-        console.error('分析データ取得エラー:', err);
-        setError('データの取得に失敗しました');
-        setLoading(false);
-      }
-    };
-
-    loadAnalyticsData();
-
-    // 5分間隔での自動更新
-    const interval = setInterval(fetchRealAnalyticsData, 5 * 60 * 1000);
-    
-    return () => clearInterval(interval);
   }, []);
 
-  // 手動更新機能
+  useEffect(() => {
+    fetchData();
+    
+    // 10分間隔での自動更新
+    const interval = setInterval(fetchData, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // 手動更新
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchRealAnalyticsData();
+    await fetchData();
     setRefreshing(false);
   };
 
-  // 手動同期機能
-  const handleManualSync = async () => {
-    setRefreshing(true);
-    console.log('🔄 手動同期開始...');
-    await fetchRealAnalyticsData();
-    setRefreshing(false);
-  };
-
-  // ユーティリティ関数
-  const getImpactColor = (impact: string) => {
-    switch (impact) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getTrendIcon = (direction: string) => {
-    switch (direction) {
-      case 'up':
-        return <TrendingUp className="w-5 h-5 text-green-600" />;
-      case 'down':
-        return <TrendingDown className="w-5 h-5 text-red-600" />;
-      default:
-        return <Activity className="w-5 h-5 text-gray-600" />;
-    }
-  };
-
-  const getPredictionTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'improving':
-        return <span className="text-green-600">📈</span>;
-      case 'declining':
-        return <span className="text-red-600">📉</span>;
-      default:
-        return <span className="text-gray-600">➡️</span>;
-    }
-  };
-
-  if (loading && !data && !dataSourceInfo) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-lg font-medium">高度な分析データを処理中...</p>
+          <p className="text-lg font-medium">6サービス統合分析中...</p>
           <p className="text-sm text-gray-600 mt-2">
-            実際のSlackワークスペースを分析しています
+            Google Meet • Slack • Discord • Teams • ChatWork • LINE WORKS
           </p>
         </div>
       </div>
@@ -627,83 +487,37 @@ const AnalyticsPage = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>データ取得エラー</AlertTitle>
-            <AlertDescription>
-              {error}
-              <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4 mt-2">
-                再試行
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      </div>
-    );
-  }
-
-  // データが0の場合の表示
-  if (!data && dataSourceInfo) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* ヘッダー */}
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                高度なアナリティクス
-              </h1>
-              <p className="text-gray-600">組織の健全性に関する詳細な分析と予測</p>
-            </div>
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh} 
-              disabled={refreshing}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              更新
+        <Alert variant="destructive" className="max-w-md">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>統合分析エラー</AlertTitle>
+          <AlertDescription>
+            {error}
+            <Button variant="outline" size="sm" onClick={handleRefresh} className="ml-4 mt-2">
+              再試行
             </Button>
-          </div>
-
-          {/* データソース表示 */}
-          <DataSourceIndicator dataSourceInfo={dataSourceInfo} />
-
-          {/* 空状態表示 */}
-          <div className="text-center py-16">
-            <BarChart3 className="mx-auto h-24 w-24 text-gray-400 mb-6" />
-            <h3 className="text-2xl font-semibold text-gray-900 mb-4">
-              Slackワークスペースに分析データがありません
-            </h3>
-            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-              あなたのSlackワークスペースには現在分析可能なデータが存在しないか、
-              アクセス権限がありません。Slack統合を確認するか、チームの活動をお待ちください。
-            </p>
-            <div className="space-y-4">
-              <Button 
-                onClick={handleManualSync} 
-                disabled={refreshing}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                🔄 再分析
-              </Button>
-              <p className="text-sm text-gray-500">
-                Slackワークスペースとの接続を確認し、最新データを分析します
-              </p>
-            </div>
-          </div>
-        </div>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900">データが見つかりません</h2>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-16">
+            <Network className="mx-auto h-24 w-24 text-gray-400 mb-6" />
+            <h3 className="text-2xl font-semibold text-gray-900 mb-4">
+              6サービス統合データがありません
+            </h3>
+            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+              統合分析を開始するには、まずサービスを接続してください。
+            </p>
+            <Button onClick={handleRefresh} className="flex items-center gap-2 mx-auto">
+              <RefreshCw className="h-4 w-4" />
+              統合状況を確認
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -716,10 +530,15 @@ const AnalyticsPage = () => {
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">高度なアナリティクス</h1>
-              <p className="text-gray-600 mt-2">実際のSlackワークスペースに基づく組織の健全性分析と予測</p>
+              <h1 className="text-3xl font-bold text-gray-900">6サービス統合アナリティクス</h1>
+              <p className="text-gray-600 mt-2">
+                Google Meet • Slack • Discord • Teams • ChatWork • LINE WORKS の包括的分析
+              </p>
             </div>
             <div className="flex items-center gap-4">
+              <Badge variant="outline" className="bg-green-100 text-green-700">
+                {data.overview.connectedServices}/6 サービス接続済み
+              </Badge>
               <Button 
                 variant="outline" 
                 onClick={handleRefresh} 
@@ -729,76 +548,63 @@ const AnalyticsPage = () => {
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 更新
               </Button>
-              <Button
-                onClick={handleManualSync}
-                disabled={refreshing}
-                className="flex items-center gap-2"
-              >
-                <Brain className="w-4 h-4" />
-                再分析
-              </Button>
             </div>
           </div>
 
-          {/* データソース表示 */}
-          {dataSourceInfo && <DataSourceIndicator dataSourceInfo={dataSourceInfo} />}
-
-          {/* 概要カード */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          {/* 統合概要カード */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">総メンバー数</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">総メッセージ数</CardTitle>
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.overview.totalMembers}</div>
-                <p className="text-xs text-muted-foreground">
-                  実際のSlackワークスペース
-                </p>
+                <div className="text-2xl font-bold">{data.overview.totalMessages.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">全サービス統合</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">アクティブチーム</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">総会議数</CardTitle>
+                <Video className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.overview.activeTeams}</div>
-                <p className="text-xs text-muted-foreground">
-                  品質: {data.overview.dataQuality}%
-                </p>
+                <div className="text-2xl font-bold">{data.overview.totalMeetings.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Meet・Teams統合</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">平均健全性スコア</CardTitle>
+                <CardTitle className="text-sm font-medium">コラボレーション</CardTitle>
+                <Network className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{data.crossServiceAnalysis.collaborationScore}%</div>
+                <p className="text-xs text-muted-foreground">クロスプラットフォーム</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">効率性</CardTitle>
                 <Zap className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-                  <CardContent>
-                <div className="flex items-center gap-2">
-                  <div className="text-2xl font-bold">{data.overview.avgHealthScore}</div>
-                  {getTrendIcon(data.overview.trendDirection)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  実データ分析基準
-                </p>
+              <CardContent>
+                <div className="text-2xl font-bold">{data.crossServiceAnalysis.communicationEfficiency}%</div>
+                <p className="text-xs text-muted-foreground">コミュニケーション</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">高リスク要因</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">データ品質</CardTitle>
+                <Database className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  {data.riskFactors.filter(r => r.impact === 'high').length}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  AI信頼度: {data.riskFactors.length > 0 ? Math.round(data.riskFactors.reduce((acc, r) => acc + r.confidence, 0) / data.riskFactors.length) : 0}%
-                </p>
+                <div className="text-2xl font-bold">{data.overview.dataQuality}%</div>
+                <p className="text-xs text-muted-foreground">統合精度</p>
               </CardContent>
             </Card>
           </div>
@@ -808,13 +614,12 @@ const AnalyticsPage = () => {
         <div className="border-b border-gray-200 mb-6">
           <nav className="-mb-px flex space-x-8 overflow-x-auto">
             {[
-              { id: 'overview', label: '概要', icon: '📊' },
-              { id: 'trends', label: 'トレンド分析', icon: '📈' },
-              { id: 'departments', label: '部署比較', icon: '🏢' },
+              { id: 'overview', label: '統合概要', icon: '📊' },
+              { id: 'services', label: 'サービス別', icon: '🔗' },
+              { id: 'cross-analysis', label: 'クロス分析', icon: '🔄' },
+              { id: 'timeline', label: 'タイムライン', icon: '📈' },
               { id: 'risks', label: 'リスク分析', icon: '⚠️' },
-              { id: 'predictions', label: 'AI予測', icon: '🔮' },
-              { id: 'heatmap', label: 'ヒートマップ', icon: '🌡️' },
-              { id: 'advanced', label: '高度分析', icon: '🧠' }
+              { id: 'predictions', label: 'AI予測', icon: '🔮' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -832,196 +637,276 @@ const AnalyticsPage = () => {
           </nav>
         </div>
 
-        {/* コンテンツエリア - 概要 */}
+        {/* 統合概要 */}
         {activeView === 'overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <span>📈</span>
-                  主要メトリクス推移
-                  <Badge variant="outline" className="bg-green-100 text-green-700">
-                    実データ
-                  </Badge>
+                  <span>🌐</span>
+                  6サービス統合状況
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {data.healthTrends.slice(-3).map((trend, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-gray-600 font-medium">{trend.month}</span>
-                      <div className="flex space-x-4">
-                        <div className="text-center">
-                          <div className="text-sm font-bold text-blue-600">{trend.overall}%</div>
-                          <div className="text-xs text-gray-500">全体</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-sm font-bold text-green-600">{trend.satisfaction}%</div>
-                          <div className="text-xs text-gray-500">満足度</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-sm font-bold text-red-600">{trend.stress}%</div>
-                          <div className="text-xs text-gray-500">ストレス</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-sm font-bold text-purple-600">{trend.dataPoints}</div>
-                          <div className="text-xs text-gray-500">データ点</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span>🚨</span>
-                  緊急対応が必要な項目
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {data.riskFactors.filter(r => r.impact === 'high').map((risk, index) => (
-                    <div key={index} className="flex items-start justify-between p-4 bg-red-50 rounded-lg border border-red-200">
-                      <div className="flex-1">
-                        <div className="font-medium text-red-900 mb-1">{risk.factor}</div>
-                        <div className="text-sm text-red-700 mb-2">{risk.description}</div>
-                        <div className="flex items-center space-x-4 text-xs text-red-600">
-                          <span>👥 {risk.affectedMembers}名に影響</span>
-                          <span>🎯 信頼度: {risk.confidence}%</span>
-                          <span>📊 深刻度: {risk.severity}/100</span>
-                          <Badge variant="outline" className="bg-green-100 text-green-800">
-                            実データ検知
-                          </Badge>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="destructive">
-                        対応
-                      </Button>
-                    </div>
-                  ))}
-                  {data.riskFactors.filter(r => r.impact === 'high').length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <div className="text-4xl mb-2">✅</div>
-                      <p>現在、緊急対応が必要な項目はありません</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* トレンド分析 */}
-        {activeView === 'trends' && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span>📈</span>
-                  健全性トレンド分析
-                  <Badge variant="outline" className="bg-green-100 text-green-700">
-                    実データ
-                  </Badge>
-                </CardTitle>
-                <CardDescription>
-                  実際のSlackワークスペースデータに基づく健全性指標の推移
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {data.healthTrends.map((trend, index) => (
-                    <div key={index} className="grid grid-cols-8 gap-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="font-medium text-gray-900">{trend.month}</div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-blue-600">{trend.overall}</div>
-                        <div className="text-xs text-gray-500">全体</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-red-600">{trend.stress}</div>
-                        <div className="text-xs text-gray-500">ストレス</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-green-600">{trend.satisfaction}</div>
-                        <div className="text-xs text-gray-500">満足度</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-purple-600">{trend.engagement}</div>
-                        <div className="text-xs text-gray-500">エンゲージメント</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-orange-600">{trend.productivity}</div>
-                        <div className="text-xs text-gray-500">生産性</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-teal-600">{trend.collaboration}</div>
-                        <div className="text-xs text-gray-500">協調性</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-indigo-600">{trend.workLifeBalance}</div>
-                        <div className="text-xs text-gray-500">WLB</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* 部署比較 */}
-        {activeView === 'departments' && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span>🏢</span>
-                  部署別健全性比較
-                  <Badge variant="outline" className="bg-green-100 text-green-700">
-                    実データ
-                  </Badge>
-                </CardTitle>
-                <CardDescription>
-                  実際のSlackワークスペースアクティビティに基づく部署別分析
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {data.departmentComparison.map((dept, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-4">
-                          <h4 className="font-semibold text-gray-900">{dept.department}</h4>
-                          <Badge variant={dept.riskLevel === 'high' ? 'destructive' : dept.riskLevel === 'medium' ? 'default' : 'secondary'}>
-                            {dept.riskLevel === 'high' ? '高リスク' : dept.riskLevel === 'medium' ? '中リスク' : '低リスク'}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-4 gap-4 mt-2 text-sm">
-                          <div>
-                            <span className="text-gray-600">メンバー数: </span>
-                            <span className="font-medium">{dept.memberCount}名</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Slack活動: </span>
-                            <span className="font-medium">{dept.slackActivity}%</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">応答時間: </span>
-                            <span className="font-medium">{dept.avgResponseTime}分</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">変化: </span>
-                            <span className={`font-medium ${dept.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {dept.change > 0 ? '+' : ''}{dept.change}
-                            </span>
+                  {Object.entries(data.serviceBreakdown).map(([key, service]: [string, any]) => (
+                    <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{service.icon}</span>
+                        <div>
+                          <div className="font-medium">{service.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {service.isConnected ? '接続済み' : '未接続'}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-900">{dept.healthScore}</div>
-                        <div className="text-sm text-gray-500">健全性スコア</div>
+                        <div className="text-sm font-bold">
+                          {service.messageCount + service.meetingCount} 件
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {service.lastActivity !== '活動なし' ? '最新活動' : '活動なし'}
+                        </div>
+                      </div>
+                      <div className={`w-3 h-3 rounded-full ${service.isConnected ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span>🎯</span>
+                  クロスサービス指標
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">コラボレーションスコア</span>
+                      <span className="text-sm font-bold">{data.crossServiceAnalysis.collaborationScore}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full" 
+                        style={{ width: `${data.crossServiceAnalysis.collaborationScore}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">コミュニケーション効率</span>
+                      <span className="text-sm font-bold">{data.crossServiceAnalysis.communicationEfficiency}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-600 h-2 rounded-full" 
+                        style={{ width: `${data.crossServiceAnalysis.communicationEfficiency}%` }}
+                      />
+                    </div>
+                  </div>
+                      <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">プラットフォーム活用バランス</span>
+                      <span className="text-sm font-bold">{data.crossServiceAnalysis.platformUsageBalance}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-purple-600 h-2 rounded-full" 
+                        style={{ width: `${data.crossServiceAnalysis.platformUsageBalance}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium">ユーザーエンゲージメント</span>
+                      <span className="text-sm font-bold">{data.crossServiceAnalysis.userEngagement}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-orange-600 h-2 rounded-full" 
+                        style={{ width: `${data.crossServiceAnalysis.userEngagement}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* サービス別分析 */}
+        {activeView === 'services' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Object.entries(data.serviceBreakdown).map(([key, service]: [string, any]) => (
+              <Card key={key} className={service.isConnected ? 'border-green-200' : 'border-gray-200'}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="text-2xl">{service.icon}</span>
+                    {service.name}
+                    <Badge variant={service.isConnected ? 'default' : 'secondary'}>
+                      {service.isConnected ? '接続済み' : '未接続'}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">{service.messageCount}</div>
+                        <div className="text-sm text-gray-600">メッセージ</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">{service.meetingCount}</div>
+                        <div className="text-sm text-gray-600">会議</div>
+                      </div>
+                    </div>
+                    <div className="text-sm">
+                      <div className="text-gray-600">最新活動:</div>
+                      <div className="font-medium">{service.lastActivity}</div>
+                    </div>
+                    {!service.isConnected && (
+                      <Button size="sm" variant="outline" className="w-full">
+                        接続設定
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* クロス分析 */}
+        {activeView === 'cross-analysis' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span>🔄</span>
+                  クロスプラットフォーム分析
+                </CardTitle>
+                <CardDescription>
+                  6サービス横断でのコミュニケーションパターンと効率性分析
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
+                    <div className="text-3xl font-bold text-blue-600 mb-2">
+                      {data.crossServiceAnalysis.collaborationScore}%
+                    </div>
+                    <div className="text-sm font-medium text-blue-800">コラボレーション</div>
+                    <div className="text-xs text-blue-600 mt-1">
+                      複数サービス活用度
+                    </div>
+                  </div>
+                  <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
+                    <div className="text-3xl font-bold text-green-600 mb-2">
+                      {data.crossServiceAnalysis.communicationEfficiency}%
+                    </div>
+                    <div className="text-sm font-medium text-green-800">効率性</div>
+                    <div className="text-xs text-green-600 mt-1">
+                      コミュニケーション品質
+                    </div>
+                  </div>
+                  <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
+                    <div className="text-3xl font-bold text-purple-600 mb-2">
+                      {data.crossServiceAnalysis.platformUsageBalance}%
+                    </div>
+                    <div className="text-sm font-medium text-purple-800">バランス</div>
+                    <div className="text-xs text-purple-600 mt-1">
+                      プラットフォーム分散
+                    </div>
+                  </div>
+                  <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg">
+                    <div className="text-3xl font-bold text-orange-600 mb-2">
+                      {data.crossServiceAnalysis.userEngagement}%
+                    </div>
+                    <div className="text-sm font-medium text-orange-800">エンゲージメント</div>
+                    <div className="text-xs text-orange-600 mt-1">
+                      ユーザー参加度
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span>📊</span>
+                  サービス別活動分布
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {Object.entries(data.serviceBreakdown).map(([key, service]: [string, any]) => {
+                    const totalActivity = service.messageCount + service.meetingCount;
+                    const maxActivity = Math.max(...Object.values(data.serviceBreakdown).map((s: any) => s.messageCount + s.meetingCount));
+                    const percentage = maxActivity > 0 ? (totalActivity / maxActivity) * 100 : 0;
+                    
+                    return (
+                      <div key={key} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span>{service.icon}</span>
+                            <span className="font-medium">{service.name}</span>
+                          </div>
+                          <div className="text-sm font-bold">{totalActivity} 件</div>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div 
+                            className={`h-3 rounded-full ${
+                              service.isConnected ? 'bg-blue-500' : 'bg-gray-400'
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>メッセージ: {service.messageCount}</span>
+                          <span>会議: {service.meetingCount}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* タイムライン */}
+        {activeView === 'timeline' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span>📈</span>
+                  統合アクティビティタイムライン
+                </CardTitle>
+                <CardDescription>
+                  過去7日間の6サービス統合アクティビティ推移
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {data.timelineData.map((day, index) => (
+                    <div key={index} className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="font-medium">{new Date(day.date).toLocaleDateString('ja-JP')}</div>
+                        <div className="text-lg font-bold text-blue-600">{day.totalActivity} 件</div>
+                      </div>
+                      <div className="grid grid-cols-6 gap-2">
+                        {Object.entries(day.serviceActivity).map(([service, count]: [string, any]) => (
+                          <div key={service} className="text-center p-2 bg-white rounded">
+                            <div className="text-lg">{getServiceIcon(service)}</div>
+                            <div className="text-sm font-bold">{count}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -1038,47 +923,64 @@ const AnalyticsPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span>⚠️</span>
-                  リスク要因分析
-                  <Badge variant="outline" className="bg-green-100 text-green-700">
-                    実データ
-                  </Badge>
+                  統合リスク分析
                 </CardTitle>
                 <CardDescription>
-                  実際のSlackワークスペースデータから検出されたリスク要因
+                  6サービス統合環境でのリスク要因とその対策
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {data.riskFactors.map((risk, index) => (
-                    <div key={index} className={`p-4 rounded-lg border ${getImpactColor(risk.impact)}`}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold mb-1">{risk.factor}</h4>
-                          <p className="text-sm mb-2">{risk.description}</p>
-                          <div className="flex items-center gap-4 text-xs">
-                            <span>👥 影響: {risk.affectedMembers}名</span>
-                            <span>🎯 信頼度: {risk.confidence}%</span>
-                            <span>📊 深刻度: {risk.severity}/100</span>
-                            <span>📅 検出: {new Date(risk.detectedAt).toLocaleDateString('ja-JP')}</span>
+                  {data.riskFactors.length > 0 ? (
+                    data.riskFactors.map((risk, index) => (
+                      <div 
+                        key={index} 
+                        className={`p-4 rounded-lg border ${
+                          risk.severity === 'high' ? 'bg-red-50 border-red-200' :
+                          risk.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' :
+                          'bg-green-50 border-green-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold mb-1">{risk.title}</h4>
+                            <p className="text-sm text-gray-600 mb-2">{risk.description}</p>
+                            <div className="flex items-center gap-4 text-xs">
+                              <span>🎯 信頼度: {risk.confidence}%</span>
+                              <span>📱 影響サービス: {risk.affectedServices.length}個</span>
+                            </div>
                           </div>
+                          <Badge 
+                            variant={
+                              risk.severity === 'high' ? 'destructive' : 
+                              risk.severity === 'medium' ? 'default' : 
+                              'secondary'
+                            }
+                          >
+                            {risk.severity === 'high' ? '高リスク' : 
+                             risk.severity === 'medium' ? '中リスク' : '低リスク'}
+                          </Badge>
                         </div>
-                        <Badge variant={risk.impact === 'high' ? 'destructive' : risk.impact === 'medium' ? 'default' : 'secondary'}>
-                          {risk.impact === 'high' ? '高影響' : risk.impact === 'medium' ? '中影響' : '低影響'}
-                        </Badge>
-                      </div>
-                      <div className="mt-3">
-                        <h5 className="text-sm font-medium mb-2">推奨対応策:</h5>
-                        <ul className="text-sm space-y-1">
-                          {risk.recommendations.map((rec, recIndex) => (
-                            <li key={recIndex} className="flex items-center gap-2">
-                              <span className="text-blue-600">•</span>
-                              {rec}
-                            </li>
+                        <div className="flex flex-wrap gap-1">
+                          {risk.affectedServices.map(service => (
+                            <Badge key={service} variant="outline" className="text-xs">
+                              {getServiceIcon(service)} {data.serviceBreakdown[service]?.name || service}
+                            </Badge>
                           ))}
-                        </ul>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        リスク要因は検出されていません
+                      </h3>
+                      <p className="text-gray-600">
+                        6サービス統合環境は正常に機能しています
+                      </p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1092,13 +994,10 @@ const AnalyticsPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <span>🔮</span>
-                  AI予測分析
-                  <Badge variant="outline" className="bg-green-100 text-green-700">
-                    実データ
-                  </Badge>
+                  AI統合予測分析
                 </CardTitle>
                 <CardDescription>
-                  実際のSlackワークスペースデータに基づく機械学習予測
+                  6サービス統合データに基づく機械学習予測
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1108,221 +1007,62 @@ const AnalyticsPage = () => {
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <h4 className="font-semibold">{prediction.metric}</h4>
-                          {getPredictionTrendIcon(prediction.trend)}
+                          <span className="text-lg">
+                            {prediction.trend === 'improving' ? '📈' : 
+                             prediction.trend === 'declining' ? '📉' : '➡️'}
+                          </span>
                           <Badge variant="outline">
                             {prediction.trend === 'improving' ? '改善予測' : 
                              prediction.trend === 'declining' ? '悪化予測' : '安定予測'}
                           </Badge>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm text-gray-600">信頼度</div>
+                          <div className="text-sm text-gray-600">AI信頼度</div>
                           <div className="font-bold">{prediction.confidence}%</div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">現在値: </span>
-                          <span className="font-medium">{prediction.current}</span>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="text-center p-3 bg-white rounded">
+                          <div className="text-gray-600">現在値</div>
+                          <div className="text-lg font-bold">{prediction.current}%</div>
                         </div>
-                        <div>
-                          <span className="text-gray-600">予測値: </span>
-                          <span className={`font-medium ${prediction.predicted > prediction.current ? 'text-green-600' : 'text-red-600'}`}>
-                            {prediction.predicted}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">期間: </span>
-                          <span className="font-medium">{prediction.timeframe}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">精度: </span>
-                          <span className="font-medium">{prediction.accuracy}%</span>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        アルゴリズム: {prediction.algorithm} | データ点: {prediction.dataPoints}件
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* ヒートマップ */}
-        {activeView === 'heatmap' && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span>🌡️</span>
-                  活動ヒートマップ
-                  <Badge variant="outline" className="bg-green-100 text-green-700">
-                    実データ
-                  </Badge>
-                </CardTitle>
-                <CardDescription>
-                  実際のSlackワークスペースアクティビティの時間別分析
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-11 gap-1">
-                  <div></div>
-                  {[9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(hour => (
-                    <div key={hour} className="text-center text-xs font-medium text-gray-600 p-2">
-                      {hour}時
-                    </div>
-                  ))}
-                  {['月', '火', '水', '木', '金'].map(day => (
-                    <React.Fragment key={day}>
-                      <div className="text-xs font-medium text-gray-600 p-2">{day}</div>
-                      {data.heatmapData
-                        .filter(item => item.day === day)
-                        .map((item, index) => (
-                          <div
-                            key={index}
-                            className={`p-2 rounded text-center text-xs font-medium ${
-                              item.value >= 80 ? 'bg-red-500 text-white' :
-                              item.value >= 60 ? 'bg-orange-400 text-white' :
-                              item.value >= 40 ? 'bg-yellow-400 text-gray-900' :
-                              'bg-green-400 text-gray-900'
-                            }`}
-                            title={`${day} ${item.hour}時: アクティビティ${item.value}% (Slackメッセージ: ${item.slackMessages}, アクティブユーザー: ${item.activeUsers})`}
-                          >
-                            {item.value}
+                        <div className="text-center p-3 bg-white rounded">
+                          <div className="text-gray-600">予測値</div>
+                          <div className={`text-lg font-bold ${
+                            prediction.predicted > prediction.current ? 'text-green-600' : 
+                            prediction.predicted < prediction.current ? 'text-red-600' : 'text-gray-600'
+                          }`}>
+                            {prediction.predicted}%
                           </div>
-                        ))}
-                    </React.Fragment>
+                        </div>
+                        <div className="text-center p-3 bg-white rounded">
+                          <div className="text-gray-600">変化</div>
+                          <div className={`text-lg font-bold ${
+                            prediction.predicted > prediction.current ? 'text-green-600' : 
+                            prediction.predicted < prediction.current ? 'text-red-600' : 'text-gray-600'
+                          }`}>
+                            {prediction.predicted > prediction.current ? '+' : ''}
+                            {Math.round(prediction.predicted - prediction.current)}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </div>
-                <div className="mt-4 flex items-center justify-center space-x-4 text-xs">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-green-400 rounded"></div>
-                    <span>低活動 (40%未満)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-yellow-400 rounded"></div>
-                    <span>中活動 (40-60%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-orange-400 rounded"></div>
-                    <span>高活動 (60-80%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-red-500 rounded"></div>
-                    <span>超高活動 (80%以上)</span>
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* 高度分析 */}
-        {activeView === 'advanced' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span>💬</span>
-                    コミュニケーションパターン
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-sm text-gray-600 mb-1">ピーク時間</div>
-                      <div className="flex flex-wrap gap-1">
-                        {data.advancedMetrics.communicationPatterns.peakHours.map(hour => (
-                          <Badge key={hour} variant="outline">{hour}時</Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 mb-1">静寂時間</div>
-                      <div className="flex flex-wrap gap-1">
-                        {data.advancedMetrics.communicationPatterns.quietHours.map(hour => (
-                          <Badge key={hour} variant="secondary">{hour}時</Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">平均応答時間</div>
-                      <div className="text-2xl font-bold">{data.advancedMetrics.communicationPatterns.averageResponseTime}分</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">協調指数</div>
-                      <div className="text-2xl font-bold">{(data.advancedMetrics.communicationPatterns.collaborationIndex * 100).toFixed(1)}%</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span>⚖️</span>
-                    ワークロード分析
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-sm text-gray-600">過労メンバー</div>
-                      <div className="text-2xl font-bold text-red-600">{data.advancedMetrics.workloadAnalysis.overworkedMembers}名</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">活用不足メンバー</div>
-                      <div className="text-2xl font-bold text-blue-600">{data.advancedMetrics.workloadAnalysis.underutilizedMembers}名</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">ワークロードバランス</div>
-                      <div className="text-2xl font-bold">{(data.advancedMetrics.workloadAnalysis.workloadBalance * 100).toFixed(1)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">バーンアウトリスク</div>
-                      <div className="text-2xl font-bold text-orange-600">{(data.advancedMetrics.workloadAnalysis.burnoutRisk * 100).toFixed(1)}%</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span>🤝</span>
-                    チームダイナミクス
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-sm text-gray-600">結束スコア</div>
-                      <div className="text-2xl font-bold text-green-600">{(data.advancedMetrics.teamDynamics.cohesionScore * 100).toFixed(1)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">多様性指数</div>
-                      <div className="text-2xl font-bold">{(data.advancedMetrics.teamDynamics.diversityIndex * 100).toFixed(1)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">リーダーシップ効果</div>
-                      <div className="text-2xl font-bold text-purple-600">{(data.advancedMetrics.teamDynamics.leadershipEffectiveness * 100).toFixed(1)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">衝突指標</div>
-                      <div className="text-2xl font-bold text-red-600">{(data.advancedMetrics.teamDynamics.conflictIndicators * 100).toFixed(1)}%</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
+        {/* フッター情報 */}
+        <div className="mt-8 text-center text-sm text-gray-500">
+          最終更新: {new Date(data.overview.lastUpdated).toLocaleString('ja-JP')} • 
+          データ品質: {data.overview.dataQuality}% • 
+          統合サービス: {data.overview.connectedServices}/6
+        </div>
       </div>
     </div>
   );
 };
 
-export default AnalyticsPage;
+export default UnifiedAnalyticsPage;
