@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   console.log('🔄 ChatWork OAuth コールバック処理開始 (PKCE対応)');
+  console.log('📋 Request URL:', request.url);
   
   try {
     // URLパラメータ取得
@@ -12,25 +13,30 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
 
+    // 全てのパラメータをログ出力
+    console.log('📋 全URLパラメータ:', Object.fromEntries(searchParams.entries()));
     console.log('📋 ChatWorkコールバックパラメータ:', { 
-      code: code ? '取得済み' : '未取得', 
+      code: code ? `取得済み(${code.substring(0, 10)}...)` : '未取得', 
       state, 
-      error 
+      error,
+      errorDescription
     });
 
     // エラーハンドリング
     if (error) {
-      console.error('❌ ChatWork OAuth エラー:', error);
+      console.error('❌ ChatWork OAuth エラー:', error, errorDescription);
       return NextResponse.redirect(
-        new URL(`/integrations?error=chatwork_oauth_error&message=${error}`, request.url)
+        new URL(`/integrations?error=chatwork_oauth_error&message=${encodeURIComponent(errorDescription || error)}`, request.url)
       );
     }
 
     if (!code) {
       console.error('❌ 認証コードが見つかりません');
+      console.log('❌ 利用可能なパラメータ:', Array.from(searchParams.keys()));
       return NextResponse.redirect(
-        new URL('/integrations?error=missing_code', request.url)
+        new URL('/integrations?error=missing_code&available_params=' + encodeURIComponent(Array.from(searchParams.keys()).join(',')), request.url)
       );
     }
 
