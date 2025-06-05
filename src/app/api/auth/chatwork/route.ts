@@ -30,9 +30,31 @@ export async function GET(request: NextRequest) {
 
     // ChatWorkユーザーIDを使って固有のユーザーIDを生成
     const chatworkUserId = `chatwork_${userInfo.account_id}`;
+    const userEmail = userInfo.login_mail || `chatwork_${userInfo.account_id}@chatwork.local`;
 
-    // データベースに統合情報を保存
-    console.log('データベース保存開始...');
+    // まずUserレコードを作成または更新
+    console.log('Userレコード作成/更新開始...');
+    await prisma.user.upsert({
+      where: {
+        email: userEmail
+      },
+      update: {
+        name: userInfo.name,
+        company: userInfo.organization_name || null,
+        lastLoginAt: new Date()
+      },
+      create: {
+        id: chatworkUserId,
+        email: userEmail,
+        name: userInfo.name,
+        company: userInfo.organization_name || null,
+        role: 'user',
+        lastLoginAt: new Date()
+      }
+    });
+
+    // 次にIntegrationレコードを作成または更新
+    console.log('Integrationレコード作成/更新開始...');
     await prisma.integration.upsert({
       where: {
         userId_service: {
