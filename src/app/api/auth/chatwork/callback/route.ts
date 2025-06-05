@@ -65,35 +65,68 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('✅ ChatWorkユーザー情報取得成功:', userInfo.name);
+     console.log('✅ ChatWorkユーザー情報取得成功:', userInfo.name);
 
     // ChatWorkユーザーIDでユーザー作成
     const chatworkUserId = `chatwork_${userInfo.account_id}`;
     const userEmail = userInfo.login_mail || `chatwork_${userInfo.account_id}@chatwork.local`;
     
-    // Userレコード作成
-    await prisma.user.upsert({
-      where: { email: userEmail },
-      update: {
-        name: userInfo.name,
-        company: userInfo.organization_name || null,
-        lastLoginAt: new Date()
-      },
-      create: {
-        id: chatworkUserId,
-        email: userEmail,
-        name: userInfo.name,
-        company: userInfo.organization_name || null,
-        role: 'user',
-        lastLoginAt: new Date()
-      }
+    console.log('生成されたユーザーID:', chatworkUserId);
+    console.log('ユーザーメール:', userEmail);
+
+    // 既存のUserレコードを確認
+    let existingUser = await prisma.user.findUnique({
+      where: { id: chatworkUserId }
     });
 
+    console.log('既存Userレコード確認:', existingUser);
+
+    if (!existingUser) {
+      // 存在しない場合は新規作成
+      console.log('新規Userレコード作成開始...');
+      try {
+        existingUser = await prisma.user.create({
+          data: {
+            id: chatworkUserId,
+            email: userEmail,
+            name: userInfo.name,
+            company: userInfo.organization_name || null,
+            role: 'user',
+            lastLoginAt: new Date()
+          }
+        });
+        console.log('新規Userレコード作成成功:', existingUser.id);
+      } catch (createError: any) {
+        console.error('Userレコード作成エラー:', createError);
+        
+        // メールアドレス重複の場合、既存レコードを取得
+        if (createError?.code === 'P2002') {
+          existingUser = await prisma.user.findUnique({
+            where: { email: userEmail }
+          });
+          if (existingUser) {
+            console.log('メール重複により既存レコード使用:', existingUser.id);
+          }
+        }
+        
+        if (!existingUser) {
+          throw new Error(`Userレコード作成に失敗: ${createError.message}`);
+        }
+      }
+    } else {
+      console.log('既存Userレコード使用:', existingUser.id);
+    }
+
+    // 最終的なuserIdを確定
+    const finalUserId = existingUser.id;
+    console.log('最終使用UserID:', finalUserId);
+
     // データベースに統合情報を保存
+    console.log('Integration保存開始...');
     await prisma.integration.upsert({
       where: {
         userId_service: {
-          userId: chatworkUserId,
+          userId: finalUserId,  // 確実に存在するuserIdを使用
           service: 'chatwork'
         }
       },
@@ -106,7 +139,7 @@ export async function GET(request: NextRequest) {
         updatedAt: new Date()
       },
       create: {
-        userId: chatworkUserId,
+        userId: finalUserId,  // 確実に存在するuserIdを使用
         service: 'chatwork',
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
