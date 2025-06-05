@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-// import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-// authOptionsは直接インポートできないため削除
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { PrismaClient } from '@prisma/client';
+
+// Prismaクライアント初期化
+const prisma = new PrismaClient();
 
 /**
- * LINE WORKS OAuth認証コールバック処理
+ * LINE WORKS OAuth認証コールバック処理（修正版）
  * 
  * LINE WORKS APIとの統合を処理し、認証情報を安全に保存します。
  * LINEスタイルビジネスコミュニケーション分析機能との連携を提供。
@@ -25,27 +27,27 @@ interface LineWorksUserInfo {
   userId: string;
   displayName: string;
   email: string;
-  mobile: string;
-  telephone: string;
-  department: string;
-  position: string;
+  mobile?: string;
+  telephone?: string;
+  department?: string;
+  position?: string;
   domainId: string;
-  locale: string;
-  timezone: string;
-  employeeNumber: string;
-  statusMessage: string;
-  avatarUrl: string;
+  locale?: string;
+  timezone?: string;
+  employeeNumber?: string;
+  statusMessage?: string;
+  avatarUrl?: string;
 }
 
 interface LineWorksOrgInfo {
   domainId: string;
   domainName: string;
   companyName: string;
-  countryCode: string;
-  language: string;
-  timezone: string;
-  contractType: string;
-  userCount: number;
+  countryCode?: string;
+  language?: string;
+  timezone?: string;
+  contractType?: string;
+  userCount?: number;
 }
 
 const LINE_WORKS_CLIENT_ID = process.env.LINE_WORKS_CLIENT_ID;
@@ -61,11 +63,21 @@ export async function GET(request: NextRequest) {
   console.log('🔄 LINE WORKS OAuth コールバック処理開始');
   
   try {
-    // セッション確認
-    const session = await getServerSession();
-    if (!session?.user?.id) {
+    // セッション確認（修正版）
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
       console.error('❌ 未認証ユーザーのアクセス');
       return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
+    }
+
+    // ユーザー情報をデータベースから取得
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+
+    if (!user) {
+      console.error('❌ ユーザーがデータベースに存在しません');
+      return NextResponse.redirect(new URL('/login?error=user_not_found', request.url));
     }
 
     // URLパラメータ取得
@@ -150,13 +162,13 @@ export async function GET(request: NextRequest) {
       companyName: orgInfo?.companyName
     });
 
-    // データベース保存
+    // データベース保存（修正版）
     console.log('💾 LINE WORKS統合情報をデータベースに保存開始');
     
     await prisma.integration.upsert({
       where: {
         userId_service: {
-          userId: session.user.id,
+          userId: user.id,
           service: 'line-works'
         }
       },
@@ -169,22 +181,24 @@ export async function GET(request: NextRequest) {
         updatedAt: new Date()
       },
       create: {
-        userId: session.user.id,
+        userId: user.id,
         service: 'line-works',
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
         isActive: true,
         teamId: orgInfo?.domainId || userInfo.domainId,
-        teamName: orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization'
+        teamName: orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization',
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     });
 
     console.log('✅ LINE WORKS統合情報保存完了');
 
-    // 成功時のリダイレクト
-    const successUrl = new URL('/integrations', request.url);
-    successUrl.searchParams.set('success', 'line_works_connected');
-    successUrl.searchParams.set('service', 'LINE WORKS');
+    // 成功時のリダイレクト（ダッシュボードに統合）
+    const successUrl = new URL('/dashboard', request.url);
+    successUrl.searchParams.set('success', 'true');
+    successUrl.searchParams.set('service', 'line-works');
     successUrl.searchParams.set('user', userInfo.displayName || userInfo.userId);
     successUrl.searchParams.set('organization', orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization');
 
@@ -192,7 +206,7 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(successUrl);
     response.cookies.delete('line_works_oauth_state');
 
-    console.log('🎉 LINE WORKS OAuth認証完了 - 統合ページにリダイレクト');
+    console.log('🎉 LINE WORKS OAuth認証完了 - ダッシュボードにリダイレクト');
     return response;
 
   } catch (error) {
@@ -229,6 +243,8 @@ async function exchangeCodeForToken(code: string): Promise<LineWorksTokenRespons
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ LINE WORKS Token exchange HTTP エラー:', response.status, errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -268,6 +284,8 @@ async function getUserInfo(accessToken: string): Promise<LineWorksUserInfo | nul
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ LINE WORKS ユーザー情報取得 HTTP エラー:', response.status, errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 

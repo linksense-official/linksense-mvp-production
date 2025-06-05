@@ -5,7 +5,7 @@ import DiscordProvider from 'next-auth/providers/discord'
 import AzureADProvider from 'next-auth/providers/azure-ad'
 import { PrismaClient } from '@prisma/client'
 
-console.log('🚀 LinkSense MVP - 本番環境OAuth統合版（7サービス）')
+console.log('🚀 LinkSense MVP - OAuth統合修正版（複数サービス同時接続対応）')
 console.log('🌐 NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
 console.log('🔧 Environment:', process.env.NODE_ENV)
 
@@ -21,22 +21,23 @@ export const authOptions: AuthOptions = {
       authorization: {
         params: {
           scope: 'openid email profile https://www.googleapis.com/auth/calendar.readonly',
-          prompt: 'select_account',
+          prompt: 'consent', // 修正: select_account → consent（再同意を促す）
           access_type: 'offline',
         },
       },
     }),
     
-    // Slack OAuth
+    // Slack OAuth - 修正版
     SlackProvider({
-  clientId: process.env.SLACK_CLIENT_ID!,
-  clientSecret: process.env.SLACK_CLIENT_SECRET!,
-  authorization: {
-    params: {
-      scope: 'channels:read users:read team:read'  // 修正: 無効なスコープを削除
-    }
-  }
-}),
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: 'users:read team:read', // 修正: channels:read を削除（無効なスコープ）
+          user_scope: 'identify' // 追加: ユーザースコープ
+        }
+      }
+    }),
     
     // Discord OAuth
     DiscordProvider({
@@ -44,22 +45,23 @@ export const authOptions: AuthOptions = {
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'identify email guilds messages.read'
+          scope: 'identify email guilds' // 修正: messages.read を削除（権限過多）
         }
       }
     }),
     
-    // Azure AD (Teams) OAuth
+    // Azure AD (Teams) OAuth - 修正版
     AzureADProvider({
-  clientId: process.env.AZURE_AD_CLIENT_ID!,
-  clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-  tenantId: process.env.AZURE_AD_TENANT_ID!,
-  authorization: {
-    params: {
-      scope: 'openid profile email User.Read'  // 修正: 基本スコープのみ
-    }
-  }
-}),
+      clientId: process.env.AZURE_AD_CLIENT_ID!,
+      clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+      tenantId: process.env.AZURE_AD_TENANT_ID!,
+      authorization: {
+        params: {
+          scope: 'openid profile email User.Read',
+          prompt: 'consent' // 追加: 再同意を促す
+        }
+      }
+    }),
   ],
   
   debug: process.env.NODE_ENV === 'development',
@@ -87,42 +89,54 @@ export const authOptions: AuthOptions = {
               email: user.email,
               name: user.name || '',
               image: user.image,
-              emailVerified: new Date(), // OAuth認証済みとして扱う
+              emailVerified: new Date(),
               createdAt: new Date(),
               updatedAt: new Date(),
             },
           })
 
-          // サービス統合情報を保存（既存のスキーマフィールドのみ使用）
-          await prisma.integration.upsert({
-            where: {
-              userId_service: {
-                userId: userData.id,
-                service: account.provider as any,
-              },
-            },
-            update: {
-              accessToken: account.access_token || '',
-              refreshToken: account.refresh_token || '',
-              isActive: true,
-              updatedAt: new Date(),
-            },
-            create: {
-              userId: userData.id,
-              service: account.provider as any,
-              accessToken: account.access_token || '',
-              refreshToken: account.refresh_token || '',
-              isActive: true,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          })
+          // 統合情報を保存（既存を無効化せずに追加）
+          const existingIntegration = await prisma.integration.findUnique({
+  where: {
+    userId_service: {
+      userId: userData.id,
+      service: account.provider as any,
+    },
+  },
+})
 
-          console.log('💾 統合情報保存完了:', {
-            userId: userData.id,
-            service: account.provider,
-            hasToken: !!account.access_token
-          })
+if (existingIntegration) {
+  // 既存の統合を更新（他のサービスには影響しない）
+  await prisma.integration.update({
+    where: { id: existingIntegration.id },
+    data: {  // 修正: 'update' → 'data'
+      accessToken: account.access_token || '',
+      refreshToken: account.refresh_token || '',
+      isActive: true,
+      updatedAt: new Date(),
+    },
+  })
+} else {
+  // 新規統合作成（他のサービスには影響しない）
+  await prisma.integration.create({
+    data: {
+      userId: userData.id,
+      service: account.provider as any,
+      accessToken: account.access_token || '',
+      refreshToken: account.refresh_token || '',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  })
+}
+
+console.log('💾 統合情報保存完了:', {
+  userId: userData.id,
+  service: account.provider,
+  hasToken: !!account.access_token,
+  action: existingIntegration ? 'updated' : 'created'
+})
         }
       } catch (error) {
         console.error('❌ データベース保存エラー:', error)
@@ -138,11 +152,11 @@ export const authOptions: AuthOptions = {
       // エラーハンドリング
       if (url.includes('error=')) {
         console.error('🚨 OAuth認証エラー:', url)
-        return `${baseUrl}/login?error=oauth_failed`
+        return `${baseUrl}/integrations?error=oauth_failed`
       }
       
-      // 認証成功後は統合管理画面へ
-      return `${baseUrl}/integrations?success=true`
+      // 認証成功後はダッシュボードへ（統合状況を即座反映）
+      return `${baseUrl}/dashboard?success=true&service=${encodeURIComponent(url.includes('provider=') ? url.split('provider=')[1].split('&')[0] : 'unknown')}`
     },
     
     async jwt({ token, user, account }) {
