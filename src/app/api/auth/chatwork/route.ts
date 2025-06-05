@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
     // セキュアなstate生成
     const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-    // ChatWork OAuth認証URL生成（Publicクライアント用）
-    const authUrl = new URL('https://oauth.chatwork.com/authorize');
+    // ChatWork OAuth認証URL生成（別のエンドポイントを試す）
+    const authUrl = new URL('https://www.chatwork.com/packages/oauth2/login.php');
     authUrl.searchParams.append('client_id', clientId);
     authUrl.searchParams.append('response_type', 'code');
     authUrl.searchParams.append('redirect_uri', redirectUri);
