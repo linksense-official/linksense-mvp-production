@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
     const clientId = process.env.CHATWORK_CLIENT_ID;
     const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/chatwork/callback`;
     
-    console.log('ChatWork OAuth開始:', { clientId: clientId ? '設定済み' : '未設定', redirectUri });
+    console.log('ChatWork OAuth開始 (Public):', { clientId: clientId ? '設定済み' : '未設定', redirectUri });
     
     if (!clientId) {
       return NextResponse.redirect(
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // セキュアなstate生成
     const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-    // ChatWork OAuth認証URL生成
+    // ChatWork OAuth認証URL生成（Publicクライアント用）
     const authUrl = new URL('https://oauth.chatwork.com/authorize');
     authUrl.searchParams.append('client_id', clientId);
     authUrl.searchParams.append('response_type', 'code');
