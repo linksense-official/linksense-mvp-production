@@ -77,41 +77,66 @@ export async function GET(request: NextRequest) {
     }
 
     // セッション確認
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      console.error('❌ セッションが見つかりません');
-      return NextResponse.redirect(
-        new URL('/integrations?error=session_not_found', request.url)
-      );
-    }
+   const session = await getServerSession(authOptions);
 
-    // データベースに統合情報を保存
-    await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: session.user.id,
-          service: 'chatwork'
-        }
-      },
-      update: {
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token || null,
-        isActive: true,
-        teamId: userInfo.organization_id?.toString() || 'unknown',
-        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User',
-        updatedAt: new Date()
-      },
-      create: {
-        userId: session.user.id,
-        service: 'chatwork',
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token || null,
-        isActive: true,
-        teamId: userInfo.organization_id?.toString() || 'unknown',
-        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User'
-      }
-    });
+let userId: string;
+
+if (session?.user?.id) {
+  // 既存のセッションがある場合はそのユーザーIDを使用
+  userId = session.user.id;
+  console.log('既存セッション使用:', userId);
+} else {
+  // セッションがない場合はChatWorkユーザーIDを使用
+  userId = `chatwork_${userInfo.account_id}`;
+  console.log('ChatWorkユーザーID使用:', userId);
+  
+  // ChatWorkユーザー情報でUserレコードを作成
+  const userEmail = userInfo.login_mail || `chatwork_${userInfo.account_id}@chatwork.local`;
+  
+  await prisma.user.upsert({
+    where: { email: userEmail },
+    update: {
+      name: userInfo.name,
+      company: userInfo.organization_name || null,
+      lastLoginAt: new Date()
+    },
+    create: {
+      id: userId,
+      email: userEmail,
+      name: userInfo.name,
+      company: userInfo.organization_name || null,
+      role: 'user',
+      lastLoginAt: new Date()
+    }
+  });
+}
+
+// データベースに統合情報を保存（userIdを使用）
+await prisma.integration.upsert({
+  where: {
+    userId_service: {
+      userId: userId,  // 動的に決定されたuserIdを使用
+      service: 'chatwork'
+    }
+  },
+  update: {
+    accessToken: tokenResponse.access_token,
+    refreshToken: tokenResponse.refresh_token || null,
+    isActive: true,
+    teamId: userInfo.organization_id?.toString() || 'unknown',
+    teamName: userInfo.organization_name || userInfo.name || 'ChatWork User',
+    updatedAt: new Date()
+  },
+  create: {
+    userId: userId,  // 動的に決定されたuserIdを使用
+    service: 'chatwork',
+    accessToken: tokenResponse.access_token,
+    refreshToken: tokenResponse.refresh_token || null,
+    isActive: true,
+    teamId: userInfo.organization_id?.toString() || 'unknown',
+    teamName: userInfo.organization_name || userInfo.name || 'ChatWork User'
+  }
+});
 
     console.log('✅ ChatWork統合完了');
 
