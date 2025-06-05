@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
-  console.log('=== ChatWork API テスト開始 ===');
+  console.log('=== ChatWork統合処理開始 ===');
   
   try {
     const apiToken = process.env.CHATWORK_API_TOKEN;
-    console.log('API Token確認:', apiToken ? '設定済み' : '未設定');
     
     // ChatWork API呼び出し
     console.log('ChatWork API呼び出し中...');
@@ -17,37 +17,57 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    console.log('API Response Status:', response.status);
-    console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('API Error Response:', errorText);
-      
-      return NextResponse.json({
-        error: 'ChatWork API Error',
-        status: response.status,
-        statusText: response.statusText,
-        responseBody: errorText
-      }, { status: 500 });
+      console.error('ChatWork API Error:', errorText);
+      return NextResponse.redirect(
+        new URL('/integrations?error=chatwork_api_error', request.url)
+      );
     }
 
     const userInfo = await response.json();
-    console.log('API Success:', userInfo);
-    
-    return NextResponse.json({
-      success: true,
-      message: 'ChatWork API接続成功',
-      userInfo: userInfo,
-      timestamp: new Date().toISOString()
+    console.log('ChatWork API成功:', userInfo.name);
+
+    // ChatWorkユーザーIDを使って固有のユーザーIDを生成
+    const chatworkUserId = `chatwork_${userInfo.account_id}`;
+
+    // データベースに統合情報を保存
+    console.log('データベース保存開始...');
+    await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: chatworkUserId,
+          service: 'chatwork'
+        }
+      },
+      update: {
+        accessToken: apiToken!,
+        isActive: true,
+        teamId: userInfo.organization_id?.toString() || 'unknown',
+        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User',
+        updatedAt: new Date()
+      },
+      create: {
+        userId: chatworkUserId,
+        service: 'chatwork',
+        accessToken: apiToken!,
+        isActive: true,
+        teamId: userInfo.organization_id?.toString() || 'unknown',
+        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User'
+      }
     });
 
+    console.log('ChatWork統合完了');
+    
+    // 成功時のリダイレクト
+    return NextResponse.redirect(
+      new URL(`/integrations?success=chatwork_connected&user=${encodeURIComponent(userInfo.name)}&service=ChatWork`, request.url)
+    );
+
   } catch (error) {
-    console.error('ChatWork API テストエラー:', error);
-    return NextResponse.json({
-      error: 'Exception occurred',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    }, { status: 500 });
+    console.error('ChatWork統合エラー:', error);
+    return NextResponse.redirect(
+      new URL(`/integrations?error=chatwork_integration_failed&message=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`, request.url)
+    );
   }
 }
