@@ -2,39 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const clientId = process.env.CHATWORK_CLIENT_ID;
-    const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/chatwork/callback`;
+    const apiToken = process.env.CHATWORK_API_TOKEN;
     
-    console.log('ChatWork OAuth開始:', { clientId: clientId ? '設定済み' : '未設定', redirectUri });
-    
-    if (!clientId) {
-      return NextResponse.json({ error: 'ChatWork client ID not configured' }, { status: 500 });
+    if (!apiToken) {
+      return NextResponse.json({ error: 'ChatWork API token not configured' }, { status: 500 });
     }
 
-    // セキュアなstate生成
-    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    console.log('ChatWork API接続テスト開始');
 
-    // ChatWork OAuth認証URL生成
-    const authUrl = new URL('https://oauth.chatwork.com/authorize');
-    authUrl.searchParams.append('client_id', clientId);
-    authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('redirect_uri', redirectUri);
-    authUrl.searchParams.append('scope', 'users.profile.me:read rooms.all:read');
-    authUrl.searchParams.append('state', state);
-
-    console.log('ChatWork認証URL生成完了:', authUrl.toString());
-
-    // フロントエンドにリダイレクトURLを返す
-    return NextResponse.json({
-      redirectUrl: authUrl.toString(),
-      message: 'ChatWork認証URLを生成しました'
+    // ChatWork APIでユーザー情報を取得
+    const response = await fetch('https://api.chatwork.com/v2/me', {
+      headers: {
+        'X-ChatWorkToken': apiToken
+      }
     });
 
+    if (!response.ok) {
+      throw new Error(`ChatWork API Error: ${response.status}`);
+    }
+
+    const userInfo = await response.json();
+    console.log('ChatWork API接続成功:', userInfo);
+    
+    // 統合ページに成功メッセージと共にリダイレクト
+    return NextResponse.redirect(
+      new URL(`/integrations?success=chatwork_connected&user=${encodeURIComponent(userInfo.name)}`, request.url)
+    );
+
   } catch (error) {
-    console.error('ChatWork OAuth開始エラー:', error);
-    return NextResponse.json(
-      { error: 'ChatWork認証の開始に失敗しました' },
-      { status: 500 }
+    console.error('ChatWork API接続エラー:', error);
+    return NextResponse.redirect(
+      new URL('/integrations?error=chatwork_connection_failed', request.url)
     );
   }
 }
