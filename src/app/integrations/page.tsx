@@ -51,20 +51,11 @@ const services: ServiceConfig[] = [
     isNextAuth: true,
   },
   {
-    id: 'zoom',
-    name: 'Zoom',
-    description: 'プロフェッショナル会議',
-    icon: '📱',
-    color: 'bg-blue-400',
-    authUrl: '/api/auth/zoom',
-    isNextAuth: false,
-  },
-  {
     id: 'chatwork',
     name: 'ChatWork',
     description: 'ビジネスチャット',
     icon: '💼',
-    color: 'bg-red-500',
+    color: 'bg-orange-500',
     authUrl: '/api/auth/chatwork',
     isNextAuth: false,
   },
@@ -89,12 +80,32 @@ export default function IntegrationsPage() {
     try {
       if (service.isNextAuth) {
         await signIn(service.id, { callbackUrl: '/integrations' })
+      } else if (service.id === 'chatwork') {
+        // ChatWork専用処理
+        const response = await fetch('/api/auth/chatwork', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.redirectUrl) {
+            // ChatWork認証画面に遷移
+            window.location.href = data.redirectUrl;
+            return; // ここで処理を終了
+          } else {
+            throw new Error('リダイレクトURLが取得できませんでした');
+          }
+        } else {
+          throw new Error('ChatWork認証開始に失敗しました');
+        }
       } else {
         window.location.href = service.authUrl
       }
     } catch (error) {
       console.error(`${service.name}認証エラー:`, error)
       setConnecting(null)
+      alert(`${service.name}の認証に失敗しました。再度お試しください。`)
     }
   }
 
@@ -103,10 +114,10 @@ export default function IntegrationsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-            🚀 LinkSense MVP - サービス統合管理
+            LinkSense MVP - サービス統合管理
           </h1>
           <p className="mt-4 text-xl text-gray-600">
-            7つのサービスを統合してコミュニケーションを効率化
+            6つのサービスを統合してコミュニケーションを効率化
           </p>
           <div className="mt-2 text-sm text-gray-500">
             環境: {process.env.NODE_ENV || 'development'} | 
@@ -164,7 +175,7 @@ export default function IntegrationsPage() {
         {session && (
           <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-4">
             <h3 className="text-lg font-medium text-green-800 mb-2">
-              ✅ 認証済みユーザー
+              認証済みユーザー
             </h3>
             <p className="text-green-700">
               ユーザー: {session.user?.name || session.user?.email}
@@ -178,7 +189,7 @@ export default function IntegrationsPage() {
         {/* 本番環境情報 */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="text-lg font-medium text-blue-800 mb-2">
-            🌐 本番環境情報
+            本番環境情報
           </h3>
           <div className="text-blue-700 text-sm space-y-1">
             <p>NEXTAUTH_URL: {process.env.NEXTAUTH_URL || '未設定'}</p>
