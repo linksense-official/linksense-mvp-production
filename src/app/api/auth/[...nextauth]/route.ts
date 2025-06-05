@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth'
+import NextAuth, { AuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import SlackProvider from 'next-auth/providers/slack'
 import DiscordProvider from 'next-auth/providers/discord'
@@ -8,7 +8,7 @@ console.log('🚀 LinkSense MVP - 本番環境OAuth統合版（7サービス）'
 console.log('🌐 NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
 console.log('🔧 Environment:', process.env.NODE_ENV)
 
-const handler = NextAuth({
+export const authOptions: AuthOptions = {
   providers: [
     // Google OAuth (Google Meet統合も兼用)
     GoogleProvider({
@@ -90,22 +90,22 @@ const handler = NextAuth({
     },
     
     async session({ session, token }) {
-  console.log('📱 セッション確立:', {
-    user: session.user?.email,
-    provider: token.provider
-  })
-  
-  // セッションに追加情報を含める（型安全な方法）
-  const extendedSession = {
-    ...session,
-    ...(token.provider && {
-      provider: token.provider as string,
-      providerAccountId: token.providerAccountId as string
-    })
-  }
-  
-  return extendedSession
-},
+      console.log('📱 セッション確立:', {
+        user: session.user?.email,
+        provider: token.provider
+      })
+      
+      // セッションに追加情報を含める（型安全な方法）
+      const extendedSession = {
+        ...session,
+        ...(token.provider && {
+          provider: token.provider as string,
+          providerAccountId: token.providerAccountId as string
+        })
+      }
+      
+      return extendedSession
+    },
   },
   
   pages: {
@@ -114,30 +114,32 @@ const handler = NextAuth({
   },
   
   session: {
-    strategy: 'jwt',
+    strategy: 'jwt' as const,
     maxAge: 30 * 24 * 60 * 60, // 30日
   },
   
   logger: {
-    error(code, metadata) {
+    error(code: any, metadata: any) {
       console.error('🚨 NextAuth ERROR:', { 
         code, 
         metadata, 
         timestamp: new Date().toISOString() 
       })
     },
-    warn(code) {
+    warn(code: any) {
       console.warn('⚠️ NextAuth WARNING:', { 
         code, 
         timestamp: new Date().toISOString() 
       })
     },
-    debug(code, metadata) {
+    debug(code: any, metadata: any) {
       if (process.env.NODE_ENV === 'development') {
         console.log('🔧 NextAuth DEBUG:', { code, metadata })
       }
     },
   },
-})
+}
+
+const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST }
