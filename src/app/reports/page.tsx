@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { RefreshCw, Info, Download, Share2, AlertTriangle, Settings } from 'lucide-react';
+import { RefreshCw, Info, Download, Share2, AlertTriangle, Settings, TrendingUp, TrendingDown, BarChart3, Users, Activity, Target } from 'lucide-react';
 
 // UIコンポーネント
 const Alert: React.FC<{ 
@@ -54,7 +54,7 @@ const Button: React.FC<{
   );
 };
 
-// レポート型定義（実データ対応）
+// レポート型定義
 interface TeamHealthReport {
   id: string;
   teamName: string;
@@ -80,7 +80,6 @@ interface TeamHealthReport {
   lastSyncTime?: Date;
 }
 
-// レポートサマリー型定義
 interface ReportSummary {
   totalTeams: number;
   averageHealthScore: number;
@@ -91,7 +90,6 @@ interface ReportSummary {
   dataCompleteness: number;
 }
 
-// データソース情報型定義
 interface DataSourceInfo {
   isRealData: boolean;
   source: string;
@@ -100,19 +98,11 @@ interface DataSourceInfo {
   recordCount: number;
 }
 
-// フィルター状態型定義
-interface ReportFilterState {
-  period: string;
-  team: string;
-  metric: string;
-  sortBy: string;
-}
-
-// 実データレポート生成サービス（修正版）
+// 統合データレポート生成サービス
 class RealDataReportsService {
   static async fetchRealReports(): Promise<{ reportsData: { reports: TeamHealthReport[], summary: ReportSummary } | null, dataSourceInfo: DataSourceInfo }> {
     try {
-      console.log('📊 統合データからレポート生成開始...');
+      console.log('統合データからレポート生成開始...');
 
       // 統合情報取得
       const integrationsResponse = await fetch('/api/integrations/user');
@@ -120,9 +110,9 @@ class RealDataReportsService {
       
       if (integrationsResponse.ok) {
         integrationsData = await integrationsResponse.json();
-        console.log('✅ 統合情報取得成功:', integrationsData?.integrations?.length || 0, '件');
+        console.log('統合情報取得成功:', integrationsData?.integrations?.length || 0, '件');
       } else {
-        console.log('⚠️ 統合情報取得失敗:', integrationsResponse.status);
+        console.log('統合情報取得失敗:', integrationsResponse.status);
       }
 
       // 統合データ取得試行
@@ -137,20 +127,12 @@ class RealDataReportsService {
       if (messagesResponse.status === 'fulfilled' && messagesResponse.value.ok) {
         messagesData = await messagesResponse.value.json();
       }
-
       if (meetingsResponse.status === 'fulfilled' && meetingsResponse.value.ok) {
         meetingsData = await meetingsResponse.value.json();
       }
 
       const integrations = integrationsData?.integrations || [];
       const connectedServices = integrations.filter((i: any) => i.isActive).length;
-
-      console.log('📊 データ取得状況:', {
-        integrations: integrations.length,
-        connectedServices,
-        messages: messagesData?.data?.length || 0,
-        meetings: meetingsData?.data?.length || 0
-      });
 
       // データがある場合はレポート生成
       if (connectedServices > 0) {
@@ -185,7 +167,7 @@ class RealDataReportsService {
       };
 
     } catch (error) {
-      console.error('❌ レポート生成エラー:', error);
+      console.error('レポート生成エラー:', error);
       return {
         reportsData: null,
         dataSourceInfo: {
@@ -208,12 +190,6 @@ class RealDataReportsService {
     const messages = messagesData?.data || [];
     const meetings = meetingsData?.data || [];
     const connectedServices = integrations.filter(i => i.isActive).length;
-    
-    console.log('📊 レポート生成:', {
-      connectedServices,
-      messages: messages.length,
-      meetings: meetings.length
-    });
 
     // 接続済みサービスに基づいてチーム生成
     const teams = this.generateTeamsFromIntegrations(integrations);
@@ -224,13 +200,13 @@ class RealDataReportsService {
       const currentScore = Math.max(40, Math.min(95, baseScore + (Math.random() - 0.5) * 15));
       const previousScore = Math.max(40, Math.min(95, currentScore + (Math.random() - 0.5) * 20));
       
-      // メトリクス生成（統合データベース）
+      // メトリクス生成
       const metrics = this.generateMetricsFromData(currentScore, messages, meetings);
       
       // トレンド分析
       const trends = this.analyzeTrends(metrics, currentScore, previousScore);
       
-      // 推奨事項生成（統合データベース）
+      // 推奨事項生成
       const recommendations = this.generateDataBasedRecommendations(
         teamName, 
         metrics, 
@@ -363,7 +339,7 @@ class RealDataReportsService {
   }
 }
 
-// APIサービス関数（修正版）
+// APIサービス関数
 class ReportService {
   static async fetchReports(): Promise<{ reportsData: { reports: TeamHealthReport[], summary: ReportSummary } | null, dataSourceInfo: DataSourceInfo }> {
     return await RealDataReportsService.fetchRealReports();
@@ -391,11 +367,11 @@ const formatTimeAgo = (timestamp: Date): string => {
 const getScoreChange = (current: number, previous: number) => {
   const change = current - previous;
   if (change > 0) {
-    return { value: `+${change}`, color: 'text-green-600', icon: '↗️' };
+    return { value: `+${change}`, color: 'text-green-600', icon: TrendingUp };
   } else if (change < 0) {
-    return { value: `${change}`, color: 'text-red-600', icon: '↘️' };
+    return { value: `${change}`, color: 'text-red-600', icon: TrendingDown };
   } else {
-    return { value: '±0', color: 'text-gray-600', icon: '→' };
+    return { value: '±0', color: 'text-gray-600', icon: Activity };
   }
 };
 
@@ -417,28 +393,28 @@ const DataSourceIndicator: React.FC<DataSourceIndicatorProps> = ({ dataSourceInf
     if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'connected' && dataSourceInfo.recordCount > 0) {
       return {
         color: 'bg-green-100 text-green-800 border-green-200',
-        icon: '✅',
+        icon: 'connected',
         text: '統合データに接続済み',
         description: `${dataSourceInfo.recordCount}件のレポートを生成しました`
       };
     } else if (dataSourceInfo.isRealData && dataSourceInfo.connectionStatus === 'connected' && dataSourceInfo.recordCount === 0) {
       return {
         color: 'bg-blue-100 text-blue-800 border-blue-200',
-        icon: 'ℹ️',
+        icon: 'info',
         text: '統合データ接続済み（レポートなし）',
         description: 'サービス接続後にレポートが生成されます'
       };
     } else if (dataSourceInfo.connectionStatus === 'error') {
       return {
         color: 'bg-red-100 text-red-800 border-red-200',
-        icon: '❌',
+        icon: 'error',
         text: 'データ取得エラー',
         description: 'データ取得に失敗しました'
       };
     } else {
       return {
         color: 'bg-gray-100 text-gray-800 border-gray-200',
-        icon: '📋',
+        icon: 'info',
         text: 'データ準備中',
         description: '統合データの準備中です'
       };
@@ -451,7 +427,6 @@ const DataSourceIndicator: React.FC<DataSourceIndicatorProps> = ({ dataSourceInf
     <Alert className={config.color}>
       <Info className="h-4 w-4" />
       <AlertTitle className="flex items-center gap-2">
-        <span>{config.icon}</span>
         {config.text}
       </AlertTitle>
       <AlertDescription>
@@ -471,16 +446,17 @@ interface ReportCardProps {
 const ReportCard: React.FC<ReportCardProps> = ({ report, onViewDetails, index }) => {
   const scoreChange = getScoreChange(report.healthScore, report.previousScore);
   const scoreColorClass = getScoreColor(report.healthScore);
+  const ChangeIcon = scoreChange.icon;
 
   return (
     <div 
-      className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:-translate-y-1 ring-1 ring-green-200"
+      className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:-translate-y-1 ring-1 ring-green-200"
       onClick={() => onViewDetails(report)}
     >
       {/* データソースバッジ */}
       <div className="flex items-center justify-between mb-2">
         <div className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          🔗 統合データ
+          統合データ
         </div>
         <div className="text-xs text-gray-500">
           {report.dataSource.toUpperCase()}
@@ -488,50 +464,51 @@ const ReportCard: React.FC<ReportCardProps> = ({ report, onViewDetails, index })
       </div>
 
       {/* ヘッダー */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div>
-          <h3 className="text-xl font-bold text-gray-900">{report.teamName}</h3>
-          <p className="text-sm text-gray-600">{report.period} | {formatTimeAgo(report.lastUpdated)}</p>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">{report.teamName}</h3>
+          <p className="text-xs sm:text-sm text-gray-600">{report.period} | {formatTimeAgo(report.lastUpdated)}</p>
         </div>
-        <div className="text-right">
-          <div className={`text-3xl font-bold px-4 py-2 rounded-lg ${scoreColorClass}`}>
+        <div className="text-center sm:text-right">
+          <div className={`text-2xl sm:text-3xl font-bold px-3 sm:px-4 py-2 rounded-lg ${scoreColorClass}`}>
             {report.healthScore}
           </div>
-          <div className={`text-sm font-medium mt-1 ${scoreChange.color}`}>
-            {scoreChange.icon} {scoreChange.value}
+          <div className={`text-xs sm:text-sm font-medium mt-1 flex items-center justify-center sm:justify-end gap-1 ${scoreChange.color}`}>
+            <ChangeIcon className="h-3 w-3" />
+            {scoreChange.value}
           </div>
         </div>
       </div>
 
       {/* メトリクス概要 */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">
         <div className="text-center p-2 bg-gray-50 rounded">
           <div className="text-xs text-gray-600">コミュニケーション</div>
-          <div className={`font-bold ${getScoreColor(report.metrics.communication).split(' ')[0]}`}>
+          <div className={`font-bold text-sm ${getScoreColor(report.metrics.communication).split(' ')[0]}`}>
             {report.metrics.communication}
           </div>
         </div>
         <div className="text-center p-2 bg-gray-50 rounded">
           <div className="text-xs text-gray-600">生産性</div>
-          <div className={`font-bold ${getScoreColor(report.metrics.productivity).split(' ')[0]}`}>
+          <div className={`font-bold text-sm ${getScoreColor(report.metrics.productivity).split(' ')[0]}`}>
             {report.metrics.productivity}
           </div>
         </div>
         <div className="text-center p-2 bg-gray-50 rounded">
           <div className="text-xs text-gray-600">満足度</div>
-          <div className={`font-bold ${getScoreColor(report.metrics.satisfaction).split(' ')[0]}`}>
+          <div className={`font-bold text-sm ${getScoreColor(report.metrics.satisfaction).split(' ')[0]}`}>
             {report.metrics.satisfaction}
           </div>
         </div>
         <div className="text-center p-2 bg-gray-50 rounded">
           <div className="text-xs text-gray-600">ワークライフ</div>
-          <div className={`font-bold ${getScoreColor(report.metrics.workLifeBalance).split(' ')[0]}`}>
+          <div className={`font-bold text-sm ${getScoreColor(report.metrics.workLifeBalance).split(' ')[0]}`}>
             {report.metrics.workLifeBalance}
           </div>
         </div>
-        <div className="text-center p-2 bg-gray-50 rounded">
+        <div className="text-center p-2 bg-gray-50 rounded col-span-2 sm:col-span-1">
           <div className="text-xs text-gray-600">コラボレーション</div>
-          <div className={`font-bold ${getScoreColor(report.metrics.collaboration).split(' ')[0]}`}>
+          <div className={`font-bold text-sm ${getScoreColor(report.metrics.collaboration).split(' ')[0]}`}>
             {report.metrics.collaboration}
           </div>
         </div>
@@ -539,9 +516,9 @@ const ReportCard: React.FC<ReportCardProps> = ({ report, onViewDetails, index })
 
       {/* 統合データメトリクス表示 */}
       <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
           <span className="text-green-700 font-medium">統合データ分析:</span>
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap gap-3">
             <span className="text-green-600">健全性: {report.healthScore}</span>
             <span className="text-green-600">データ品質: 95%</span>
             {report.lastSyncTime && (
@@ -554,22 +531,24 @@ const ReportCard: React.FC<ReportCardProps> = ({ report, onViewDetails, index })
       {/* 推奨事項プレビュー */}
       <div className="mb-4">
         <h5 className="text-sm font-medium text-gray-700 mb-2">主な推奨事項</h5>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 line-clamp-2">
           {report.recommendations[0]}
         </p>
       </div>
 
       {/* アクションボタン */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {report.trends.improving.length > 0 && (
-            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-              📈 {report.trends.improving.length}項目改善
+            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+              <TrendingUp className="h-3 w-3" />
+              {report.trends.improving.length}項目改善
             </span>
           )}
           {report.trends.declining.length > 0 && (
-            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
-              📉 {report.trends.declining.length}項目悪化
+            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full flex items-center gap-1">
+              <TrendingDown className="h-3 w-3" />
+              {report.trends.declining.length}項目悪化
             </span>
           )}
         </div>
@@ -578,7 +557,7 @@ const ReportCard: React.FC<ReportCardProps> = ({ report, onViewDetails, index })
             e.stopPropagation();
             onViewDetails(report);
           }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium w-full sm:w-auto"
         >
           詳細を見る
         </button>
@@ -587,7 +566,7 @@ const ReportCard: React.FC<ReportCardProps> = ({ report, onViewDetails, index })
   );
 };
 
-// メインコンポーネント（レポートページ）
+// メインコンポーネント
 export default function ReportsPage() {
   const { data: session, status } = useSession();
   
@@ -672,7 +651,7 @@ export default function ReportsPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">レポートデータを読み込み中...</p>
@@ -684,14 +663,14 @@ export default function ReportsPage() {
 
   if (status === 'unauthenticated') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">認証が必要です</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">認証が必要です</h1>
           <p className="text-gray-600 mb-8">レポート機能にはログインが必要です</p>
           <Button onClick={() => window.location.href = '/login'}>
             ログイン
           </Button>
-        </div>
+           </div>
       </div>
     );
   }
@@ -699,17 +678,17 @@ export default function ReportsPage() {
   // データが0の場合の表示
   if (!data && dataSourceInfo) {
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* ヘッダー */}
-          <div className="flex justify-between items-start mb-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6 sm:mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">チーム健全性レポート</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">チーム健全性レポート</h1>
               <p className="text-gray-600">統合データに基づく詳細な健全性分析とトレンドレポート</p>
             </div>
-            <Button onClick={handleRefresh} disabled={refreshing}>
+            <Button onClick={handleRefresh} disabled={refreshing} className="w-full sm:w-auto">
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              更新
+              <span className="ml-2">更新</span>
             </Button>
           </div>
 
@@ -717,24 +696,26 @@ export default function ReportsPage() {
           <DataSourceIndicator dataSourceInfo={dataSourceInfo} />
 
           {/* 空状態表示 */}
-          <div className="text-center py-16">
-            <div className="text-6xl text-gray-400 mb-6">📊</div>
-            <h3 className="text-2xl font-semibold text-gray-900 mb-4">
-              レポートデータがありません
-            </h3>
-            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-              チーム健全性レポートを生成するには、まずコミュニケーションサービスを接続してください。
-              サービス接続後、チームの活動データが蓄積されるとレポートが自動生成されます。
-            </p>
-            <div className="space-y-4">
-              <Button onClick={() => window.location.href = '/integrations'} className="flex items-center gap-2 mx-auto">
-                <Settings className="h-4 w-4" />
-                サービスを接続
-              </Button>
-              <Button variant="outline" onClick={handleRefresh} disabled={refreshing} className="flex items-center gap-2 mx-auto">
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                データを再確認
-              </Button>
+          <div className="text-center py-12 sm:py-16">
+            <div className="max-w-md mx-auto">
+              <BarChart3 className="mx-auto h-16 sm:h-24 w-16 sm:w-24 text-gray-400 mb-4 sm:mb-6" />
+              <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4">
+                レポートデータがありません
+              </h3>
+              <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8">
+                チーム健全性レポートを生成するには、まずコミュニケーションサービスを接続してください。
+                サービス接続後、チームの活動データが蓄積されるとレポートが自動生成されます。
+              </p>
+              <div className="space-y-3 sm:space-y-4">
+                <Button onClick={() => window.location.href = '/integrations'} className="flex items-center gap-2 w-full sm:w-auto mx-auto">
+                  <Settings className="h-4 w-4" />
+                  サービスを接続
+                </Button>
+                <Button variant="outline" onClick={handleRefresh} disabled={refreshing} className="flex items-center gap-2 w-full sm:w-auto mx-auto">
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  データを再確認
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -744,25 +725,25 @@ export default function ReportsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6 space-y-6 pb-16">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6 pb-16">
         {/* データソースインジケーター */}
         {dataSourceInfo && <DataSourceIndicator dataSourceInfo={dataSourceInfo} />}
 
         {/* ページヘッダー */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">チーム健全性レポート</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">チーム健全性レポート</h1>
               <p className="text-gray-600 mt-1">
                 統合データに基づく詳細な健全性分析とトレンドレポート
               </p>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button onClick={handleRefresh} disabled={refreshing}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+              <Button onClick={handleRefresh} disabled={refreshing} className="w-full sm:w-auto">
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                更新
+                <span className="ml-2">更新</span>
               </Button>
-              <Button onClick={handleExportReport} disabled={!data}>
+              <Button onClick={handleExportReport} disabled={!data} className="w-full sm:w-auto">
                 <Download className="h-4 w-4 mr-2" />
                 レポート出力
               </Button>
@@ -772,65 +753,65 @@ export default function ReportsPage() {
 
         {/* サマリーカード */}
         {data && data.summary && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">👥</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-8 sm:w-10 h-8 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Users className="h-4 sm:h-5 w-4 sm:w-5 text-blue-600" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-600">総チーム数</div>
-                  <div className="text-2xl font-bold text-blue-600">{data.summary.totalTeams}</div>
+                  <div className="text-xs sm:text-sm font-medium text-gray-600">総チーム数</div>
+                  <div className="text-lg sm:text-2xl font-bold text-blue-600">{data.summary.totalTeams}</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">📊</span>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-8 sm:w-10 h-8 sm:h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                  <BarChart3 className="h-4 sm:h-5 w-4 sm:w-5 text-purple-600" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-600">平均健全性スコア</div>
-                  <div className={`text-2xl font-bold ${getScoreColor(data.summary.averageHealthScore).split(' ')[0]}`}>
+                  <div className="text-xs sm:text-sm font-medium text-gray-600">平均健全性スコア</div>
+                  <div className={`text-lg sm:text-2xl font-bold ${getScoreColor(data.summary.averageHealthScore).split(' ')[0]}`}>
                     {data.summary.averageHealthScore}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">📈</span>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-8 sm:w-10 h-8 sm:h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-4 sm:h-5 w-4 sm:w-5 text-green-600" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-600">改善中チーム</div>
-                  <div className="text-2xl font-bold text-green-600">{data.summary.teamsImproving}</div>
+                  <div className="text-xs sm:text-sm font-medium text-gray-600">改善中チーム</div>
+                  <div className="text-lg sm:text-2xl font-bold text-green-600">{data.summary.teamsImproving}</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">📉</span>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-8 sm:w-10 h-8 sm:h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <TrendingDown className="h-4 sm:h-5 w-4 sm:w-5 text-red-600" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-600">悪化中チーム</div>
-                  <div className="text-2xl font-bold text-red-600">{data.summary.teamsDeclining}</div>
+                  <div className="text-xs sm:text-sm font-medium text-gray-600">悪化中チーム</div>
+                  <div className="text-lg sm:text-2xl font-bold text-red-600">{data.summary.teamsDeclining}</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg">⚠️</span>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 col-span-2 sm:col-span-1">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-8 sm:w-10 h-8 sm:h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="h-4 sm:h-5 w-4 sm:w-5 text-orange-600" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-gray-600">要注意チーム</div>
-                  <div className="text-2xl font-bold text-orange-600">{data.summary.criticalIssues}</div>
+                  <div className="text-xs sm:text-sm font-medium text-gray-600">要注意チーム</div>
+                  <div className="text-lg sm:text-2xl font-bold text-orange-600">{data.summary.criticalIssues}</div>
                 </div>
               </div>
             </div>
@@ -838,9 +819,9 @@ export default function ReportsPage() {
         )}
 
         {/* レポート一覧 */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
               チームレポート一覧 ({data ? data.reports.length : 0}件)
             </h2>
             <div className="text-sm text-gray-500">
@@ -849,7 +830,7 @@ export default function ReportsPage() {
           </div>
 
           {data && data.reports.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {data.reports.map((report, index) => (
                 <ReportCard
                   key={report.id}
@@ -860,8 +841,10 @@ export default function ReportsPage() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-              <div className="text-4xl text-gray-300 mb-4">📋</div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
+              <div className="text-3xl sm:text-4xl text-gray-300 mb-4">
+                <BarChart3 className="mx-auto h-12 w-12" />
+              </div>
               <p className="text-gray-500 mb-4">レポートデータがありません</p>
               <Button onClick={() => window.location.href = '/integrations'}>
                 サービスを接続してレポート生成を開始
@@ -884,14 +867,14 @@ export default function ReportsPage() {
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[95vh] overflow-hidden">
               {/* モーダルヘッダー */}
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-4 flex-shrink-0">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 sm:px-6 py-4 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold">{selectedReport.teamName} 詳細レポート</h2>
-                    <p className="text-blue-100">
+                    <h2 className="text-xl sm:text-2xl font-bold">{selectedReport.teamName} 詳細レポート</h2>
+                    <p className="text-blue-100 text-sm sm:text-base">
                       {selectedReport.period} | {formatTimeAgo(selectedReport.lastUpdated)}
                       <span className="ml-2 px-2 py-1 bg-green-500 bg-opacity-30 rounded-full text-xs">
-                        🔗 統合データ
+                        統合データ
                       </span>
                     </p>
                   </div>
@@ -908,14 +891,14 @@ export default function ReportsPage() {
 
               {/* モーダルコンテンツ（スクロール可能エリア） */}
               <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 140px)' }}>
-                <div className="p-6 pb-8">
-                  <div className="space-y-6">
+                <div className="p-4 sm:p-6 pb-8">
+                  <div className="space-y-4 sm:space-y-6">
                     {/* 健全性スコア */}
-                    <div className="bg-gray-50 rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold text-gray-900">総合健全性スコア</h3>
-                        <div className="text-right">
-                          <div className={`text-4xl font-bold px-6 py-3 rounded-lg ${getScoreColor(selectedReport.healthScore)}`}>
+                    <div className="bg-gray-50 rounded-lg p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                        <h3 className="text-lg sm:text-xl font-bold text-gray-900">総合健全性スコア</h3>
+                        <div className="text-center sm:text-right">
+                          <div className={`text-3xl sm:text-4xl font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-lg ${getScoreColor(selectedReport.healthScore)}`}>
                             {selectedReport.healthScore}
                           </div>
                           <div className={`text-sm font-medium mt-2 ${getScoreChange(selectedReport.healthScore, selectedReport.previousScore).color}`}>
@@ -935,7 +918,7 @@ export default function ReportsPage() {
                         </p>
                         <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                           <div className="flex items-center text-green-800 text-sm">
-                            <span className="mr-2">🔗</span>
+                            <Target className="h-4 w-4 mr-2" />
                             このスコアは統合データに基づいて算出されています
                           </div>
                         </div>
@@ -943,9 +926,9 @@ export default function ReportsPage() {
                     </div>
 
                     {/* メトリクス詳細 */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">{selectedReport.teamName} - 詳細メトリクス</h4>
-                      <div className="space-y-4">
+                    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
+                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">{selectedReport.teamName} - 詳細メトリクス</h4>
+                      <div className="space-y-3 sm:space-y-4">
                         {Object.entries(selectedReport.metrics).map(([key, value]) => {
                           const metricLabels: { [key: string]: string } = {
                             communication: 'コミュニケーション',
@@ -980,8 +963,8 @@ export default function ReportsPage() {
                     </div>
 
                     {/* 推奨事項 */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
+                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
                         推奨改善施策
                         <span className="ml-2 text-sm font-normal text-green-600">
                           (統合データ分析に基づく)
@@ -1006,17 +989,17 @@ export default function ReportsPage() {
               </div>
 
               {/* モーダルフッター（固定） */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
+              <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button onClick={handleExportReport} className="text-sm">
+                    <Button onClick={handleExportReport} className="text-sm w-full sm:w-auto">
                       <Download className="w-4 h-4 mr-2" />
                       詳細レポート出力
                     </Button>
                   </div>
                   <button
                     onClick={() => setIsDetailModalOpen(false)}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors w-full sm:w-auto"
                   >
                     閉じる
                   </button>

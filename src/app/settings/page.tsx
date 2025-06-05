@@ -344,7 +344,6 @@ const useLanguage = () => {
   return context;
 };
 
-
 // 統合ページで使用する型定義
 interface Integration {
   id: string;
@@ -386,7 +385,7 @@ const showNotification = (message: string, type: 'success' | 'error' | 'warning'
   }
   
   // コンソールログ
-  console.log(`🔔 通知: ${message} (${type})`);
+  console.log(`通知: ${message} (${type})`);
   
   // カスタムイベントでUIに通知
   window.dispatchEvent(new CustomEvent('settings-notification', {
@@ -525,6 +524,7 @@ const SettingsPageContent: React.FC = () => {
   // 統合ページ関連のstate
   const [integrationsState, setIntegrationsState] = useState<Integration[]>(integrations);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  
   // 言語変更ハンドラーを追加
   const handleLanguageChange = (newLanguage: 'ja' | 'en') => {
     setLanguage(newLanguage);
@@ -538,11 +538,11 @@ const SettingsPageContent: React.FC = () => {
   useEffect(() => {
     const initializeIntegrations = async () => {
       try {
-        console.log('🚀 統合管理システムの初期化を開始...');
+        console.log('統合管理システムの初期化を開始...');
         console.log('integrationManager:', integrationManager);
         
         console.log('SlackIntegration クラス登録確認...');
-        console.log('🔷 TeamsIntegration クラス登録確認...');
+        console.log('TeamsIntegration クラス登録確認...');
         
         // 統合サービス定義を統合管理システム用の形式に変換
         const integrationConfigs = integrations.map(integration => ({
@@ -577,11 +577,11 @@ const SettingsPageContent: React.FC = () => {
         
         console.log('初期化後の統合リスト:', integrationManager.integrations);
         console.log('Slack統合確認:', integrationManager.integrations.get('slack'));
-        console.log('🔷 Teams統合確認:', integrationManager.integrations.get('microsoft-teams'));
+        console.log('Teams統合確認:', integrationManager.integrations.get('microsoft-teams'));
         
-        console.log('✅ 統合管理システムの初期化が完了しました');
+        console.log('統合管理システムの初期化が完了しました');
       } catch (error) {
-        console.error('❌ 統合管理システム初期化エラー:', error);
+        console.error('統合管理システム初期化エラー:', error);
         console.error('エラー詳細:', error instanceof Error ? error.message : String(error));
       }
     };
@@ -593,7 +593,7 @@ const SettingsPageContent: React.FC = () => {
   useEffect(() => {
     const updateIntegrationStates = async () => {
       try {
-        console.log('🔄 統合状態の更新を開始...');
+        console.log('統合状態の更新を開始...');
         
         const registeredIntegrations = integrationManager.integrations;
         
@@ -601,7 +601,7 @@ const SettingsPageContent: React.FC = () => {
           prev.map(integration => {
             const registered = registeredIntegrations.get(integration.id);
             if (registered) {
-              console.log(`📊 ${integration.name} ステータス:`, registered.status);
+              console.log(`${integration.name} ステータス:`, registered.status);
               return {
                 ...integration,
                 isConnected: registered.status === 'connected',
@@ -635,7 +635,7 @@ const SettingsPageContent: React.FC = () => {
     const organization = urlParams.get('organization');
 
     if (success === 'slack_connected' && teamName) {
-      console.log('✅ Slack接続成功を検出:', teamName);
+      console.log('Slack接続成功を検出:', teamName);
       
       setIntegrationsState(prev => 
         prev.map(i => 
@@ -662,7 +662,7 @@ const SettingsPageContent: React.FC = () => {
     } 
     else if (success === 'teams_connected') {
       const displayName = userName || organization || '不明';
-      console.log('✅ Teams接続成功を検出:', displayName);
+      console.log('Teams接続成功を検出:', displayName);
       
       setIntegrationsState(prev => 
         prev.map(i => 
@@ -706,9 +706,9 @@ const SettingsPageContent: React.FC = () => {
     }
 
     const tab = urlParams.get('tab');
-if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].includes(tab)) {
-  setActiveTab(tab as typeof activeTab);
-}
+    if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].includes(tab)) {
+      setActiveTab(tab as typeof activeTab);
+    }
   }, []);
 
   // 設定データの初期化
@@ -755,7 +755,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
           return;
         }
         else if (integrationId === 'microsoft-teams') {
-          console.log('🔷 Teams OAuth フローを開始...');
+          console.log('Teams OAuth フローを開始...');
           window.location.href = integration.setupUrl;
           return;
         }
@@ -902,7 +902,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     if (!integration) return;
 
     try {
-      console.log(`🔄 実際の同期を開始: ${integration.name}`);
+      console.log(`実際の同期を開始: ${integration.name}`);
       
       setIntegrationsState(prev => 
         prev.map(i => 
@@ -918,12 +918,12 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
       });
 
       if (integrationId === 'slack') {
-        console.log('🔗 Slack統合管理システム同期実行...');
+        console.log('Slack統合管理システム同期実行...');
         
         const syncResult = await integrationManager.sync('slack');
         
         if (syncResult) {
-          console.log('✅ Slack同期結果:', syncResult);
+          console.log('Slack同期結果:', syncResult);
           
           const analytics = (syncResult as any).analytics;
           let healthScore = 85;
@@ -931,12 +931,12 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
           
           if (analytics) {
             healthScore = analytics.healthScore || 85;
-            console.log('📊 分析データの取得に成功:', analytics);
+            console.log('分析データの取得に成功:', analytics);
           } else {
             const analyticsFromManager = await integrationManager.getAnalytics('slack');
             if (analyticsFromManager) {
               healthScore = analyticsFromManager.healthScore || 85;
-              console.log('📊 統合マネージャーから分析データを取得:', analyticsFromManager);
+              console.log('統合マネージャーから分析データを取得:', analyticsFromManager);
             }
           }
           
@@ -969,12 +969,12 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
         }
       }
       else if (integrationId === 'microsoft-teams') {
-        console.log('🔷 Teams統合管理システム同期実行...');
+        console.log('Teams統合管理システム同期実行...');
         
         const syncResult = await integrationManager.sync('microsoft-teams');
         
         if (syncResult) {
-          console.log('✅ Teams同期結果:', syncResult);
+          console.log('Teams同期結果:', syncResult);
           
           const analytics = (syncResult as any).analytics;
           let healthScore = 82;
@@ -982,12 +982,12 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
           
           if (analytics) {
             healthScore = analytics.healthScore || 82;
-            console.log('📊 Teams分析データの取得に成功:', analytics);
+            console.log('Teams分析データの取得に成功:', analytics);
           } else {
             const analyticsFromManager = await integrationManager.getAnalytics('microsoft-teams');
             if (analyticsFromManager) {
               healthScore = analyticsFromManager.healthScore || 82;
-              console.log('📊 統合マネージャーからTeams分析データを取得:', analyticsFromManager);
+              console.log('統合マネージャーからTeams分析データを取得:', analyticsFromManager);
             }
           }
           
@@ -1020,7 +1020,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
         }
       }
       else {
-        console.log(`🔄 モック同期: ${integration.name}`);
+        console.log(`モック同期: ${integration.name}`);
         
         await new Promise(resolve => setTimeout(resolve, 3000));
         
@@ -1058,7 +1058,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
       }
       
     } catch (error) {
-      console.error(`❌ ${integration.name} 同期エラー:`, error);
+      console.error(`${integration.name} 同期エラー:`, error);
       
       setIntegrationsState(prev => 
         prev.map(i => 
@@ -1079,7 +1079,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     }
   };
 
-  // 🔧 通知設定の変更（実際の機能動作実装）
+  // 通知設定の変更（実際の機能動作実装）
   const handleNotificationChange = (key: keyof NotificationSettings, value: boolean) => {
     if (settings) {
       setSettings({
@@ -1090,8 +1090,8 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
         }
       });
       
-      // 🔧 実際の機能動作実装
-      console.log(`🔔 通知設定変更: ${key} = ${value}`);
+      // 実際の機能動作実装
+      console.log(`通知設定変更: ${key} = ${value}`);
       
       // 実際の通知設定APIを呼び出し
       if (key === 'pushNotifications' && value) {
@@ -1103,7 +1103,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
               // Service Worker登録（実際のプッシュ通知実装）
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/sw.js').then(registration => {
-                  console.log('🔔 Service Worker登録成功:', registration);
+                  console.log('Service Worker登録成功:', registration);
                 }).catch(error => {
                   console.error('Service Worker登録失敗:', error);
                 });
@@ -1230,7 +1230,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     }
   };
 
-  // 🔧 プライバシー設定の変更（実際の機能動作実装）
+  // プライバシー設定の変更（実際の機能動作実装）
   const handlePrivacyChange = (key: keyof PrivacySettings, value: boolean) => {
     if (settings) {
       setSettings({
@@ -1241,8 +1241,8 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
         }
       });
       
-      // 🔧 実際の機能動作実装
-      console.log(`🔒 プライバシー設定変更: ${key} = ${value}`);
+      // 実際の機能動作実装
+      console.log(`プライバシー設定変更: ${key} = ${value}`);
       
       if (key === 'shareAnalytics') {
         // 分析データ共有設定API呼び出し
@@ -1384,7 +1384,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     }
   };
 
-  // 🔧 一般設定の変更（実際の機能動作実装）
+  // 一般設定の変更（実際の機能動作実装）
   const handleGeneralChange = (key: keyof Pick<LocalUserSettings, 'theme' | 'language' | 'timezone'>, value: string) => {
     if (settings) {
       setSettings({
@@ -1392,8 +1392,8 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
         [key]: value
       });
       
-      // 🔧 実際の機能動作実装
-      console.log(`⚙️ 一般設定変更: ${key} = ${value}`);
+      // 実際の機能動作実装
+      console.log(`一般設定変更: ${key} = ${value}`);
       
       if (key === 'theme') {
         // テーマの実際の適用
@@ -1504,7 +1504,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
           timeZone: value,
           year: 'numeric',
           month: '2-digit',
-          day: '2-digit',
+           day: '2-digit',
           hour: '2-digit',
           minute: '2-digit'
         });
@@ -1531,9 +1531,9 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     }
   };
 
-  // 🔧 セキュリティダッシュボード機能実装
+  // セキュリティダッシュボード機能実装
   const handleSecurityDashboard = () => {
-    console.log('🛡️ セキュリティダッシュボードを開く');
+    console.log('セキュリティダッシュボードを開く');
     
     // 実際のセキュリティダッシュボードデータを取得
     fetch('/api/security/dashboard', {
@@ -1575,9 +1575,9 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     });
   };
 
-  // 🔧 2要素認証設定機能実装
+  // 2要素認証設定機能実装
   const handle2FASetup = () => {
-    console.log('🔐 2要素認証設定を開く');
+    console.log('2要素認証設定を開く');
     
     // 2FA設定前の準備
     fetch('/api/auth/2fa/prepare', {
@@ -1620,9 +1620,9 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     });
   };
 
-  // 🔧 パスワードリセット機能実装
+  // パスワードリセット機能実装
   const handlePasswordReset = () => {
-    console.log('🔑 パスワードリセットを開く');
+    console.log('パスワードリセットを開く');
     
     // パスワードリセット準備
     fetch('/api/auth/password-reset/prepare', {
@@ -1733,7 +1733,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
   if (loading || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="flex items-center space-x-3">
           <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
           <span className="text-lg font-medium text-gray-900">読み込み中...</span>
@@ -1744,7 +1744,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
   if (!settings) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900">設定を読み込み中...</h2>
@@ -1754,22 +1754,22 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ヘッダー */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-center space-x-3 mb-4">
-            <Settings className="h-8 w-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">設定</h1>
+            <Settings className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">設定</h1>
           </div>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             チーム健全性分析ツールの設定と統合を管理
           </p>
         </div>
 
         {/* メッセージ表示 */}
         {message && (
-          <div className={`mb-6 p-4 rounded-md border ${
+          <div className={`mb-4 sm:mb-6 p-4 rounded-md border ${
             message.type === 'success' 
               ? 'bg-green-50 border-green-200' 
               : 'bg-red-50 border-red-200'
@@ -1795,15 +1795,15 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
         <div className="bg-white shadow-sm rounded-lg border border-gray-200">
           {/* タブナビゲーション */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
+          <div className="border-b border-gray-200 overflow-x-auto">
+            <nav className="-mb-px flex space-x-4 sm:space-x-8 px-4 sm:px-6 min-w-max">
               {[
-  { id: 'notifications', name: '通知', icon: Bell },
-  { id: 'privacy', name: 'プライバシー', icon: Shield },
-  { id: 'security', name: 'セキュリティ', icon: Lock },
-  { id: 'integrations', name: '統合', icon: Link },
-  { id: 'general', name: '一般', icon: Globe },
-].map((tab) => (
+                { id: 'notifications', name: '通知', icon: Bell },
+                { id: 'privacy', name: 'プライバシー', icon: Shield },
+                { id: 'security', name: 'セキュリティ', icon: Lock },
+                { id: 'integrations', name: '統合', icon: Link },
+                { id: 'general', name: '一般', icon: Globe },
+              ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
@@ -1811,22 +1811,22 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                     activeTab === tab.id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors duration-200`}
+                  } whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex items-center space-x-1 sm:space-x-2 transition-colors duration-200`}
                 >
-                  <tab.icon className="w-4 h-4" />
+                  <tab.icon className="w-3 h-3 sm:w-4 sm:h-4" />
                   <span>{tab.name}</span>
                 </button>
               ))}
             </nav>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {/* 通知設定タブ */}
             {activeTab === 'notifications' && (
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">通知設定</h3>
-                    <p className="text-sm text-gray-600 mb-6">
+                  <p className="text-sm text-gray-600 mb-6">
                     チーム健全性インサイトに関する通知の受け取り方法を設定
                   </p>
                 </div>
@@ -1834,11 +1834,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 <div className="space-y-4">
                   {/* メール通知 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <Bell className="w-4 h-4 text-blue-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">メール通知</h4>
                         <p className="text-sm text-gray-500">
                           重要なアラートと更新をメールで受信
@@ -1850,7 +1850,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handleNotificationChange('emailNotifications', !settings.notifications.emailNotifications)}
                       className={`${
                         settings.notifications.emailNotifications ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -1862,11 +1862,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
                   {/* プッシュ通知 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <Zap className="w-4 h-4 text-green-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">プッシュ通知</h4>
                         <p className="text-sm text-gray-500">
                           ブラウザでリアルタイム通知を受信
@@ -1878,7 +1878,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handleNotificationChange('pushNotifications', !settings.notifications.pushNotifications)}
                       className={`${
                         settings.notifications.pushNotifications ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -1890,11 +1890,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
                   {/* 週次レポート */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <BarChart3 className="w-4 h-4 text-purple-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">週次レポート</h4>
                         <p className="text-sm text-gray-500">
                           毎週チーム健全性サマリーレポートを受信
@@ -1906,7 +1906,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handleNotificationChange('weeklyReports', !settings.notifications.weeklyReports)}
                       className={`${
                         settings.notifications.weeklyReports ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -1918,11 +1918,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
                   {/* 緊急アラート */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <AlertTriangle className="w-4 h-4 text-red-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">緊急アラート</h4>
                         <p className="text-sm text-gray-500">
                           バーンアウトリスクと重要な問題の即座の通知
@@ -1934,7 +1934,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handleNotificationChange('criticalAlerts', !settings.notifications.criticalAlerts)}
                       className={`${
                         settings.notifications.criticalAlerts ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -1946,11 +1946,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
                   {/* チーム更新情報 */}
                   <div className="flex items-center justify-between py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <Users className="w-4 h-4 text-yellow-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">チーム更新情報</h4>
                         <p className="text-sm text-gray-500">
                           チームメンバーの追加、削除、変更に関する通知
@@ -1962,7 +1962,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handleNotificationChange('teamUpdates', !settings.notifications.teamUpdates)}
                       className={`${
                         settings.notifications.teamUpdates ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -1988,11 +1988,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 <div className="space-y-4">
                   {/* 分析データの共有 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <BarChart3 className="w-4 h-4 text-blue-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">分析データの共有</h4>
                         <p className="text-sm text-gray-500">
                           サービス改善のための匿名化された分析データの共有を許可
@@ -2004,7 +2004,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handlePrivacyChange('shareAnalytics', !settings.privacy.shareAnalytics)}
                       className={`${
                         settings.privacy.shareAnalytics ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -2016,11 +2016,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
                   {/* データの匿名化 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <Shield className="w-4 h-4 text-green-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">データの匿名化</h4>
                         <p className="text-sm text-gray-500">
                           レポートと分析で個人識別子を匿名化
@@ -2032,7 +2032,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handlePrivacyChange('anonymizeData', !settings.privacy.anonymizeData)}
                       className={`${
                         settings.privacy.anonymizeData ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -2044,11 +2044,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
                   {/* データ保持期間の設定 */}
                   <div className="flex items-center justify-between py-4 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <Clock className="w-4 h-4 text-purple-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">データ保持設定</h4>
                         <p className="text-sm text-gray-500">
                           プランベースのデータ保持期間設定を有効化
@@ -2060,7 +2060,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handlePrivacyChange('dataRetention', !settings.privacy.dataRetention)}
                       className={`${
                         settings.privacy.dataRetention ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -2072,11 +2072,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
 
                   {/* データエクスポート */}
                   <div className="flex items-center justify-between py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <Download className="w-4 h-4 text-yellow-600" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-gray-900">データエクスポート</h4>
                         <p className="text-sm text-gray-500">
                           チーム健全性データのエクスポート機能を有効化
@@ -2088,7 +2088,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       onClick={() => handlePrivacyChange('exportData', !settings.privacy.exportData)}
                       className={`${
                         settings.privacy.exportData ? 'bg-blue-600' : 'bg-gray-200'
-                      } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                       } relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-4`}
                     >
                       <span
                         className={`${
@@ -2102,8 +2102,8 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 {/* データ削除セクション */}
                 <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-md">
                   <div className="flex items-start space-x-3">
-                    <Trash2 className="w-5 h-5 text-red-600 mt-0.5" />
-                    <div>
+                    <Trash2 className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-medium text-red-800 mb-2">データ削除</h4>
                       <p className="text-sm text-red-600 mb-4">
                         アカウントに関連するすべてのデータを完全に削除します。この操作は元に戻せません。
@@ -2147,91 +2147,91 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
             )}
 
            {/* セキュリティ設定タブ */}
-{activeTab === 'security' && (
-  <div className="space-y-6">
-    <div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">セキュリティ設定</h3>
-      <p className="text-sm text-gray-600 mb-6">
-        アカウントのセキュリティを強化するための設定
-      </p>
-    </div>
+            {activeTab === 'security' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">セキュリティ設定</h3>
+                  <p className="text-sm text-gray-600 mb-6">
+                    アカウントのセキュリティを強化するための設定
+                  </p>
+                </div>
 
-    {/* セキュリティダッシュボードリンク */}
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-  <div className="flex items-start space-x-4">
-    <div className="flex-shrink-0">
-      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-        <Shield className="w-5 h-5 text-blue-600" />
-      </div>
-    </div>
-    <div className="flex-1">
-      <h4 className="text-lg font-medium text-blue-900 mb-2">セキュリティダッシュボード</h4>
-      <p className="text-sm text-blue-700 mb-4">
-        ログイン履歴、異常検知、セキュリティアラートを監視・管理します。
-      </p>
-      
-      <button
-        onClick={handleSecurityDashboard}
-        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-      >
-        <Shield className="w-4 h-4 mr-2" />
-        セキュリティダッシュボードを開く
-      </button>
-    </div>
-  </div>
-</div>
+                {/* セキュリティダッシュボードリンク */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Shield className="w-5 h-5 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-lg font-medium text-blue-900 mb-2">セキュリティダッシュボード</h4>
+                      <p className="text-sm text-blue-700 mb-4">
+                        ログイン履歴、異常検知、セキュリティアラートを監視・管理します。
+                      </p>
+                      
+                      <button
+                        onClick={handleSecurityDashboard}
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors w-full sm:w-auto justify-center sm:justify-start"
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        セキュリティダッシュボードを開く
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-    {/* 2要素認証設定 */}
-    <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-      <div className="flex items-start space-x-4">
-        <div className="flex-shrink-0">
-          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-            <Lock className="w-5 h-5 text-green-600" />
-          </div>
-        </div>
-        <div className="flex-1">
-          <h4 className="text-lg font-medium text-green-900 mb-2">2要素認証</h4>
-          <p className="text-sm text-green-700 mb-4">
-            パスワードに加えて認証アプリのコードを使用することで、アカウントのセキュリティを大幅に向上させます。
-          </p>
-          
-          <button
-            onClick={handle2FASetup}
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
-          >
-            <Lock className="w-4 h-4 mr-2" />
-            2要素認証を設定
-          </button>
-        </div>
-      </div>
-    </div>
+                {/* 2要素認証設定 */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <Lock className="w-5 h-5 text-green-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-lg font-medium text-green-900 mb-2">2要素認証</h4>
+                      <p className="text-sm text-green-700 mb-4">
+                        パスワードに加えて認証アプリのコードを使用することで、アカウントのセキュリティを大幅に向上させます。
+                      </p>
+                      
+                      <button
+                        onClick={handle2FASetup}
+                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors w-full sm:w-auto justify-center sm:justify-start"
+                      >
+                        <Lock className="w-4 h-4 mr-2" />
+                        2要素認証を設定
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-    {/* パスワードリセット */}
-    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-      <div className="flex items-start space-x-4">
-        <div className="flex-shrink-0">
-          <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-            <RefreshCw className="w-5 h-5 text-yellow-600" />
-          </div>
-        </div>
-        <div className="flex-1">
-          <h4 className="text-lg font-medium text-yellow-900 mb-2">パスワード管理</h4>
-          <p className="text-sm text-yellow-700 mb-4">
-            パスワードの変更やリセットを安全に行います。
-          </p>
-          
-          <button
-            onClick={handlePasswordReset}
-            className="inline-flex items-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            パスワードをリセット
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+                {/* パスワードリセット */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-start space-y-4 sm:space-y-0 sm:space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <RefreshCw className="w-5 h-5 text-yellow-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-lg font-medium text-yellow-900 mb-2">パスワード管理</h4>
+                      <p className="text-sm text-yellow-700 mb-4">
+                        パスワードの変更やリセットを安全に行います。
+                      </p>
+                      
+                      <button
+                        onClick={handlePasswordReset}
+                        className="inline-flex items-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 transition-colors w-full sm:w-auto justify-center sm:justify-start"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        パスワードをリセット
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 統合設定タブ - 日本語版 */}
             {activeTab === 'integrations' && (
@@ -2249,7 +2249,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                     <div className="flex-shrink-0">
                       <Users className="w-5 h-5 text-blue-600" />
                     </div>
-                    <div className="ml-3">
+                    <div className="ml-3 flex-1 min-w-0">
                       <h4 className="text-sm font-medium text-blue-800">Microsoft Teams統合が利用可能になりました！</h4>
                       <p className="text-sm text-blue-600 mt-1">
                         Microsoft 365環境向けの高度なチーム健全性分析。会議参加、チャット活動、コラボレーションパターンを分析します。
@@ -2264,7 +2264,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 )}
 
                 {/* 統合ツール一覧 - 日本語版 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {integrationsState
                     .sort((a, b) => (a.priority || 999) - (b.priority || 999))
                     .map((integration) => (
@@ -2281,12 +2281,12 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       }`}
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-1">
                             {integration.icon}
-                            <h4 className="font-medium text-gray-900">{integration.name}</h4>
+                            <h4 className="font-medium text-gray-900 truncate">{integration.name}</h4>
                             {integration.id === 'microsoft-teams' && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
                                 新機能
                               </span>
                             )}
@@ -2324,8 +2324,8 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                           {/* 最終同期時刻表示 */}
                           {integration.isConnected && integration.lastSync && (
                             <div className="mt-1 flex items-center space-x-1">
-                              <Clock className="w-3 h-3 text-gray-400" />
-                              <span className="text-xs text-gray-500">
+                              <Clock className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                              <span className="text-xs text-gray-500 truncate">
                                 最終同期: {new Date(integration.lastSync).toLocaleString()}
                               </span>
                             </div>
@@ -2334,13 +2334,13 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                           {/* エラーメッセージ表示 */}
                           {integration.errorMessage && (
                             <div className="mt-2 flex items-center space-x-1">
-                              <AlertTriangle className="w-3 h-3 text-red-500" />
+                              <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />
                               <span className="text-xs text-red-600">{integration.errorMessage}</span>
                             </div>
                           )}
                         </div>
                         
-                        <div className="flex flex-col items-end space-y-1">
+                        <div className="flex flex-col items-end space-y-1 ml-3">
                           {integration.isConnected && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               <CheckCircle className="w-3 h-3 mr-1" />
@@ -2368,7 +2368,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
                         <button
                           onClick={() => setSelectedIntegration(integration)}
                           className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1"
@@ -2377,13 +2377,13 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                           <span>詳細を表示</span>
                         </button>
                         
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2 w-full sm:w-auto">
                           {integration.isConnected ? (
                             <React.Fragment>
                               <button
                                 onClick={() => handleSync(integration.id)}
                                 disabled={integration.isSyncing}
-                                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex-1 sm:flex-none ${
                                   integration.isSyncing
                                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                     : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
@@ -2391,12 +2391,12 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                                 title="データを同期"
                               >
                                 {integration.isSyncing ? (
-                                  <div className="flex items-center space-x-1">
+                                  <div className="flex items-center justify-center space-x-1">
                                     <RefreshCw className="w-3 h-3 animate-spin" />
                                      <span>同期中</span>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center space-x-1">
+                                  <div className="flex items-center justify-center space-x-1">
                                     <RefreshCw className="w-3 h-3" />
                                     <span>同期</span>
                                   </div>
@@ -2404,7 +2404,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                               </button>
                               <button
                                 onClick={() => handleDisconnect(integration.id)}
-                                className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 transition-colors flex items-center space-x-1"
+                                className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm font-medium hover:bg-red-200 transition-colors flex items-center space-x-1 flex-1 sm:flex-none justify-center"
                               >
                                 <X className="w-3 h-3" />
                                 <span>切断</span>
@@ -2414,7 +2414,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                             <button
                               onClick={() => handleConnect(integration.id)}
                               disabled={integration.isConnecting}
-                              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
+                              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 justify-center w-full sm:w-auto ${
                                 integration.isConnecting
                                   ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                   : integration.id === 'microsoft-teams'
@@ -2445,14 +2445,14 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 <div className="space-y-6">
                   {/* 基本統計 */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
                       <h4 className="text-sm font-medium text-blue-800 flex items-center space-x-2">
                         <BarChart3 className="w-4 h-4" />
                         <span>接続ステータス（7サービス対応）</span>
                       </h4>
                       <button
                         onClick={async () => {
-                          console.log('🔄 グローバル同期を開始...');
+                          console.log('グローバル同期を開始...');
                           setMessage({ type: 'success', text: '接続されているすべてのサービスの同期を開始しています...' });
                           
                           const connectedIntegrations = integrationsState.filter(i => i.isConnected);
@@ -2468,7 +2468,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                           });
                         }}
                         disabled={integrationsState.some(i => i.isSyncing)}
-                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 w-full sm:w-auto justify-center ${
                           integrationsState.some(i => i.isSyncing)
                             ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                             : 'bg-blue-600 text-white hover:bg-blue-700'
@@ -2488,24 +2488,24 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       </button>
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                       <div className="flex items-center space-x-2">
-                        <Database className="w-4 h-4 text-blue-600" />
+                        <Database className="w-4 h-4 text-blue-600 flex-shrink-0" />
                         <span className="text-blue-600">総サービス数:</span>
                         <span className="font-medium">{integrationsState.length}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
                         <span className="text-blue-600">接続済み:</span>
                         <span className="font-medium">{integrationsState.filter(i => i.isConnected).length}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RefreshCw className="w-4 h-4 text-yellow-600" />
+                        <RefreshCw className="w-4 h-4 text-yellow-600 flex-shrink-0" />
                         <span className="text-blue-600">同期中:</span>
                         <span className="font-medium">{integrationsState.filter(i => i.isSyncing).length}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
                         <span className="text-blue-600">エラー:</span>
                         <span className="font-medium">{integrationsState.filter(i => i.errorMessage).length}</span>
                       </div>
@@ -2544,7 +2544,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                   {/* 同期履歴セクション */}
                   {integrationsState.some(i => i.isConnected) && (
                     <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
                         <h4 className="text-sm font-medium text-green-800 flex items-center space-x-2">
                           <Clock className="w-4 h-4" />
                           <span>最近の同期履歴</span>
@@ -2560,22 +2560,22 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                           .filter(i => i.isConnected)
                           .map(integration => (
                             <div key={integration.id} className="flex items-center justify-between p-2 bg-white rounded border border-green-100">
-                              <div className="flex items-center space-x-3">
-                                <div className={`w-2 h-2 rounded-full ${
+                              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                                   integration.isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
                                 }`}></div>
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-2 min-w-0">
                                   {integration.icon}
-                                  <span className="text-sm font-medium text-green-700">{integration.name}</span>
+                                  <span className="text-sm font-medium text-green-700 truncate">{integration.name}</span>
                                   {integration.id === 'microsoft-teams' && (
-                                    <span className="inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                    <span className="inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
                                       新機能
                                     </span>
                                   )}
                                 </div>
                               </div>
                               
-                              <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-3 flex-shrink-0">
                                 {/* 健全性スコア */}
                                 {integration.healthScore && (
                                   <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -2590,11 +2590,20 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                                 {/* 最終同期時刻 */}
                                 <span className="text-xs text-green-600 flex items-center space-x-1">
                                   <Clock className="w-3 h-3" />
-                                  <span>
+                                  <span className="hidden sm:inline">
                                     {integration.lastSync 
                                       ? new Date(integration.lastSync).toLocaleString('ja-JP', {
                                           month: 'short',
                                           day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })
+                                      : '未同期'
+                                    }
+                                  </span>
+                                  <span className="sm:hidden">
+                                    {integration.lastSync 
+                                      ? new Date(integration.lastSync).toLocaleString('ja-JP', {
                                           hour: '2-digit',
                                           minute: '2-digit'
                                         })
@@ -2607,7 +2616,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                                 {integration.isSyncing && (
                                   <div className="flex items-center space-x-1">
                                     <RefreshCw className="w-3 h-3 animate-spin text-yellow-600" />
-                                    <span className="text-xs text-yellow-600">同期中</span>
+                                    <span className="text-xs text-yellow-600 hidden sm:inline">同期中</span>
                                   </div>
                                 )}
                               </div>
@@ -2625,7 +2634,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                         <span>統合メトリクス概要</span>
                       </h4>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {(() => {
                           const integrationsWithMetrics = integrationsState.filter(i => i.isConnected && i.metrics);
                           if (integrationsWithMetrics.length === 0) return null;
@@ -2705,13 +2714,13 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       <span>言語</span>
                     </label>
                     <select
-  value={language}
-  onChange={(e) => handleLanguageChange(e.target.value as 'ja' | 'en')}
-  className="mt-1 w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
->
-  <option value="ja">日本語 (Japanese)</option>
-  <option value="en">English</option>
-</select>
+                      value={language}
+                      onChange={(e) => handleLanguageChange(e.target.value as 'ja' | 'en')}
+                      className="mt-1 w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    >
+                      <option value="ja">日本語 (Japanese)</option>
+                      <option value="en">English</option>
+                    </select>
                     <p className="mt-1 text-sm text-gray-500">
                       お好みのアプリケーション言語を選択
                     </p>
@@ -2747,23 +2756,23 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                     <span>アカウント情報</span>
                   </h4>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
                       <span className="text-sm text-gray-600">ユーザーID:</span>
-                      <span className="text-sm font-medium text-gray-900">{user?.id}</span>
+                      <span className="text-sm font-medium text-gray-900 break-all">{user?.id}</span>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
                       <span className="text-sm text-gray-600">メールアドレス:</span>
-                      <span className="text-sm font-medium text-gray-900">{user?.email}</span>
+                      <span className="text-sm font-medium text-gray-900 break-all">{user?.email}</span>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
                       <span className="text-sm text-gray-600">役割:</span>
                       <span className="text-sm font-medium text-gray-900">メンバー</span>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
                       <span className="text-sm text-gray-600">部署:</span>
                       <span className="text-sm font-medium text-gray-900">未設定</span>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
                       <span className="text-sm text-gray-600">登録日:</span>
                       <span className="text-sm font-medium text-gray-900">
                         {new Date().toLocaleDateString('ja-JP')}
@@ -2776,7 +2785,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
           </div>
 
           {/* 保存ボタン */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+          <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
             <div className="flex justify-end">
               <button
                 type="button"
@@ -2786,7 +2795,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                   saving 
                     ? 'bg-gray-400 cursor-not-allowed' 
                     : 'bg-blue-600 hover:bg-blue-700'
-                } text-white px-6 py-2 rounded-md font-medium transition-colors flex items-center space-x-2`}
+                } text-white px-6 py-2 rounded-md font-medium transition-colors flex items-center space-x-2 w-full sm:w-auto justify-center`}
               >
                 {saving && (
                   <RefreshCw className="w-4 h-4 animate-spin" />
@@ -2929,11 +2938,11 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 <ul className="space-y-1">
                   {selectedIntegration.features.map((feature, index) => (
                     <li key={index} className="text-sm text-gray-600 flex items-center">
-                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                      {feature}
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                      <span className="flex-1">{feature}</span>
                       {selectedIntegration.id === 'microsoft-teams' && 
                        (feature.includes('会議参加') || feature.includes('Teams通話') || feature.includes('チーム結束度')) && (
-                        <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
                           強化済み
                         </span>
                       )}
@@ -2942,7 +2951,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                 </ul>
               </div>
 
-              <div className="flex justify-end pt-4 border-t border-gray-200 space-x-2">
+              <div className="flex flex-col sm:flex-row justify-end pt-4 border-t border-gray-200 space-y-2 sm:space-y-0 sm:space-x-2">
                 {selectedIntegration.isConnected ? (
                   <>
                     <button
@@ -2951,7 +2960,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                         setSelectedIntegration(null);
                       }}
                       disabled={selectedIntegration.isSyncing}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center space-x-1 ${
                         selectedIntegration.isSyncing
                           ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
@@ -2974,7 +2983,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                         handleDisconnect(selectedIntegration.id);
                         setSelectedIntegration(null);
                       }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors flex items-center space-x-1"
+                      className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors flex items-center justify-center space-x-1"
                     >
                       <X className="w-3 h-3" />
                       <span>切断</span>
@@ -2987,7 +2996,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
                       setSelectedIntegration(null);
                     }}
                     disabled={selectedIntegration.isConnecting}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 ${
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center space-x-1 w-full sm:w-auto ${
                       selectedIntegration.isConnecting
                         ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                         : selectedIntegration.id === 'microsoft-teams'
@@ -3016,6 +3025,7 @@ if (tab && ['notifications', 'privacy', 'security', 'integrations', 'general'].i
     </div>
   );
 };
+
 const SettingsPage: React.FC = () => {
   return (
     <LanguageProvider>
