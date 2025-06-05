@@ -1,12 +1,12 @@
-// src/app/api/integrations/disconnect/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
-    // 認証確認
-    const session = await getServerSession();
+    // 認証確認（authOptionsを正しく渡す）
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: '認証が必要です' },
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, integrationId } = body;
+    const { service, userId, integrationId } = body;
 
     // セキュリティチェック：リクエストのuserIdとセッションのuserIdが一致するか確認
     if (userId && userId !== user.id) {
@@ -38,33 +38,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!integrationId) {
+    // service または integrationId のいずれかが必要
+    if (!service && !integrationId) {
       return NextResponse.json(
-        { error: 'integrationId は必須です' },
+        { error: 'service または integrationId は必須です' },
         { status: 400 }
       );
     }
 
+    const serviceToDisconnect = service || integrationId;
+
     console.log('🔄 統合サービス切断開始:', {
       userId: user.id,
-      integrationId
+      service: serviceToDisconnect
     });
 
     // 統合情報を検索
     const existingIntegration = await prisma.integration.findFirst({
       where: {
         userId: user.id,
-        service: integrationId,
+        service: serviceToDisconnect,
       },
     });
 
     if (!existingIntegration) {
-      console.log('⚠️ 統合情報が見つかりません:', { userId: user.id, integrationId });
+      console.log('⚠️ 統合情報が見つかりません:', { userId: user.id, service: serviceToDisconnect });
       return NextResponse.json(
         { 
           success: true,
           message: '統合情報が見つかりませんが、切断処理は成功しました',
-          integrationId 
+          service: serviceToDisconnect 
         }
       );
     }
@@ -84,29 +87,26 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ 統合サービス切断完了:', {
       userId: user.id,
-      integrationId,
+      service: serviceToDisconnect,
       integrationDbId: updatedIntegration.id
     });
 
-    // フロントエンド用にデータ形式を変換
+    // フロントエンド用にデータ形式を変換（統合ページの期待形式に合わせる）
     const formattedIntegration = {
       id: updatedIntegration.id,
-      serviceId: updatedIntegration.service,
-      serviceName: updatedIntegration.teamName || updatedIntegration.service,
-      status: 'disconnected',
-      settings: {
-        teamId: updatedIntegration.teamId,
-        teamName: updatedIntegration.teamName,
-      },
-      createdAt: updatedIntegration.createdAt,
-      updatedAt: updatedIntegration.updatedAt,
+      service: updatedIntegration.service,
+      isActive: false,
+      createdAt: updatedIntegration.createdAt.toISOString(),
+      updatedAt: updatedIntegration.updatedAt.toISOString(),
+      teamId: updatedIntegration.teamId,
+      teamName: updatedIntegration.teamName,
     };
 
     return NextResponse.json({
       success: true,
       message: '統合サービスの切断が完了しました',
       integration: formattedIntegration,
-      integrationId,
+      service: serviceToDisconnect,
     });
 
   } catch (error) {
@@ -125,8 +125,8 @@ export async function POST(request: NextRequest) {
 // GET メソッドでも切断状態の確認ができるようにする
 export async function GET(request: NextRequest) {
   try {
-    // 認証確認
-    const session = await getServerSession();
+    // 認証確認（authOptionsを正しく渡す）
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: '認証が必要です' },
@@ -147,27 +147,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // URLパラメータから integrationId を取得
+    // URLパラメータから service を取得
     const { searchParams } = new URL(request.url);
-    const integrationId = searchParams.get('integrationId');
+    const service = searchParams.get('service') || searchParams.get('integrationId');
 
-    if (!integrationId) {
+    if (!service) {
       return NextResponse.json(
-        { error: 'integrationId パラメータが必要です' },
+        { error: 'service パラメータが必要です' },
         { status: 400 }
       );
     }
 
     console.log('🔍 統合サービス状態確認:', {
       userId: user.id,
-      integrationId
+      service
     });
 
     // 統合情報を検索
     const integration = await prisma.integration.findFirst({
       where: {
         userId: user.id,
-        service: integrationId,
+        service: service,
       },
       select: {
         id: true,
@@ -185,29 +185,25 @@ export async function GET(request: NextRequest) {
         success: true,
         connected: false,
         message: '統合情報が見つかりません',
-        integrationId,
+        service,
       });
     }
 
     // フロントエンド用にデータ形式を変換
     const formattedIntegration = {
       id: integration.id,
-      serviceId: integration.service,
-      serviceName: integration.teamName || integration.service,
-      status: integration.isActive ? 'connected' : 'disconnected',
-      connected: integration.isActive,
-      settings: {
-        teamId: integration.teamId,
-        teamName: integration.teamName,
-      },
-      createdAt: integration.createdAt,
-      updatedAt: integration.updatedAt,
+      service: integration.service,
+      isActive: integration.isActive,
+      createdAt: integration.createdAt.toISOString(),
+      updatedAt: integration.updatedAt.toISOString(),
+      teamId: integration.teamId,
+      teamName: integration.teamName,
     };
 
     console.log('✅ 統合サービス状態確認完了:', {
       userId: user.id,
-      integrationId,
-      status: formattedIntegration.status
+      service,
+      isActive: formattedIntegration.isActive
     });
 
     return NextResponse.json({

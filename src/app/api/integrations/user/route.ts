@@ -1,12 +1,12 @@
-// src/app/api/integrations/user/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    // 認証確認（authOptionsを使わずに直接セッション取得）
-    const session = await getServerSession();
+    // 認証確認（authOptionsを正しく渡す）
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: '認証が必要です' },
@@ -50,33 +50,34 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // フロントエンド用にデータ形式を変換
+    // フロントエンド用にデータ形式を変換（統合ページの期待形式に合わせる）
     const formattedIntegrations = userIntegrations.map(integration => ({
       id: integration.id,
-      serviceId: integration.service,
-      serviceName: integration.teamName || integration.service,
-      status: integration.isActive ? 'connected' : 'disconnected',
-      healthScore: integration.isActive ? Math.floor(Math.random() * 30) + 70 : undefined,
-      lastSync: integration.isActive ? integration.updatedAt.toISOString() : undefined,
-      dataPoints: integration.isActive ? Math.floor(Math.random() * 5000) + 1000 : undefined,
-      settings: {
-        teamId: integration.teamId,
-        teamName: integration.teamName,
-      },
-      createdAt: integration.createdAt,
-      updatedAt: integration.updatedAt,
+      service: integration.service, // 統合ページで期待されるフィールド名
+      isActive: integration.isActive,
+      createdAt: integration.createdAt.toISOString(),
+      updatedAt: integration.updatedAt.toISOString(),
+      // 追加情報
+      teamId: integration.teamId,
+      teamName: integration.teamName,
+      hasToken: !!integration.accessToken,
     }));
 
     console.log('✅ ユーザー統合情報取得成功:', {
       userId: user.id,
       integrationCount: formattedIntegrations.length,
-      integrations: formattedIntegrations.map(i => ({ id: i.serviceId, status: i.status }))
+      integrations: formattedIntegrations.map(i => ({ 
+        service: i.service, 
+        isActive: i.isActive,
+        hasToken: i.hasToken 
+      }))
     });
 
     return NextResponse.json({
       success: true,
       integrations: formattedIntegrations,
       count: formattedIntegrations.length,
+      userId: user.id,
     });
 
   } catch (error) {
@@ -94,8 +95,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 認証確認
-    const session = await getServerSession();
+    // 認証確認（authOptionsを正しく渡す）
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: '認証が必要です' },
@@ -178,15 +179,12 @@ export async function POST(request: NextRequest) {
     // フロントエンド用にデータ形式を変換
     const formattedIntegration = {
       id: integration.id,
-      serviceId: integration.service,
-      serviceName: integration.teamName || integration.service,
-      status: integration.isActive ? 'connected' : 'disconnected',
-      settings: {
-        teamId: integration.teamId,
-        teamName: integration.teamName,
-      },
-      createdAt: integration.createdAt,
-      updatedAt: integration.updatedAt,
+      service: integration.service,
+      isActive: integration.isActive,
+      createdAt: integration.createdAt.toISOString(),
+      updatedAt: integration.updatedAt.toISOString(),
+      teamId: integration.teamId,
+      teamName: integration.teamName,
     };
 
     return NextResponse.json({
