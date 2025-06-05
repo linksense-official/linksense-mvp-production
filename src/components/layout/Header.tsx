@@ -79,11 +79,11 @@ const Header: React.FC = () => {
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // リアルタイム通知データ（実際の実装ではAPIから取得）
+  // リアルタイム通知データ（絵文字削除・プロフェッショナル化）
   const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: '1',
-      title: '🚨 緊急: チーム健全性低下',
+      title: '緊急: チーム健全性低下',
       message: 'プロダクト開発チームの健全性スコアが65%に低下しました。即座の対応が必要です。',
       type: 'error',
       timestamp: '5分前',
@@ -95,7 +95,7 @@ const Header: React.FC = () => {
     },
     {
       id: '2',
-      title: '✅ レポート生成完了',
+      title: 'レポート生成完了',
       message: '月次チーム健全性レポートが正常に生成されました。ダウンロード可能です。',
       type: 'success',
       timestamp: '1時間前',
@@ -106,7 +106,7 @@ const Header: React.FC = () => {
     },
     {
       id: '3',
-      title: '🔄 システム更新完了',
+      title: 'システム更新完了',
       message: 'LinkSenseが新機能を含むバージョン2.1.0にアップデートされました。',
       type: 'info',
       timestamp: '3時間前',
@@ -117,7 +117,7 @@ const Header: React.FC = () => {
     },
     {
       id: '4',
-      title: '👥 新メンバー追加',
+      title: '新メンバー追加',
       message: '田中太郎さんがマーケティングチームに追加されました。',
       type: 'info',
       timestamp: '1日前',
@@ -128,7 +128,7 @@ const Header: React.FC = () => {
     },
     {
       id: '5',
-      title: '🔐 セキュリティアップデート',
+      title: 'セキュリティアップデート',
       message: 'セキュリティパッチが適用されました。システムは安全に保護されています。',
       type: 'info',
       timestamp: '2日前',
@@ -651,7 +651,7 @@ const Header: React.FC = () => {
 
                 {/* 通知パネル */}
                 {headerState.isNotificationOpen && (
-                  <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-[32rem] overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-[32rem] overflow-hidden">
                     {/* ヘッダー */}
                     <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                       <div className="flex items-center space-x-2">
@@ -682,18 +682,18 @@ const Header: React.FC = () => {
 
                     {/* 通知フィルター */}
                     <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                      <div className="flex items-center space-x-2 text-xs">
-                        <Filter className="h-3 w-3 text-gray-400" />
-                        <button className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
+                      <div className="flex items-center space-x-2 text-xs overflow-x-auto">
+                        <Filter className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                        <button className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full whitespace-nowrap">
                           すべて
                         </button>
-                        <button className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                        <button className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors whitespace-nowrap">
                           緊急
                         </button>
-                        <button className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                        <button className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors whitespace-nowrap">
                           チーム
                         </button>
-                        <button className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                        <button className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors whitespace-nowrap">
                           システム
                         </button>
                       </div>
@@ -720,19 +720,19 @@ const Header: React.FC = () => {
                               {getNotificationIcon(notification.type, notification.priority)}
                               <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start">
-                                  <div className="flex items-center space-x-2">
-                                    <p className={`text-sm text-gray-900 dark:text-white ${
+                                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                    <p className={`text-sm text-gray-900 dark:text-white truncate ${
                                       !notification.isRead ? 'font-semibold' : 'font-medium'
                                     }`}>
                                       {notification.title}
                                     </p>
-                                    <div className="flex items-center space-x-1">
+                                    <div className="flex items-center space-x-1 flex-shrink-0">
                                       <div className="text-gray-400 dark:text-gray-500">
                                         {getCategoryIcon(notification.category)}
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-2 ml-2">
+                                  <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
                                     {!notification.isRead && (
                                       <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                                     )}
@@ -777,13 +777,13 @@ const Header: React.FC = () => {
 
                     {/* フッター */}
                     <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
                         <Link
                           href="/alerts"
                           className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors"
                           onClick={() => setHeaderState(prev => ({ ...prev, isNotificationOpen: false }))}
                         >
-                          すべてのアラートを表示 →
+                          すべてのアラートを表示
                         </Link>
                         <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
                           <Clock className="h-3 w-3" />
@@ -799,13 +799,13 @@ const Header: React.FC = () => {
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={toggleUserMenu}
-                  className="flex items-center space-x-3 p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex items-center space-x-2 sm:space-x-3 p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                   aria-label="ユーザーメニューを開く"
                 >
                   {/* プロフィール画像またはアバター */}
                   <div className="relative">
-                    <div className="w-9 h-9 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 shadow-sm">
-                      <span className="text-white text-sm font-semibold">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center border-2 border-gray-200 dark:border-gray-700 shadow-sm">
+                      <span className="text-white text-xs sm:text-sm font-semibold">
                         {getInitials(user?.name || 'User')}
                       </span>
                     </div>
@@ -815,7 +815,7 @@ const Header: React.FC = () => {
                   </div>
 
                   <div className="hidden md:block text-left">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-24">
                       {user?.name || 'ユーザー'}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -823,7 +823,7 @@ const Header: React.FC = () => {
                     </p>
                   </div>
 
-                  <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 hidden sm:block" />
                 </button>
 
                 {/* ユーザードロップダウンメニュー */}
@@ -1021,11 +1021,11 @@ const Header: React.FC = () => {
                   <div className="flex-shrink-0 text-gray-400 dark:text-gray-500">
                     {result.icon}
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {result.title}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                       {result.description}
                     </p>
                   </div>
