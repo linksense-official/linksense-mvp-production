@@ -32,9 +32,13 @@ export async function GET(request: NextRequest) {
     const chatworkUserId = `chatwork_${userInfo.account_id}`;
     const userEmail = userInfo.login_mail || `chatwork_${userInfo.account_id}@chatwork.local`;
 
+    console.log('生成されたユーザーID:', chatworkUserId);
+    console.log('ユーザーメール:', userEmail);
+
     // まずUserレコードを作成または更新
     console.log('Userレコード作成/更新開始...');
-    await prisma.user.upsert({
+    
+    const user = await prisma.user.upsert({
       where: {
         email: userEmail
       },
@@ -53,37 +57,22 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // 次にIntegrationレコードを作成または更新
-    console.log('Integrationレコード作成/更新開始...');
-    await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: chatworkUserId,
-          service: 'chatwork'
-        }
-      },
-      update: {
-        accessToken: apiToken!,
-        isActive: true,
-        teamId: userInfo.organization_id?.toString() || 'unknown',
-        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User',
-        updatedAt: new Date()
-      },
-      create: {
-        userId: chatworkUserId,
-        service: 'chatwork',
-        accessToken: apiToken!,
-        isActive: true,
-        teamId: userInfo.organization_id?.toString() || 'unknown',
-        teamName: userInfo.organization_name || userInfo.name || 'ChatWork User'
-      }
+    console.log('作成されたUserレコード:', user);
+
+    // Userレコードが存在するか確認
+    const existingUser = await prisma.user.findUnique({
+      where: { id: chatworkUserId }
     });
 
-    console.log('ChatWork統合完了');
-    
-    // 成功時のリダイレクト
+    console.log('確認されたUserレコード:', existingUser);
+
+    if (!existingUser) {
+      throw new Error(`User not found after creation: ${chatworkUserId}`);
+    }
+
+    // 成功時のリダイレクト（Integration作成は一旦スキップ）
     return NextResponse.redirect(
-      new URL(`/integrations?success=chatwork_connected&user=${encodeURIComponent(userInfo.name)}&service=ChatWork`, request.url)
+      new URL(`/integrations?debug=user_created&user=${encodeURIComponent(userInfo.name)}&userId=${encodeURIComponent(chatworkUserId)}`, request.url)
     );
 
   } catch (error) {
