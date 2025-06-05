@@ -73,7 +73,7 @@ const services: ServiceConfig[] = [
     description: 'ビジネス向けLINE',
     icon: '📞',
     color: 'bg-green-500',
-    authUrl: '/api/auth/line-works',
+    authUrl: '/api/auth/line-works',  // 修正: カスタム実装URL
     isNextAuth: false,
   },
 ]

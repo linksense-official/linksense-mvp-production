@@ -29,14 +29,14 @@ export const authOptions: AuthOptions = {
     
     // Slack OAuth
     SlackProvider({
-      clientId: process.env.SLACK_CLIENT_ID!,
-      clientSecret: process.env.SLACK_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: 'channels:read channels:history users:read team:read'
-        }
-      }
-    }),
+  clientId: process.env.SLACK_CLIENT_ID!,
+  clientSecret: process.env.SLACK_CLIENT_SECRET!,
+  authorization: {
+    params: {
+      scope: 'channels:read users:read team:read'  // 修正: 無効なスコープを削除
+    }
+  }
+}),
     
     // Discord OAuth
     DiscordProvider({
@@ -51,15 +51,15 @@ export const authOptions: AuthOptions = {
     
     // Azure AD (Teams) OAuth
     AzureADProvider({
-      clientId: process.env.AZURE_AD_CLIENT_ID!,
-      clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-      tenantId: process.env.AZURE_AD_TENANT_ID!,
-      authorization: {
-        params: {
-          scope: 'openid profile email offline_access User.Read Calendars.Read Team.ReadBasic.All Channel.ReadBasic.All ChannelMessage.Read.All ChatMessage.Read.All'
-        }
-      }
-    }),
+  clientId: process.env.AZURE_AD_CLIENT_ID!,
+  clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+  tenantId: process.env.AZURE_AD_TENANT_ID!,
+  authorization: {
+    params: {
+      scope: 'openid profile email User.Read'  // 修正: 基本スコープのみ
+    }
+  }
+}),
   ],
   
   debug: process.env.NODE_ENV === 'development',
