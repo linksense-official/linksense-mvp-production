@@ -13,12 +13,11 @@ export async function GET(request: NextRequest) {
 
     const state = Math.random().toString(36).substring(2, 15);
 
-    // LINE WORKS OAuth認証URL生成（最小スコープ）
+    // LINE WORKS OAuth認証URL生成（スコープなし）
     const authUrl = new URL('https://auth.worksmobile.com/oauth2/v2.0/authorize');
     authUrl.searchParams.append('response_type', 'code');
     authUrl.searchParams.append('client_id', clientId);
     authUrl.searchParams.append('redirect_uri', redirectUri);
-    authUrl.searchParams.append('scope', 'user.read');  // ✅ 最小スコープのみ
     authUrl.searchParams.append('state', state);
 
     console.log('🔵 認証URL:', authUrl.toString());
