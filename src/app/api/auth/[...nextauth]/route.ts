@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server'  // ← この行を追加
 import NextAuth, { AuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import SlackProvider from 'next-auth/providers/slack'
@@ -310,4 +311,23 @@ console.log('💾 統合情報保存完了:', {
 
 const handler = NextAuth(authOptions)
 
-export { handler as GET, handler as POST }
+// LINE WORKS パスを除外する関数
+function isLineWorksPath(request: NextRequest): boolean {
+  const pathname = request.nextUrl.pathname
+  return pathname.includes('/api/auth/linetest')
+}
+
+// LINE WORKS パスの場合は NextAuth を通さない
+export async function GET(request: NextRequest) {
+  if (isLineWorksPath(request)) {
+    return new Response('Not Found', { status: 404 })
+  }
+  return handler(request)
+}
+
+export async function POST(request: NextRequest) {
+  if (isLineWorksPath(request)) {
+    return new Response('Not Found', { status: 404 })
+  }
+  return handler(request)
+}
