@@ -186,21 +186,28 @@ useEffect(() => {
   }
 
    const handleConnect = async (service: ServiceConfig) => {
-    setConnecting(service.id)
-    
-    try {
-      if (service.isNextAuth) {
-        await signIn(service.id, { callbackUrl: '/integrations?success=true' })
-      } else if (service.id === 'chatwork') {
-        window.location.href = service.authUrl
-      } else {
-        window.location.href = service.authUrl
-      }
-    } catch (error) {
-      console.error(`${service.name}認証エラー:`, error)
-      setConnecting(null)
+  console.log('🔍 handleConnect 実行:', service.id, service.authUrl)
+  setConnecting(service.id)
+  
+  try {
+    if (service.isNextAuth) {
+      console.log('🔍 NextAuth 統合:', service.id)
+      await signIn(service.id, { callbackUrl: '/integrations?success=true' })
+    } else if (service.id === 'chatwork') {
+      console.log('🔍 ChatWork 統合:', service.authUrl)
+      window.location.href = service.authUrl
+    } else if (service.id === 'lineworks') {
+      console.log('🔍 LINE WORKS 統合:', service.authUrl)
+      window.location.href = service.authUrl
+    } else {
+      console.log('🔍 その他の統合:', service.id, service.authUrl)
+      window.location.href = service.authUrl
     }
+  } catch (error) {
+    console.error(`${service.name}認証エラー:`, error)
+    setConnecting(null)
   }
+}
 
   if (status === 'loading') {
     return (
