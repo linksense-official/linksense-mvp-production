@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 const LINE_WORKS_CLIENT_ID = process.env.LINE_WORKS_CLIENT_ID;
 const LINE_WORKS_CLIENT_SECRET = process.env.LINE_WORKS_CLIENT_SECRET;
@@ -11,6 +12,13 @@ const getRedirectUri = () => {
 // ✅ LINE WORKS OAuth スコープ設定（修正版）
 const LINE_WORKS_SCOPES = 'user:read';
 
+// ✅ セキュアなstate生成関数
+const generateSecureState = () => {
+  return Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
 export async function GET(request: NextRequest) {
   try {
     const redirectUri = getRedirectUri();
@@ -20,59 +28,63 @@ export async function GET(request: NextRequest) {
     console.log('Redirect URI:', redirectUri);
     console.log('Scopes:', LINE_WORKS_SCOPES);
 
-    if (!LINE_WORKS_CLIENT_ID) {
-      console.error('❌ LINE_WORKS_CLIENT_ID が設定されていません');
-      return NextResponse.redirect(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/integrations?error=line_works_config_missing`);
+    if (!LINE_WORKS_CLIENT_ID || !LINE_WORKS_CLIENT_SECRET) {
+      console.error('❌ LINE WORKS環境変数が設定されていません');
+      const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+      return NextResponse.redirect(`${baseUrl}/integrations?error=line_works_config_missing`);
     }
 
-    if (!LINE_WORKS_CLIENT_SECRET) {
-      console.error('❌ LINE_WORKS_CLIENT_SECRET が設定されていません');
-      return NextResponse.redirect(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/integrations?error=line_works_config_missing`);
-    }
-
-    // ✅ セキュアなstate生成
-    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // ✅ より安全なstate生成
+    const state = generateSecureState();
     
-    // ✅ LINE WORKS OAuth URL構築（修正版）
+    // ✅ LINE WORKS OAuth URL構築（最適化版）
     const authUrl = new URL('https://auth.worksmobile.com/oauth2/v2.0/authorize');
-    authUrl.searchParams.set('client_id', LINE_WORKS_CLIENT_ID);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('redirect_uri', redirectUri);
-    authUrl.searchParams.set('scope', LINE_WORKS_SCOPES);
-    authUrl.searchParams.set('state', state);
-    // 修正: LINE WORKSでは以下のパラメータは不要または問題を引き起こす可能性
-    // authUrl.searchParams.set('access_type', 'offline');
-    // authUrl.searchParams.set('prompt', 'consent');
+    const params = {
+      client_id: LINE_WORKS_CLIENT_ID,
+      response_type: 'code',
+      redirect_uri: redirectUri,
+      scope: LINE_WORKS_SCOPES,
+      state: state,
+    };
+
+    // パラメータを設定
+    Object.entries(params).forEach(([key, value]) => {
+      authUrl.searchParams.set(key, value);
+    });
     
     console.log('✅ 生成されたLINE WORKS OAuth URL:', authUrl.toString());
-    console.log('✅ Redirect URI確認:', authUrl.searchParams.get('redirect_uri'));
-    console.log('✅ Scopes確認:', authUrl.searchParams.get('scope'));
+    console.log('✅ パラメータ確認:', {
+      client_id: authUrl.searchParams.get('client_id')?.substring(0, 8) + '...',
+      redirect_uri: authUrl.searchParams.get('redirect_uri'),
+      scope: authUrl.searchParams.get('scope'),
+      state: authUrl.searchParams.get('state')?.substring(0, 8) + '...'
+    });
 
+    // ✅ レスポンス作成
     const response = NextResponse.redirect(authUrl.toString());
     
-    // ✅ Cookie設定（修正版）
+    // ✅ セキュアなCookie設定
     response.cookies.set('line_works_oauth_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 600, // 10分間有効
-      path: '/' // パスを明示的に設定
+      path: '/'
     });
 
-    // ✅ LINE WORKS OAuth開始ログ
-    console.log('✅ LINE WORKS OAuth認証開始完了');
-    console.log('✅ State設定:', state);
+    console.log('✅ LINE WORKS OAuth認証開始完了 - State:', state.substring(0, 8) + '...');
 
     return response;
 
   } catch (error) {
     console.error('❌ LINE WORKS OAuth開始エラー:', error);
     
-    // ✅ エラー時のリダイレクト（修正版）
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const errorUrl = `${baseUrl}/integrations?error=line_works_oauth_failed&message=${encodeURIComponent('LINE WORKS OAuth認証の開始に失敗しました')}`;
+    // ✅ 詳細なエラー情報
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ エラー詳細:', errorMessage);
     
-    console.log('❌ エラーリダイレクト先:', errorUrl);
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const errorUrl = `${baseUrl}/integrations?error=line_works_oauth_failed&message=${encodeURIComponent('LINE WORKS OAuth認証の開始に失敗しました: ' + errorMessage)}`;
     
     return NextResponse.redirect(errorUrl);
   }

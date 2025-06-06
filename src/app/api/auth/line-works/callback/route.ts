@@ -139,14 +139,14 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ LINE WORKSアクセストークン取得成功');
 
-    // ユーザー情報取得
+     // ユーザー情報取得（修正版）
     console.log('👤 LINE WORKS ユーザー情報取得開始');
     const userInfo = await getUserInfo(tokenResponse.access_token);
     
     if (!userInfo) {
       console.error('❌ LINE WORKSユーザー情報取得失敗');
       return NextResponse.redirect(
-        new URL('/integrations?error=user_info_failed', request.url)
+        new URL('/integrations?error=user_info_failed&message=' + encodeURIComponent('LINE WORKSユーザー情報の取得に失敗しました。スコープ設定を確認してください。'), request.url)
       );
     }
 
@@ -162,14 +162,14 @@ export async function GET(request: NextRequest) {
       companyName: orgInfo?.companyName
     });
 
-    // データベース保存（修正版）
+      // データベース保存（修正版）
     console.log('💾 LINE WORKS統合情報をデータベースに保存開始');
     
     await prisma.integration.upsert({
       where: {
         userId_service: {
           userId: user.id,
-          service: 'line-works'
+          service: 'line-works' // ✅ そのまま維持（スキーマ上問題なし）
         }
       },
       update: {
@@ -177,17 +177,17 @@ export async function GET(request: NextRequest) {
         refreshToken: tokenResponse.refresh_token || null,
         isActive: true,
         teamId: orgInfo?.domainId || userInfo.domainId,
-        teamName: orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization',
+        teamName: orgInfo?.companyName || orgInfo?.domainName || userInfo.displayName || 'LINE WORKS Organization',
         updatedAt: new Date()
       },
       create: {
         userId: user.id,
-        service: 'line-works',
+        service: 'line-works', // ✅ そのまま維持
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
         isActive: true,
         teamId: orgInfo?.domainId || userInfo.domainId,
-        teamName: orgInfo?.companyName || orgInfo?.domainName || 'Unknown Organization',
+        teamName: orgInfo?.companyName || orgInfo?.domainName || userInfo.displayName || 'LINE WORKS Organization',
         createdAt: new Date(),
         updatedAt: new Date()
       }
@@ -279,17 +279,33 @@ async function getUserInfo(accessToken: string): Promise<LineWorksUserInfo | nul
     const response = await fetch('https://www.worksapis.com/v1.0/users/me', {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ LINE WORKS ユーザー情報取得 HTTP エラー:', response.status, errorText);
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      
+      // より詳細なエラー情報
+      if (response.status === 401) {
+        throw new Error('認証エラー: アクセストークンが無効または期限切れです');
+      } else if (response.status === 403) {
+        throw new Error('権限エラー: user:read スコープが不足している可能性があります');
+      } else if (response.status === 404) {
+        throw new Error('APIエンドポイントが見つかりません');
+      } else {
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+      }
     }
 
     const userInfo: LineWorksUserInfo = await response.json();
+    
+    // 必須フィールドの検証
+    if (!userInfo.userId || !userInfo.domainId) {
+      throw new Error('ユーザー情報の必須フィールド（userId, domainId）が不足しています');
+    }
     
     console.log('📋 LINE WORKS ユーザー情報レスポンス:', {
       userId: userInfo.userId,
@@ -303,7 +319,7 @@ async function getUserInfo(accessToken: string): Promise<LineWorksUserInfo | nul
     return userInfo;
   } catch (error) {
     console.error('❌ LINE WORKS ユーザー情報取得エラー:', error);
-    return null;
+    return null; // ✅ 修正: nullを返して上位で処理
   }
 }
 

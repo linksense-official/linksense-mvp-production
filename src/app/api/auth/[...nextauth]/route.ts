@@ -4,6 +4,7 @@ import SlackProvider from 'next-auth/providers/slack'
 import DiscordProvider from 'next-auth/providers/discord'
 import AzureADProvider from 'next-auth/providers/azure-ad'
 import { PrismaClient } from '@prisma/client'
+import type { OAuthConfig, OAuthUserConfig } from 'next-auth/providers/oauth'
 
 console.log('🚀 LinkSense MVP - OAuth統合修正版（複数サービス同時接続対応）')
 console.log('🌐 NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
@@ -13,7 +14,7 @@ console.log('🔧 Environment:', process.env.NODE_ENV)
 const prisma = new PrismaClient()
 
 export const authOptions: AuthOptions = {
-  providers: [
+    providers: [
     // Google OAuth (Google Meet統合も兼用)
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -62,6 +63,33 @@ export const authOptions: AuthOptions = {
         }
       }
     }),
+
+       // LINE WORKS OAuth - 新規追加（型修正版）
+    {
+      id: "line-works",
+      name: "LINE WORKS",
+      type: "oauth",
+      authorization: {
+        url: "https://auth.worksmobile.com/oauth2/v2.0/authorize",
+        params: {
+          scope: "user:read",
+          response_type: "code",
+          access_type: "offline",
+        }
+      },
+      token: "https://auth.worksmobile.com/oauth2/v2.0/token",
+      userinfo: "https://www.worksapis.com/v1.0/users/me",
+      clientId: process.env.LINE_WORKS_CLIENT_ID!,
+      clientSecret: process.env.LINE_WORKS_CLIENT_SECRET!,
+      profile(profile: any) {
+        return {
+          id: profile.userId,
+          name: profile.userName || profile.displayName,
+          email: profile.userEmail || profile.email,
+          image: profile.photoUrl || profile.picture,
+        }
+      },
+    } as OAuthConfig<any>,
   ],
   
   debug: process.env.NODE_ENV === 'development',
