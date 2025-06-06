@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -14,41 +12,26 @@ const getRedirectUri = () => {
 };
 
 export async function GET(request: NextRequest) {
-  console.log('🔄 LINE WORKS コールバック処理開始');
+  console.log('🔄 LINE WORKS OAuth コールバック処理開始');
   
   try {
-    // セッション確認
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      console.error('❌ 未認証ユーザーのアクセス');
-      return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
-    }
-
-    // ユーザー情報取得
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user) {
-      console.error('❌ ユーザーがデータベースに存在しません');
-      return NextResponse.redirect(new URL('/login?error=user_not_found', request.url));
-    }
-
+    // URLパラメータ取得
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const error = searchParams.get('error');
     const state = searchParams.get('state');
 
-    console.log('📋 コールバックパラメータ:', { 
-      code: code ? `${code.substring(0, 10)}...` : '未取得', 
+    console.log('📋 LINE WORKSコールバックパラメータ:', { 
+      code: code ? '取得済み' : '未取得', 
       error,
       state: state ? `${state.substring(0, 10)}...` : '未取得'
     });
 
+    // エラーハンドリング
     if (error) {
       console.error('❌ LINE WORKS OAuth エラー:', error);
       return NextResponse.redirect(
-        new URL(`/integrations?error=${encodeURIComponent('LINE WORKS認証エラー: ' + error)}`, request.url)
+        new URL(`/integrations?error=line_works_oauth_error&message=${error}`, request.url)
       );
     }
 
@@ -73,98 +56,171 @@ export async function GET(request: NextRequest) {
     const tokenResponse = await exchangeCodeForToken(code);
     
     if (!tokenResponse.access_token) {
-      console.error('❌ アクセストークン取得失敗');
+      console.error('❌ LINE WORKSアクセストークン取得失敗');
       return NextResponse.redirect(
         new URL('/integrations?error=token_exchange_failed', request.url)
       );
     }
 
-   // ユーザー情報取得
-console.log('👤 LINE WORKS ユーザー情報取得開始');
-const userInfo = await getUserInfo(tokenResponse.access_token);
+    console.log('✅ LINE WORKSアクセストークン取得成功');
 
-// 修正: userInfoは必ず返されるので、基本的なvalidationのみ
-if (!userInfo || !userInfo.displayName) {
-  console.error('❌ ユーザー情報が不完全です');
-  return NextResponse.redirect(
-    new URL('/integrations?error=user_info_incomplete', request.url)
-  );
-}
+    // ユーザー情報取得
+    console.log('👤 LINE WORKS ユーザー情報取得開始');
+    const userInfo = await getUserInfo(tokenResponse.access_token);
 
-    // データベース保存
-    console.log('💾 LINE WORKS統合情報をデータベースに保存');
-    
-    await prisma.integration.upsert({
-  where: {
-    userId_service: {
-      userId: user.id,
-      service: 'line-works'
+    // 修正: userInfoは必ず返されるので、基本的なvalidationのみ
+    if (!userInfo || !userInfo.displayName) {
+      console.error('❌ ユーザー情報が不完全です');
+      return NextResponse.redirect(
+        new URL('/integrations?error=user_info_incomplete', request.url)
+      );
     }
-  },
-  update: {
-    accessToken: tokenResponse.access_token,
-    refreshToken: tokenResponse.refresh_token || null,
-    isActive: true,
-    teamId: String(userInfo.domainId),
-    teamName: typeof userInfo.displayName === 'object' 
-      ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
-      : (userInfo.displayName || 'LINE WORKS Organization'),
-    updatedAt: new Date()
-  },
-  create: {
-    userId: user.id,
-    service: 'line-works',
-    accessToken: tokenResponse.access_token,
-    refreshToken: tokenResponse.refresh_token || null,
-    isActive: true,
-    teamId: String(userInfo.domainId),
-    teamName: typeof userInfo.displayName === 'object' 
-      ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
-      : (userInfo.displayName || 'LINE WORKS Organization'),
-    createdAt: new Date(),
-    updatedAt: new Date()
-  }
-});
+
+    console.log('✅ LINE WORKSユーザー情報取得成功:', userInfo.displayName);
+
+    // LINE WORKS ユーザーIDでユーザー作成（ChatWork方式）
+    const lineWorksUserId = `line-works_${userInfo.userId}`;
+    const userEmail = userInfo.email || `line-works_${userInfo.userId}@line-works.local`;
+    
+    console.log('生成されたユーザーID:', lineWorksUserId);
+    console.log('ユーザーメール:', userEmail);
+
+    // 既存のUserレコードを確認
+    let existingUser = await prisma.user.findUnique({
+      where: { id: lineWorksUserId }
+    });
+
+    console.log('既存Userレコード確認:', existingUser);
+
+    if (!existingUser) {
+      // 存在しない場合は新規作成
+      console.log('新規Userレコード作成開始...');
+      try {
+        existingUser = await prisma.user.create({
+          data: {
+            id: lineWorksUserId,
+            email: userEmail,
+            name: typeof userInfo.displayName === 'object' 
+              ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
+              : (userInfo.displayName || 'LINE WORKS User'),
+            company: userInfo.domainId || null,
+            role: 'user',
+            lastLoginAt: new Date()
+          }
+        });
+        console.log('新規Userレコード作成成功:', existingUser.id);
+      } catch (createError: any) {
+        console.error('Userレコード作成エラー:', createError);
+        
+        // メールアドレス重複の場合、既存レコードを取得
+        if (createError?.code === 'P2002') {
+          existingUser = await prisma.user.findUnique({
+            where: { email: userEmail }
+          });
+          if (existingUser) {
+            console.log('メール重複により既存レコード使用:', existingUser.id);
+          }
+        }
+        
+        if (!existingUser) {
+          throw new Error(`Userレコード作成に失敗: ${createError.message}`);
+        }
+      }
+    } else {
+      console.log('既存Userレコード使用:', existingUser.id);
+    }
+
+    // 最終的なuserIdを確定
+    const finalUserId = existingUser.id;
+    console.log('最終使用UserID:', finalUserId);
+
+    // データベースに統合情報を保存
+    console.log('Integration保存開始...');
+    await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: finalUserId,
+          service: 'line-works'
+        }
+      },
+      update: {
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: String(userInfo.domainId),
+        teamName: typeof userInfo.displayName === 'object' 
+          ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
+          : (userInfo.displayName || 'LINE WORKS Organization'),
+        updatedAt: new Date()
+      },
+      create: {
+        userId: finalUserId,
+        service: 'line-works',
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: String(userInfo.domainId),
+        teamName: typeof userInfo.displayName === 'object' 
+          ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
+          : (userInfo.displayName || 'LINE WORKS Organization')
+      }
+    });
+
     console.log('✅ LINE WORKS統合完了');
 
     // 成功時のリダイレクト
+    const displayName = typeof userInfo.displayName === 'object' 
+      ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
+      : (userInfo.displayName || 'LINE WORKS User');
+
+    // Cookieクリア
     const response = NextResponse.redirect(
-      new URL(`/integrations?success=true&service=line-works&user=${encodeURIComponent(userInfo.displayName)}`, request.url)
+      new URL(`/integrations?success=line_works_connected&user=${encodeURIComponent(displayName)}`, request.url)
     );
-    
-    // State cookie削除
     response.cookies.delete('line_works_oauth_state');
     
     return response;
 
   } catch (error) {
-    console.error('❌ LINE WORKS コールバック処理エラー:', error);
+    console.error('❌ LINE WORKS OAuth処理中にエラー:', error);
     return NextResponse.redirect(
-      new URL(`/integrations?error=${encodeURIComponent('コールバック処理エラー')}`, request.url)
+      new URL(`/integrations?error=line_works_integration_failed&message=${encodeURIComponent(error instanceof Error ? error.message : 'Unknown error')}`, request.url)
     );
   }
 }
 
 async function exchangeCodeForToken(code: string) {
-  const response = await fetch('https://auth.worksmobile.com/oauth2/v2.0/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: LINE_WORKS_CLIENT_ID!,
-      client_secret: LINE_WORKS_CLIENT_SECRET!,
-      code: code,
-      redirect_uri: getRedirectUri(),
-      grant_type: 'authorization_code'
-    })
-  });
+  try {
+    console.log('🔄 LINE WORKS Token exchange開始');
+    
+    const response = await fetch('https://auth.worksmobile.com/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: LINE_WORKS_CLIENT_ID!,
+        client_secret: LINE_WORKS_CLIENT_SECRET!,
+        code: code,
+        redirect_uri: getRedirectUri(),
+        grant_type: 'authorization_code'
+      })
+    });
 
-  if (!response.ok) {
-    throw new Error(`Token exchange failed: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Token exchange error:', errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('📋 LINE WORKS Token exchange成功');
+    
+    return data;
+  } catch (error) {
+    console.error('❌ LINE WORKS Token exchange エラー:', error);
+    return { error: error instanceof Error ? error.message : 'token_exchange_failed' };
   }
-
-  return await response.json();
 }
 
 async function getUserInfo(accessToken: string) {

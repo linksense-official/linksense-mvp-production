@@ -11,9 +11,7 @@ const getRedirectUri = () => {
 const LINE_WORKS_SCOPES = 'user.read user.profile.read user.email.read';
 
 const generateSecureState = () => {
-  return Array.from(crypto.getRandomValues(new Uint8Array(32)))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
 
 export async function GET(request: NextRequest) {
@@ -22,12 +20,18 @@ export async function GET(request: NextRequest) {
   try {
     if (!LINE_WORKS_CLIENT_ID || !LINE_WORKS_CLIENT_SECRET) {
       console.error('❌ LINE WORKS環境変数が設定されていません');
-      const errorUrl = `${process.env.NEXTAUTH_URL}/integrations?error=line_works_config_missing`;
-      return NextResponse.redirect(errorUrl);
+      return NextResponse.redirect(
+        new URL('/integrations?error=line_works_config_missing', request.url)
+      );
     }
 
     const redirectUri = getRedirectUri();
     const state = generateSecureState();
+    
+    console.log('LINE WORKS OAuth開始:', { 
+      clientId: LINE_WORKS_CLIENT_ID ? '設定済み' : '未設定', 
+      redirectUri 
+    });
     
     // LINE WORKS OAuth URL構築
     const authUrl = new URL('https://auth.worksmobile.com/oauth2/v2.0/authorize');
@@ -37,7 +41,7 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.set('scope', LINE_WORKS_SCOPES);
     authUrl.searchParams.set('state', state);
     
-    console.log('✅ LINE WORKS OAuth URL:', authUrl.toString());
+    console.log('LINE WORKS認証URL生成完了:', authUrl.toString());
     
     const response = NextResponse.redirect(authUrl.toString());
     
@@ -55,7 +59,8 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ LINE WORKS OAuth開始エラー:', error);
-    const errorUrl = `${process.env.NEXTAUTH_URL}/integrations?error=line_works_oauth_failed`;
-    return NextResponse.redirect(errorUrl);
+    return NextResponse.redirect(
+      new URL('/integrations?error=line_works_oauth_start_failed', request.url)
+    );
   }
 }
