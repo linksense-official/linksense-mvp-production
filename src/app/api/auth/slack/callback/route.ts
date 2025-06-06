@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-// import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -38,7 +36,7 @@ interface SlackTokenResponse {
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
 
-// Redirect URI生成（統合ページ対応）
+// Redirect URI生成
 const getRedirectUri = () => {
   const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
   return `${baseUrl}/api/auth/slack/callback`;
@@ -48,13 +46,6 @@ export async function GET(request: NextRequest) {
   console.log('🔄 Slack OAuth コールバック処理開始');
   
   try {
-    // セッション確認
-    const session = await getServerSession();
-    if (!session?.user?.id) {
-      console.error('❌ 未認証ユーザーのアクセス');
-      return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
-    }
-
     // URLパラメータ取得
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
@@ -103,6 +94,30 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ Slackアクセストークン取得成功');
 
+    // Slackユーザー情報を取得してメールアドレスを特定
+    const userInfo = await getSlackUserInfo(tokenResponse.access_token, tokenResponse.authed_user?.id);
+    
+    if (!userInfo?.email) {
+      console.error('❌ Slackユーザー情報の取得に失敗');
+      return NextResponse.redirect(
+        new URL('/integrations?error=user_info_failed', request.url)
+      );
+    }
+
+    // メールアドレスでユーザーを特定
+    const user = await prisma.user.findUnique({
+      where: { email: userInfo.email }
+    });
+
+    if (!user) {
+      console.error('❌ 対応するユーザーが見つかりません:', userInfo.email);
+      return NextResponse.redirect(
+        new URL('/integrations?error=user_not_found', request.url)
+      );
+    }
+
+    console.log('✅ ユーザー特定成功:', { userId: user.id, email: userInfo.email });
+
     // チーム情報取得
     console.log('👥 Slackチーム情報取得開始');
     const teamInfo = await getSlackTeamInfo(tokenResponse.access_token);
@@ -122,7 +137,7 @@ export async function GET(request: NextRequest) {
     await prisma.integration.upsert({
       where: {
         userId_service: {
-          userId: session.user.id,
+          userId: user.id,
           service: 'slack'
         }
       },
@@ -135,7 +150,7 @@ export async function GET(request: NextRequest) {
         updatedAt: new Date()
       },
       create: {
-        userId: session.user.id,
+        userId: user.id,
         service: 'slack',
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.authed_user?.access_token || null,
@@ -208,6 +223,37 @@ async function exchangeCodeForToken(code: string): Promise<SlackTokenResponse> {
       ok: false, 
       error: error instanceof Error ? error.message : 'token_exchange_failed' 
     };
+  }
+}
+
+async function getSlackUserInfo(accessToken: string, userId?: string) {
+  try {
+    console.log('🔄 Slackユーザー情報API呼び出し開始');
+    
+    const response = await fetch('https://slack.com/api/users.profile.get', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    console.log('📋 Slackユーザー情報レスポンス:', {
+      ok: data.ok,
+      email: data.profile?.email,
+      error: data.error
+    });
+    
+    return data.profile;
+  } catch (error) {
+    console.error('❌ Slackユーザー情報取得エラー:', error);
+    return null;
   }
 }
 
