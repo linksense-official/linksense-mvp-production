@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
-  console.log('🚨🚨🚨 LINE WORKS コールバック処理開始');
-  console.log('🔍 リクエストURL:', request.url);
+  console.log('🔄 LINE WORKS OAuth コールバック処理開始');
   
   try {
     // URLパラメータ取得
@@ -12,8 +11,8 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
-    console.log('🚨 コールバックパラメータ:', { 
-      code: code ? `取得済み(${code.substring(0, 10)}...)` : '未取得', 
+    console.log('📋 LINE WORKSコールバックパラメータ:', { 
+      code: code ? '取得済み' : '未取得', 
       state, 
       error 
     });
@@ -33,10 +32,48 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 強制的にテスト用リダイレクト
-    console.log('🚨 テスト用リダイレクト実行');
+    // アクセストークン取得
+    console.log('🔑 LINE WORKS アクセストークン取得開始');
+    const tokenResponse = await exchangeCodeForToken(code);
+    
+    console.log('🔑 トークンレスポンス確認:', {
+      hasAccessToken: !!tokenResponse.access_token,
+      hasError: !!tokenResponse.error,
+      tokenStart: tokenResponse.access_token ? tokenResponse.access_token.substring(0, 10) + '...' : 'なし'
+    });
+    
+    if (!tokenResponse.access_token) {
+      console.error('❌ LINE WORKSアクセストークン取得失敗');
+      return NextResponse.redirect(
+        new URL('/integrations?error=token_exchange_failed', request.url)
+      );
+    }
+
+    console.log('✅ LINE WORKSアクセストークン取得成功');
+
+    // ユーザー情報取得
+    const userInfo = await getUserInfo(tokenResponse.access_token);
+    
+    console.log('👤 ユーザー情報確認:', {
+      userInfo: userInfo ? 'あり' : 'なし',
+      displayName: userInfo?.displayName,
+      userId: userInfo?.userId,
+      email: userInfo?.email
+    });
+    
+    if (!userInfo) {
+      console.error('❌ LINE WORKSユーザー情報取得失敗');
+      return NextResponse.redirect(
+        new URL('/integrations?error=user_info_failed', request.url)
+      );
+    }
+
+    // 一時的にユーザー名を固定して確認
+    const testUserName = userInfo.displayName || userInfo.name || userInfo.userName || 'LINE_WORKS_USER';
+    console.log('👤 最終ユーザー名:', testUserName);
+
     return NextResponse.redirect(
-      new URL('/integrations?success=line_works_connected&user=TEST_USER&debug=callback_executed', request.url)
+      new URL(`/integrations?success=line_works_connected&user=${encodeURIComponent(testUserName)}&debug=user_info_success`, request.url)
     );
 
   } catch (error) {
@@ -46,7 +83,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
 async function exchangeCodeForToken(code: string) {
   try {
     const clientId = process.env.LINE_WORKS_CLIENT_ID;
