@@ -36,12 +36,6 @@ export async function GET(request: NextRequest) {
     console.log('🔑 LINE WORKS アクセストークン取得開始');
     const tokenResponse = await exchangeCodeForToken(code);
     
-    console.log('🔑 トークンレスポンス確認:', {
-      hasAccessToken: !!tokenResponse.access_token,
-      hasError: !!tokenResponse.error,
-      tokenStart: tokenResponse.access_token ? tokenResponse.access_token.substring(0, 10) + '...' : 'なし'
-    });
-    
     if (!tokenResponse.access_token) {
       console.error('❌ LINE WORKSアクセストークン取得失敗');
       return NextResponse.redirect(
@@ -54,13 +48,6 @@ export async function GET(request: NextRequest) {
     // ユーザー情報取得
     const userInfo = await getUserInfo(tokenResponse.access_token);
     
-    console.log('👤 ユーザー情報確認:', {
-      userInfo: userInfo ? 'あり' : 'なし',
-      displayName: userInfo?.displayName,
-      userId: userInfo?.userId,
-      email: userInfo?.email
-    });
-    
     if (!userInfo) {
       console.error('❌ LINE WORKSユーザー情報取得失敗');
       return NextResponse.redirect(
@@ -68,11 +55,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-      // ユーザー名を正しく取得
-    let userName = 'LINE_WORKS_USER'; // デフォルト値
-    
+    // ユーザー名を正しく取得
+    let userName = 'LINE_WORKS_USER';
     if (userInfo) {
-      // 複数のフィールドを順番に確認
       if (typeof userInfo.displayName === 'string') {
         userName = userInfo.displayName;
       } else if (typeof userInfo.name === 'string') {
@@ -82,16 +67,96 @@ export async function GET(request: NextRequest) {
       } else if (typeof userInfo.email === 'string') {
         userName = userInfo.email;
       } else if (userInfo.displayName && typeof userInfo.displayName === 'object') {
-        // displayNameがオブジェクトの場合、中身を確認
         userName = userInfo.displayName.ja || userInfo.displayName.en || userInfo.displayName.value || 'LINE_WORKS_USER';
       }
     }
-    
-    console.log('👤 最終ユーザー名:', userName);
 
-    return NextResponse.redirect(
-      new URL(`/integrations?success=line_works_connected&user=${encodeURIComponent(userName)}&debug=user_info_success`, request.url)
+    console.log('✅ LINE WORKSユーザー情報取得成功:', userName);
+
+    // LINE WORKSユーザーIDでユーザー作成
+    const lineWorksUserId = `line-works_${userInfo.userId || Date.now()}`;
+    const userEmail = userInfo.email || `line-works_${userInfo.userId || Date.now()}@lineworks.local`;
+    
+    console.log('生成されたユーザーID:', lineWorksUserId);
+    console.log('ユーザーメール:', userEmail);
+
+    // 既存のUserレコードを確認
+    let existingUser = await prisma.user.findUnique({
+      where: { id: lineWorksUserId }
+    });
+
+    if (!existingUser) {
+      // 存在しない場合は新規作成
+      try {
+        existingUser = await prisma.user.create({
+          data: {
+            id: lineWorksUserId,
+            email: userEmail,
+            name: userName,
+            company: userInfo.domainName || null,
+            role: 'user',
+            lastLoginAt: new Date()
+          }
+        });
+        console.log('新規Userレコード作成成功:', existingUser.id);
+      } catch (createError: any) {
+        console.error('Userレコード作成エラー:', createError);
+        
+        if (createError?.code === 'P2002') {
+          existingUser = await prisma.user.findUnique({
+            where: { email: userEmail }
+          });
+          if (existingUser) {
+            console.log('メール重複により既存レコード使用:', existingUser.id);
+          }
+        }
+        
+        if (!existingUser) {
+          throw new Error(`Userレコード作成に失敗: ${createError.message}`);
+        }
+      }
+    } else {
+      console.log('既存Userレコード使用:', existingUser.id);
+    }
+
+    // データベースに統合情報を保存
+    console.log('Integration保存開始...');
+    await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: existingUser.id,
+          service: 'lineworks'
+        }
+      },
+      update: {
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: userInfo.domainId?.toString() || 'unknown',
+        teamName: userInfo.domainName || userName || 'LINE WORKS User',
+        updatedAt: new Date()
+      },
+      create: {
+        userId: existingUser.id,
+        service: 'lineworks',
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token || null,
+        isActive: true,
+        teamId: userInfo.domainId?.toString() || 'unknown',
+        teamName: userInfo.domainName || userName || 'LINE WORKS User'
+      }
+    });
+
+    console.log('✅ LINE WORKS統合完了');
+
+    // Cookieクリア
+    const response = NextResponse.redirect(
+      new URL(`/integrations?success=line_works_connected&user=${encodeURIComponent(userName)}`, request.url)
     );
+    response.cookies.delete('line_works_oauth_state');
+
+    return response;
+
   } catch (error) {
     console.error('❌ LINE WORKS OAuth処理中にエラー:', error);
     return NextResponse.redirect(
