@@ -210,7 +210,7 @@ async function getUserInfo(accessToken: string) {
     console.log('📡 LINE WORKS API レスポンス:', {
       status: response.status,
       statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
+      ok: response.ok
     });
 
     if (!response.ok) {
@@ -220,13 +220,11 @@ async function getUserInfo(accessToken: string) {
     }
 
     const userInfo = await response.json();
-    console.log('📋 LINE WORKS ユーザー情報取得成功 - RAWデータ:', JSON.stringify(userInfo, null, 2));
+    console.log('📋 LINE WORKS ユーザー情報 RAWデータ:', JSON.stringify(userInfo, null, 2));
     console.log('📋 重要フィールド確認:', {
       displayName: userInfo.displayName,
       userId: userInfo.userId,
       email: userInfo.email,
-      domainName: userInfo.domainName,
-      domainId: userInfo.domainId,
       userName: userInfo.userName,
       name: userInfo.name
     });
