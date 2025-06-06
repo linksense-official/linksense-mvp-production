@@ -29,17 +29,6 @@ export const authOptions: AuthOptions = {
       },
     }),
     
-    // Slack OAuth - 修正版
-    SlackProvider({
-      clientId: process.env.SLACK_CLIENT_ID!,
-      clientSecret: process.env.SLACK_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: 'users:read team:read', // 修正: channels:read を削除（無効なスコープ）
-          user_scope: 'identify' // 追加: ユーザースコープ
-        }
-      }
-    }),
     
     // Discord OAuth
     DiscordProvider({
