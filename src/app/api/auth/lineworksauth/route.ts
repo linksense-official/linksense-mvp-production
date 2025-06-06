@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.append('client_id', clientId);
     authUrl.searchParams.append('response_type', 'code');
     authUrl.searchParams.append('redirect_uri', redirectUri);
-    authUrl.searchParams.append('scope', 'user.read');
+    // authUrl.searchParams.append('scope', 'user.read'); // この行をコメントアウト
     authUrl.searchParams.append('state', state);
 
     console.log('🔵 LINE WORKS認証URL生成完了:', authUrl.toString());
