@@ -68,14 +68,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 一時的にユーザー名を固定して確認
-    const testUserName = userInfo.displayName || userInfo.name || userInfo.userName || 'LINE_WORKS_USER';
-    console.log('👤 最終ユーザー名:', testUserName);
+      // ユーザー名を正しく取得
+    let userName = 'LINE_WORKS_USER'; // デフォルト値
+    
+    if (userInfo) {
+      // 複数のフィールドを順番に確認
+      if (typeof userInfo.displayName === 'string') {
+        userName = userInfo.displayName;
+      } else if (typeof userInfo.name === 'string') {
+        userName = userInfo.name;
+      } else if (typeof userInfo.userName === 'string') {
+        userName = userInfo.userName;
+      } else if (typeof userInfo.email === 'string') {
+        userName = userInfo.email;
+      } else if (userInfo.displayName && typeof userInfo.displayName === 'object') {
+        // displayNameがオブジェクトの場合、中身を確認
+        userName = userInfo.displayName.ja || userInfo.displayName.en || userInfo.displayName.value || 'LINE_WORKS_USER';
+      }
+    }
+    
+    console.log('👤 最終ユーザー名:', userName);
 
     return NextResponse.redirect(
-      new URL(`/integrations?success=line_works_connected&user=${encodeURIComponent(testUserName)}&debug=user_info_success`, request.url)
+      new URL(`/integrations?success=line_works_connected&user=${encodeURIComponent(userName)}&debug=user_info_success`, request.url)
     );
-
   } catch (error) {
     console.error('❌ LINE WORKS OAuth処理中にエラー:', error);
     return NextResponse.redirect(
