@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('redirect_uri', redirectUri);
-    authUrl.searchParams.set('scope', 'user.read user.profile.read user.email.read');
+    authUrl.searchParams.set('scope', 'user.read');
     authUrl.searchParams.set('state', state);
 
     console.log('LINE WORKS認証URL生成完了:', authUrl.toString());
