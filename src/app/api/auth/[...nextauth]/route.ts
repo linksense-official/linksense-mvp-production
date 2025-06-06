@@ -63,7 +63,8 @@ export const authOptions: AuthOptions = {
         }
       }
     }),
-
+    // 一時的にコメントアウト
+    /*
          // LINE WORKS OAuth - TypeScriptエラー修正版
     {
       id: "line-works",
@@ -107,6 +108,7 @@ export const authOptions: AuthOptions = {
         }
       },
     } as OAuthConfig<any>,
+         */
   ],
   
   debug: process.env.NODE_ENV === 'development',

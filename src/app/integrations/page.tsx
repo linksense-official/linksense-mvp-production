@@ -83,15 +83,14 @@ const services: ServiceConfig[] = [
     authUrl: '/api/auth/chatwork',
     isNextAuth: false,
   },
-  {
-    // ✅ LINE WORKS設定修正
+    {
     id: 'line-works',
     name: 'LINE WORKS',
     description: 'ビジネス向けLINE',
     icon: Phone,
     color: 'bg-green-500',
-    authUrl: '/api/auth/signin/line-works', // 修正: NextAuth経由に変更
-    isNextAuth: true, // 修正: false → true
+    authUrl: '/api/auth/line-works', // カスタム認証
+    isNextAuth: false, // NextAuthを使わない
   },
 ]
 
