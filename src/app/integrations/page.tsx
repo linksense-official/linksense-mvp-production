@@ -48,13 +48,13 @@ const services: ServiceConfig[] = [
     isNextAuth: true,
   },
   {
-    id: 'slack',
-    name: 'Slack',
-    description: 'チームコミュニケーション',
-    icon: MessageSquare,
-    color: 'bg-purple-500',
-    authUrl: '/api/auth/signin/slack',
-    isNextAuth: true,
+     id: 'slack',
+  name: 'Slack',
+  description: 'チームコミュニケーション',
+  icon: MessageSquare,
+  color: 'bg-purple-500',
+  authUrl: '/api/auth/slack',  // ✅ 正しい
+  isNextAuth: false,           // ✅ カスタム実装に変更
   },
   {
     id: 'discord',
