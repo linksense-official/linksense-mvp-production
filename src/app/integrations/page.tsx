@@ -172,43 +172,22 @@ export default function IntegrationsPage() {
     }
   }
 
-  const handleConnect = async (service: ServiceConfig) => {
-  console.log('🔧 handleConnect開始:', {
-    serviceName: service.name,
-    serviceId: service.id,
-    isNextAuth: service.isNextAuth,
-    authUrl: service.authUrl,
-    timestamp: new Date().toISOString()
-  });
-  
-  setConnecting(service.id)
-  
-  try {
-    if (service.isNextAuth) {
-      console.log('🔧 NextAuth経由の認証開始');
-      await signIn(service.id, { callbackUrl: '/integrations?success=true' })
-    } else if (service.id === 'chatwork') {
-      console.log('🔧 ChatWork認証開始');
-      window.location.href = service.authUrl
-    } else {
-      console.log('🔧 カスタム認証開始:', service.id);
-      console.log('🔧 リダイレクト先URL:', service.authUrl);
-      console.log('🔧 window.location.href実行前');
-      
-      window.location.href = service.authUrl;
-      
-      console.log('🔧 window.location.href実行後');
+   const handleConnect = async (service: ServiceConfig) => {
+    setConnecting(service.id)
+    
+    try {
+      if (service.isNextAuth) {
+        await signIn(service.id, { callbackUrl: '/integrations?success=true' })
+      } else if (service.id === 'chatwork') {
+        window.location.href = service.authUrl
+      } else {
+        window.location.href = service.authUrl
+      }
+    } catch (error) {
+      console.error(`${service.name}認証エラー:`, error)
+      setConnecting(null)
     }
-  } catch (error) {
-    console.error(`❌ ${service.name}認証エラー:`, {
-      error,
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      timestamp: new Date().toISOString()
-    });
-    setConnecting(null)
   }
-}
 
   if (status === 'loading') {
     return (
@@ -392,7 +371,7 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
                 
-               <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <div className="mt-4 flex flex-col sm:flex-row gap-2">
   {isConnected ? (
     <>
       <button
@@ -403,10 +382,7 @@ export default function IntegrationsPage() {
         切断
       </button>
       <button
-        onClick={() => {
-          console.log('🔧 再接続ボタンクリック:', service.name, service.id);
-          handleConnect(service);
-        }}
+        onClick={() => handleConnect(service)}
         disabled={connecting === service.id}
         className={`flex-1 inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200`}
       >
@@ -415,53 +391,23 @@ export default function IntegrationsPage() {
       </button>
     </>
   ) : (
-    <>
-      {/* 通常の接続ボタン */}
-      <button
-        onClick={() => {
-          console.log('🔧 接続ボタンクリック:', service.name, service.id);
-          handleConnect(service);
-        }}
-        disabled={connecting === service.id}
-        className={`w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200 mb-2`}
-      >
-        {connecting === service.id ? (
-          <>
-            <RefreshCw className="animate-spin h-4 w-4 mr-2" />
-            接続中...
-          </>
-        ) : (
-          <>
-            <CheckCircle className="h-4 w-4 mr-2" />
-            連携する
-          </>
-        )}
-      </button>
-
-      {/* LINE WORKS専用のテストボタン */}
-      {service.id === 'line-works' && (
+    <button
+      onClick={() => handleConnect(service)}
+      disabled={connecting === service.id}
+      className={`w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200`}
+    >
+      {connecting === service.id ? (
         <>
-          <button
-            onClick={() => {
-              console.log('🧪 テストボタンクリック検出');
-              alert('テストボタンが動作しています');
-              console.log('🧪 直接リダイレクト実行');
-              window.location.href = '/api/auth/line-works';
-            }}
-            className="w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-500 hover:opacity-80 mb-2"
-          >
-            🧪 LINE WORKS直接テスト
-          </button>
-
-          <button
-            onClick={() => console.log('🧪 ログテスト - LINE WORKS')}
-            className="w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-yellow-500 hover:opacity-80"
-          >
-            🧪 ログテスト
-          </button>
+          <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+          接続中...
+        </>
+      ) : (
+        <>
+          <CheckCircle className="h-4 w-4 mr-2" />
+          連携する
         </>
       )}
-    </>
+    </button>
   )}
 </div>
               </div>
