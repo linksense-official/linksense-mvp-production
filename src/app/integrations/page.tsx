@@ -392,7 +392,7 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
                 
-                <div className="mt-4 flex flex-col sm:flex-row gap-2">
+               <div className="mt-4 flex flex-col sm:flex-row gap-2">
   {isConnected ? (
     <>
       <button
@@ -404,7 +404,7 @@ export default function IntegrationsPage() {
       </button>
       <button
         onClick={() => {
-          console.log('🔧 再接続ボタンクリック検出:', service.name, service.id);
+          console.log('🔧 再接続ボタンクリック:', service.name, service.id);
           handleConnect(service);
         }}
         disabled={connecting === service.id}
@@ -415,26 +415,53 @@ export default function IntegrationsPage() {
       </button>
     </>
   ) : (
-    <button
-      onClick={() => {
-        console.log('🔧 新規接続ボタンクリック検出:', service.name, service.id);
-        handleConnect(service);
-      }}
-      disabled={connecting === service.id}
-      className={`w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200`}
-    >
-      {connecting === service.id ? (
+    <>
+      {/* 通常の接続ボタン */}
+      <button
+        onClick={() => {
+          console.log('🔧 接続ボタンクリック:', service.name, service.id);
+          handleConnect(service);
+        }}
+        disabled={connecting === service.id}
+        className={`w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200 mb-2`}
+      >
+        {connecting === service.id ? (
+          <>
+            <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+            接続中...
+          </>
+        ) : (
+          <>
+            <CheckCircle className="h-4 w-4 mr-2" />
+            連携する
+          </>
+        )}
+      </button>
+
+      {/* LINE WORKS専用のテストボタン */}
+      {service.id === 'line-works' && (
         <>
-          <RefreshCw className="animate-spin h-4 w-4 mr-2" />
-          接続中...
-        </>
-      ) : (
-        <>
-          <CheckCircle className="h-4 w-4 mr-2" />
-          連携する
+          <button
+            onClick={() => {
+              console.log('🧪 テストボタンクリック検出');
+              alert('テストボタンが動作しています');
+              console.log('🧪 直接リダイレクト実行');
+              window.location.href = '/api/auth/line-works';
+            }}
+            className="w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-500 hover:opacity-80 mb-2"
+          >
+            🧪 LINE WORKS直接テスト
+          </button>
+
+          <button
+            onClick={() => console.log('🧪 ログテスト - LINE WORKS')}
+            className="w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-yellow-500 hover:opacity-80"
+          >
+            🧪 ログテスト
+          </button>
         </>
       )}
-    </button>
+    </>
   )}
 </div>
               </div>
