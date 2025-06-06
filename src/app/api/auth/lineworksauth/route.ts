@@ -1,46 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  try {
-    const clientId = process.env.LINE_WORKS_CLIENT_ID;
-    const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/lineworksauth/callback`;
-    
-    console.log('LINE WORKS OAuth開始:', { clientId: clientId ? '設定済み' : '未設定', redirectUri });
-    
-    if (!clientId) {
-      return NextResponse.redirect(
-        new URL('/integrations?error=line_works_client_id_missing', request.url)
-      );
-    }
-
-    // セキュアなstate生成
-    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-    // LINE WORKS OAuth認証URL生成
-    const authUrl = new URL('https://auth.worksmobile.com/oauth2/v2.0/authorize');
-    authUrl.searchParams.append('client_id', clientId);
-    authUrl.searchParams.append('response_type', 'code');
-    authUrl.searchParams.append('redirect_uri', redirectUri);
-    authUrl.searchParams.append('scope', 'user.read');
-    authUrl.searchParams.append('state', state);
-
-    console.log('LINE WORKS認証URL生成完了:', authUrl.toString());
-
-    // stateをCookieに保存
-    const response = NextResponse.redirect(authUrl.toString());
-    response.cookies.set('line_works_oauth_state', state, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 600 // 10分間有効
-    });
-
-    return response;
-
-  } catch (error) {
-    console.error('LINE WORKS OAuth開始エラー:', error);
-    return NextResponse.redirect(
-      new URL('/integrations?error=line_works_oauth_start_failed', request.url)
-    );
-  }
+  console.log('🚨🚨🚨 LINE WORKS 認証開始ファイルが実行されました！');
+  console.log('🔍 リクエストURL:', request.url);
+  console.log('🔍 環境変数確認:', {
+    clientId: process.env.LINE_WORKS_CLIENT_ID ? '設定済み' : '未設定',
+    nextAuthUrl: process.env.NEXTAUTH_URL
+  });
+  
+  // 一時的に強制的にエラーを発生させて確認
+  return NextResponse.redirect(
+    new URL('/integrations?error=debug_test&message=認証ファイルが実行されました', request.url)
+  );
 }
