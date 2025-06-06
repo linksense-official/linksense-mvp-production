@@ -7,7 +7,7 @@ const LINE_WORKS_CLIENT_ID = process.env.LINE_WORKS_CLIENT_ID;
 const LINE_WORKS_CLIENT_SECRET = process.env.LINE_WORKS_CLIENT_SECRET;
 
 export async function GET(request: NextRequest) {
-  console.log('🔄 LINE WORKS OAuth コールバック処理開始 - 新パス版');
+  console.log('🔄 LINE WORKS OAuth コールバック処理開始 - 完全独立パス版');
   
   try {
     const { searchParams } = new URL(request.url);
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
             name: typeof userInfo.displayName === 'object' 
               ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
               : (userInfo.displayName || 'LINE WORKS User'),
-            company: String(userInfo.domainId) || null,  // String()で文字列変換
+            company: String(userInfo.domainId) || null,
             role: 'user',
             lastLoginAt: new Date()
           }
@@ -180,7 +180,7 @@ async function exchangeCodeForToken(code: string) {
   try {
     console.log('🔄 LINE WORKS Token exchange開始');
     
-    const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/lineworks/callback`;
+    const redirectUri = `${process.env.NEXTAUTH_URL}/api/lineworks-oauth/callback`;
     
     const response = await fetch('https://auth.worksmobile.com/oauth2/v2.0/token', {
       method: 'POST',

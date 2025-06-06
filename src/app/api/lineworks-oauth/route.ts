@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  console.log('🔄 LINE WORKS OAuth 認証開始 - 新パス版');
+  console.log('🔄 LINE WORKS OAuth 認証開始 - 完全独立パス版');
   
   try {
     const clientId = process.env.LINE_WORKS_CLIENT_ID;
-    const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/lineworks/callback`;
+    const redirectUri = `${process.env.NEXTAUTH_URL}/api/lineworks-oauth/callback`;
     
     console.log('LINE WORKS OAuth開始:', { clientId: clientId ? '設定済み' : '未設定', redirectUri });
     

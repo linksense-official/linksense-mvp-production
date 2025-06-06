@@ -89,7 +89,7 @@ const services: ServiceConfig[] = [
   description: 'ビジネス向けLINE',
   icon: Phone,
   color: 'bg-green-500',
-  authUrl: '/api/auth/lineworks', // この設定が重要
+  authUrl: '/api/lineworks-oauth', // この設定が重要
   isNextAuth: false, // カスタム認証として設定
 },
 ]
