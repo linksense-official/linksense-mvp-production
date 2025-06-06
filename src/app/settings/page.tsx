@@ -441,19 +441,19 @@ const integrations: Integration[] = [
     priority: 3
   },
   {
-    id: 'line-works',
-    name: 'LINE WORKS',
-    description: 'LINEビジネスコミュニケーション分析',
-    category: 'communication',
-    market: 'japan',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['トーク分析', 'カレンダー統合', 'アドレス帳活用'],
-    setupUrl: '/api/auth/line-works',
-    icon: <MessageSquare className="w-5 h-5" />,
-    priority: 4
-  },
+  id: 'line-works',
+  name: 'LINE WORKS',
+  description: 'LINEビジネスコミュニケーション分析',
+  category: 'communication',
+  market: 'japan',
+  isConnected: false,
+  isConnecting: false,
+  isSyncing: false,
+  features: ['トーク分析', 'カレンダー統合', 'アドレス帳活用'],
+  setupUrl: '/api/auth/lineworksauth',  // ✅ 正しい
+  icon: <MessageSquare className="w-5 h-5" />,
+  priority: 4
+},
 
   // 残りのグローバルツール
   {

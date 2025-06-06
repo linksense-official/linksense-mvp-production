@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     const clientId = process.env.LINE_WORKS_CLIENT_ID;
-    const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/linetest/callback`;
+    const redirectUri = `${process.env.NEXTAUTH_URL}/api/auth/lineworksauth/callback`;
     
     console.log('LINE WORKS OAuth開始:', { clientId: clientId ? '設定済み' : '未設定', redirectUri });
     
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 600
+      maxAge: 600 // 10分間有効
     });
 
     return response;

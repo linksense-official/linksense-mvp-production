@@ -311,23 +311,4 @@ console.log('💾 統合情報保存完了:', {
 
 const handler = NextAuth(authOptions)
 
-// LINE WORKS パスを除外する関数
-function isLineWorksPath(request: NextRequest): boolean {
-  const pathname = request.nextUrl.pathname
-  return pathname.includes('/api/auth/linetest')
-}
-
-// LINE WORKS パスの場合は NextAuth を通さない
-export async function GET(request: NextRequest) {
-  if (isLineWorksPath(request)) {
-    return new Response('Not Found', { status: 404 })
-  }
-  return handler(request)
-}
-
-export async function POST(request: NextRequest) {
-  if (isLineWorksPath(request)) {
-    return new Response('Not Found', { status: 404 })
-  }
-  return handler(request)
-}
+export { handler as GET, handler as POST }
