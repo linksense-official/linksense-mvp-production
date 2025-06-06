@@ -230,7 +230,8 @@ async function getSlackUserInfo(accessToken: string, userId?: string) {
   try {
     console.log('🔄 Slackユーザー情報API呼び出し開始');
     
-    const response = await fetch('https://slack.com/api/users.profile.get', {
+    // まず auth.test でユーザーIDを取得
+    const authResponse = await fetch('https://slack.com/api/auth.test', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -238,19 +239,44 @@ async function getSlackUserInfo(accessToken: string, userId?: string) {
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    if (!authResponse.ok) {
+      throw new Error(`Auth test failed: ${authResponse.status}`);
     }
 
-    const data = await response.json();
+    const authData = await authResponse.json();
+    console.log('📋 Slack auth.test レスポンス:', authData);
+
+    if (!authData.ok) {
+      throw new Error(`Auth test error: ${authData.error}`);
+    }
+
+    // 次に users.info でユーザー詳細情報を取得
+    const userResponse = await fetch(`https://slack.com/api/users.info?user=${authData.user_id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`User info failed: ${userResponse.status}`);
+    }
+
+    const userData = await userResponse.json();
     
     console.log('📋 Slackユーザー情報レスポンス:', {
-      ok: data.ok,
-      email: data.profile?.email,
-      error: data.error
+      ok: userData.ok,
+      email: userData.user?.profile?.email,
+      name: userData.user?.profile?.real_name,
+      error: userData.error
     });
     
-    return data.profile;
+    if (!userData.ok) {
+      throw new Error(`User info error: ${userData.error}`);
+    }
+    
+    return userData.user?.profile;
   } catch (error) {
     console.error('❌ Slackユーザー情報取得エラー:', error);
     return null;
