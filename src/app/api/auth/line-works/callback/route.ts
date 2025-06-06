@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
             name: typeof userInfo.displayName === 'object' 
               ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
               : (userInfo.displayName || 'LINE WORKS User'),
-            company: userInfo.domainId || null,
+            company: String(userInfo.domainId) || null,
             role: 'user',
             lastLoginAt: new Date()
           }
