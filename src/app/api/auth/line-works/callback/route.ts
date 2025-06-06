@@ -163,31 +163,44 @@ export async function GET(request: NextRequest) {
     });
 
       // データベース保存（修正版）
-    console.log('💾 LINE WORKS統合情報をデータベースに保存開始');
+       console.log('💾 LINE WORKS統合情報をデータベースに保存開始');
+    
+    // 安全な型変換
+    const teamId = orgInfo?.domainId || userInfo.domainId;
+    const safeTeamId = teamId ? String(teamId) : null;
+    const teamName = orgInfo?.companyName || orgInfo?.domainName || userInfo.displayName || 'LINE WORKS Organization';
+    
+    console.log('📋 保存データ確認:', {
+      userId: user.id,
+      service: 'line-works',
+      teamId: safeTeamId,
+      teamName: teamName,
+      hasAccessToken: !!tokenResponse.access_token
+    });
     
     await prisma.integration.upsert({
       where: {
         userId_service: {
           userId: user.id,
-          service: 'line-works' // ✅ そのまま維持（スキーマ上問題なし）
+          service: 'line-works'
         }
       },
       update: {
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
         isActive: true,
-        teamId: orgInfo?.domainId || userInfo.domainId,
-        teamName: orgInfo?.companyName || orgInfo?.domainName || userInfo.displayName || 'LINE WORKS Organization',
+        teamId: safeTeamId, // 安全に変換されたteamId
+        teamName: teamName,
         updatedAt: new Date()
       },
       create: {
         userId: user.id,
-        service: 'line-works', // ✅ そのまま維持
+        service: 'line-works',
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || null,
         isActive: true,
-        teamId: orgInfo?.domainId || userInfo.domainId,
-        teamName: orgInfo?.companyName || orgInfo?.domainName || userInfo.displayName || 'LINE WORKS Organization',
+        teamId: safeTeamId, // 安全に変換されたteamId
+        teamName: teamName,
         createdAt: new Date(),
         updatedAt: new Date()
       }
