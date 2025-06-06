@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
-  console.log('🔄 LINE WORKS コールバック処理開始（簡素版）');
+  console.log('🔄 LINE WORKS コールバック処理開始');
   
   try {
     const { searchParams } = new URL(request.url);
@@ -10,37 +10,33 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state');
 
     console.log('📋 コールバックパラメータ:', { 
-      code: code ? '取得済み' : '未取得', 
+      code: code ? `${code.substring(0, 10)}...` : '未取得', 
       error,
-      state: state ? '取得済み' : '未取得'
+      state: state ? `${state.substring(0, 10)}...` : '未取得',
+      fullUrl: request.url
     });
 
-    // エラーハンドリング
     if (error) {
       console.error('❌ LINE WORKS OAuth エラー:', error);
-      return NextResponse.redirect(
-        new URL(`/integrations?error=${encodeURIComponent('LINE WORKS認証エラー: ' + error)}`, request.url)
-      );
+      const errorUrl = `${process.env.NEXTAUTH_URL}/integrations?error=${encodeURIComponent('LINE WORKS認証エラー: ' + error)}`;
+      return NextResponse.redirect(errorUrl, 302);
     }
 
     if (!code) {
       console.error('❌ 認証コードが見つかりません');
-      return NextResponse.redirect(
-        new URL('/integrations?error=missing_code', request.url)
-      );
+      const errorUrl = `${process.env.NEXTAUTH_URL}/integrations?error=missing_code`;
+      return NextResponse.redirect(errorUrl, 302);
     }
 
-    // 成功時は統合ページにリダイレクト（データベース保存は後で実装）
+    // 成功時のリダイレクト
     console.log('✅ LINE WORKS認証成功 - 統合ページにリダイレクト');
-    return NextResponse.redirect(
-      new URL('/integrations?success=true&service=line-works&message=' + encodeURIComponent('LINE WORKS認証は成功しましたが、統合情報の保存は後で実装します'), request.url)
-    );
+    const successUrl = `${process.env.NEXTAUTH_URL}/integrations?success=true&service=line-works&code=${encodeURIComponent(code.substring(0, 10))}`;
+    return NextResponse.redirect(successUrl, 302);
 
   } catch (error) {
     console.error('❌ LINE WORKS コールバック処理エラー:', error);
-    return NextResponse.redirect(
-      new URL(`/integrations?error=${encodeURIComponent('コールバック処理エラー')}`, request.url)
-    );
+    const errorUrl = `${process.env.NEXTAUTH_URL}/integrations?error=${encodeURIComponent('コールバック処理エラー')}`;
+    return NextResponse.redirect(errorUrl, 302);
   }
 }
 
