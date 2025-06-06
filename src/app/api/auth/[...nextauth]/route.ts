@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import NextAuth, { AuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import SlackProvider from 'next-auth/providers/slack'
@@ -13,12 +12,6 @@ console.log('🔧 Environment:', process.env.NODE_ENV)
 
 // Prismaクライアント初期化
 const prisma = new PrismaClient()
-
-// LINE WORKS パスを除外する関数
-function isLineWorksPath(request: NextRequest): boolean {
-  const pathname = request.nextUrl.pathname
-  return pathname.includes('/api/auth/line-works')
-}
 
 export const authOptions: AuthOptions = {
     providers: [
@@ -317,17 +310,4 @@ console.log('💾 統合情報保存完了:', {
 
 const handler = NextAuth(authOptions)
 
-// LINE WORKS パスの場合は NextAuth を通さない
-export async function GET(request: NextRequest) {
-  if (isLineWorksPath(request)) {
-    return new Response('Not Found', { status: 404 })
-  }
-  return handler(request)
-}
-
-export async function POST(request: NextRequest) {
-  if (isLineWorksPath(request)) {
-    return new Response('Not Found', { status: 404 })
-  }
-  return handler(request)
-}
+export { handler as GET, handler as POST }
