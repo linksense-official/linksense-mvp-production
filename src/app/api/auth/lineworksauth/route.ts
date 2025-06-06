@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.append('client_id', clientId);
     authUrl.searchParams.append('redirect_uri', redirectUri);
     authUrl.searchParams.append('state', state);
+    authUrl.searchParams.append('scope', 'user.read');
+    authUrl.searchParams.append('state', state);
 
     console.log('🔵 認証URL:', authUrl.toString());
 
