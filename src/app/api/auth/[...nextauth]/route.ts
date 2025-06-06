@@ -64,29 +64,46 @@ export const authOptions: AuthOptions = {
       }
     }),
 
-       // LINE WORKS OAuth - 新規追加（型修正版）
-           {
+         // LINE WORKS OAuth - TypeScriptエラー修正版
+    {
       id: "line-works",
       name: "LINE WORKS",
       type: "oauth",
       authorization: {
         url: "https://auth.worksmobile.com/oauth2/v2.0/authorize",
         params: {
-          scope: "user.read user.profile.read user.email.read", // 最適化されたスコープ
+          scope: "user.read user.profile.read user.email.read",
           response_type: "code",
           access_type: "offline",
         }
       },
       token: "https://auth.worksmobile.com/oauth2/v2.0/token",
-      userinfo: "https://www.worksapis.com/v1.0/users/me",
+      userinfo: {
+        // 修正: request関数のみを定義
+        async request({ tokens }) {
+          const response = await fetch("https://www.worksapis.com/v1.0/users/me", {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch user info: ${response.status}`);
+          }
+          
+          return await response.json();
+        }
+      },
       clientId: process.env.LINE_WORKS_CLIENT_ID!,
       clientSecret: process.env.LINE_WORKS_CLIENT_SECRET!,
       profile(profile: any) {
+        console.log('LINE WORKS Profile:', profile);
         return {
-          id: profile.userId,
-          name: profile.userName || profile.displayName,
-          email: profile.userEmail || profile.email,
-          image: profile.photoUrl || profile.picture,
+          id: profile.userId || profile.id,
+          name: profile.displayName || profile.userName || profile.name,
+          email: profile.email || profile.userEmail,
+          image: profile.picture || profile.photoUrl || profile.avatarUrl,
         }
       },
     } as OAuthConfig<any>,
