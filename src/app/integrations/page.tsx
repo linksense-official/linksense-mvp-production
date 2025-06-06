@@ -84,14 +84,14 @@ const services: ServiceConfig[] = [
     isNextAuth: false,
   },
     {
-    id: 'line-works',
-    name: 'LINE WORKS',
-    description: 'ビジネス向けLINE',
-    icon: Phone,
-    color: 'bg-green-500',
-    authUrl: '/api/auth/line-works', // カスタム認証
-    isNextAuth: false, // NextAuthを使わない
-  },
+  id: 'line-works',
+  name: 'LINE WORKS',
+  description: 'ビジネス向けLINE',
+  icon: Phone,
+  color: 'bg-green-500',
+  authUrl: '/api/auth/line-works', // この設定が重要
+  isNextAuth: false, // カスタム認証として設定
+},
 ]
 
 export default function IntegrationsPage() {
@@ -173,21 +173,42 @@ export default function IntegrationsPage() {
   }
 
   const handleConnect = async (service: ServiceConfig) => {
-    setConnecting(service.id)
-    
-    try {
-      if (service.isNextAuth) {
-        await signIn(service.id, { callbackUrl: '/integrations?success=true' })
-      } else if (service.id === 'chatwork') {
-        window.location.href = service.authUrl
-      } else {
-        window.location.href = service.authUrl
-      }
-    } catch (error) {
-      console.error(`${service.name}認証エラー:`, error)
-      setConnecting(null)
+  console.log('🔧 handleConnect開始:', {
+    serviceName: service.name,
+    serviceId: service.id,
+    isNextAuth: service.isNextAuth,
+    authUrl: service.authUrl,
+    timestamp: new Date().toISOString()
+  });
+  
+  setConnecting(service.id)
+  
+  try {
+    if (service.isNextAuth) {
+      console.log('🔧 NextAuth経由の認証開始');
+      await signIn(service.id, { callbackUrl: '/integrations?success=true' })
+    } else if (service.id === 'chatwork') {
+      console.log('🔧 ChatWork認証開始');
+      window.location.href = service.authUrl
+    } else {
+      console.log('🔧 カスタム認証開始:', service.id);
+      console.log('🔧 リダイレクト先URL:', service.authUrl);
+      console.log('🔧 window.location.href実行前');
+      
+      window.location.href = service.authUrl;
+      
+      console.log('🔧 window.location.href実行後');
     }
+  } catch (error) {
+    console.error(`❌ ${service.name}認証エラー:`, {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    setConnecting(null)
   }
+}
 
   if (status === 'loading') {
     return (
@@ -372,44 +393,50 @@ export default function IntegrationsPage() {
                 </div>
                 
                 <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                  {isConnected ? (
-                    <>
-                      <button
-                        onClick={() => handleDisconnect(service.id)}
-                        className="flex-1 inline-flex justify-center items-center py-2 px-4 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        切断
-                      </button>
-                      <button
-                        onClick={() => handleConnect(service)}
-                        disabled={connecting === service.id}
-                        className={`flex-1 inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200`}
-                      >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${connecting === service.id ? 'animate-spin' : ''}`} />
-                        再接続
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => handleConnect(service)}
-                      disabled={connecting === service.id}
-                      className={`w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200`}
-                    >
-                      {connecting === service.id ? (
-                        <>
-                          <RefreshCw className="animate-spin h-4 w-4 mr-2" />
-                          接続中...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          連携する
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
+  {isConnected ? (
+    <>
+      <button
+        onClick={() => handleDisconnect(service.id)}
+        className="flex-1 inline-flex justify-center items-center py-2 px-4 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
+      >
+        <XCircle className="h-4 w-4 mr-2" />
+        切断
+      </button>
+      <button
+        onClick={() => {
+          console.log('🔧 再接続ボタンクリック検出:', service.name, service.id);
+          handleConnect(service);
+        }}
+        disabled={connecting === service.id}
+        className={`flex-1 inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200`}
+      >
+        <RefreshCw className={`h-4 w-4 mr-2 ${connecting === service.id ? 'animate-spin' : ''}`} />
+        再接続
+      </button>
+    </>
+  ) : (
+    <button
+      onClick={() => {
+        console.log('🔧 新規接続ボタンクリック検出:', service.name, service.id);
+        handleConnect(service);
+      }}
+      disabled={connecting === service.id}
+      className={`w-full inline-flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${service.color} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 transition-all duration-200`}
+    >
+      {connecting === service.id ? (
+        <>
+          <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+          接続中...
+        </>
+      ) : (
+        <>
+          <CheckCircle className="h-4 w-4 mr-2" />
+          連携する
+        </>
+      )}
+    </button>
+  )}
+</div>
               </div>
             )
           })}
