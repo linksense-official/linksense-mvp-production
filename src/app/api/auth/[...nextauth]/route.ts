@@ -65,14 +65,14 @@ export const authOptions: AuthOptions = {
     }),
 
        // LINE WORKS OAuth - 新規追加（型修正版）
-    {
+           {
       id: "line-works",
       name: "LINE WORKS",
       type: "oauth",
       authorization: {
         url: "https://auth.worksmobile.com/oauth2/v2.0/authorize",
         params: {
-          scope: "user:read",
+          scope: "user.read user.profile.read user.email.read", // 最適化されたスコープ
           response_type: "code",
           access_type: "offline",
         }
