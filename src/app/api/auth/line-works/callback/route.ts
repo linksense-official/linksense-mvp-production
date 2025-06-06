@@ -95,33 +95,36 @@ if (!userInfo || !userInfo.displayName) {
     console.log('💾 LINE WORKS統合情報をデータベースに保存');
     
     await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: user.id,
-          service: 'line-works'
-        }
-      },
-      update: {
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token || null,
-        isActive: true,
-        teamId: String(userInfo.domainId),
-        teamName: userInfo.displayName || 'LINE WORKS Organization',
-        updatedAt: new Date()
-      },
-      create: {
-        userId: user.id,
-        service: 'line-works',
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token || null,
-        isActive: true,
-        teamId: String(userInfo.domainId),
-        teamName: userInfo.displayName || 'LINE WORKS Organization',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    });
-
+  where: {
+    userId_service: {
+      userId: user.id,
+      service: 'line-works'
+    }
+  },
+  update: {
+    accessToken: tokenResponse.access_token,
+    refreshToken: tokenResponse.refresh_token || null,
+    isActive: true,
+    teamId: String(userInfo.domainId),
+    teamName: typeof userInfo.displayName === 'object' 
+      ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
+      : (userInfo.displayName || 'LINE WORKS Organization'),
+    updatedAt: new Date()
+  },
+  create: {
+    userId: user.id,
+    service: 'line-works',
+    accessToken: tokenResponse.access_token,
+    refreshToken: tokenResponse.refresh_token || null,
+    isActive: true,
+    teamId: String(userInfo.domainId),
+    teamName: typeof userInfo.displayName === 'object' 
+      ? `${userInfo.displayName.lastName} ${userInfo.displayName.firstName}`.trim()
+      : (userInfo.displayName || 'LINE WORKS Organization'),
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+});
     console.log('✅ LINE WORKS統合完了');
 
     // 成功時のリダイレクト
