@@ -198,6 +198,7 @@ async function exchangeCodeForToken(code: string) {
 async function getUserInfo(accessToken: string) {
   try {
     console.log('🔄 LINE WORKS ユーザー情報取得開始');
+    console.log('🔑 使用アクセストークン:', accessToken ? `${accessToken.substring(0, 10)}...` : 'なし');
     
     const response = await fetch('https://www.worksapis.com/v1.0/users/me', {
       headers: {
@@ -206,12 +207,29 @@ async function getUserInfo(accessToken: string) {
       }
     });
 
+    console.log('📡 LINE WORKS API レスポンス:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('❌ LINE WORKS API エラーレスポンス:', errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
     }
 
     const userInfo = await response.json();
-    console.log('📋 LINE WORKS ユーザー情報取得成功');
+    console.log('📋 LINE WORKS ユーザー情報取得成功 - RAWデータ:', JSON.stringify(userInfo, null, 2));
+    console.log('📋 重要フィールド確認:', {
+      displayName: userInfo.displayName,
+      userId: userInfo.userId,
+      email: userInfo.email,
+      domainName: userInfo.domainName,
+      domainId: userInfo.domainId,
+      userName: userInfo.userName,
+      name: userInfo.name
+    });
     
     return userInfo;
   } catch (error) {
