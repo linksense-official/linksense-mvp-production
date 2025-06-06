@@ -84,13 +84,13 @@ const services: ServiceConfig[] = [
     isNextAuth: false,
   },
     {
-  id: 'lineworks',
+     id: 'lineworks',
   name: 'LINE WORKS',
   description: 'ビジネス向けLINE',
   icon: Phone,
   color: 'bg-green-500',
- authUrl: '/api/auth/lineworksauth', 
-  isNextAuth: false, // カスタム認証として設定
+  authUrl: '/api/auth/lineworks-service', // ✅ Service Account用エンドポイント
+  isNextAuth: false,
 },
 ]
 
