@@ -131,16 +131,29 @@ export default function IntegrationsPage() {
     }
   }, [session?.user?.id])
 
-  // URL パラメータで成功メッセージを表示
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    if (urlParams.get('success') === 'true') {
-      // 成功時に統合状態を再取得
-      setTimeout(() => {
-        fetchIntegrations()
-      }, 1000)
-    }
-  }, [])
+ // URL パラメータで成功メッセージを表示
+useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const success = urlParams.get('success')
+  const error = urlParams.get('error')
+  
+  console.log('🔍 URL パラメータ確認:', { success, error, url: window.location.href })
+  
+  if (success === 'true') {
+    // 成功時に統合状態を再取得
+    setTimeout(() => {
+      fetchIntegrations()
+    }, 1000)
+  } else if (success === 'line_works_connected') {
+    console.log('🔍 LINE WORKS 接続成功を検出')
+    // LINE WORKS 特有の処理
+    setTimeout(() => {
+      fetchIntegrations()
+    }, 1000)
+  } else if (error) {
+    console.log('🔍 エラーを検出:', error)
+  }
+}, [])
 
   // サービスが統合済みかチェック
   const isServiceConnected = (serviceId: string): boolean => {
