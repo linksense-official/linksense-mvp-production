@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     console.log('✅ Slackアクセストークン取得成功');
 
     // Slackユーザー情報を取得してメールアドレスを特定
-    const userInfo = await getSlackUserInfo(tokenResponse.access_token, tokenResponse.authed_user?.id);
+    const userInfo = await getSlackUserInfo(tokenResponse.access_token, tokenResponse.authed_user?.access_token);
     
     if (!userInfo?.email) {
       console.error('❌ Slackユーザー情報の取得に失敗');
@@ -226,15 +226,18 @@ async function exchangeCodeForToken(code: string): Promise<SlackTokenResponse> {
   }
 }
 
-async function getSlackUserInfo(accessToken: string, userId?: string) {
+async function getSlackUserInfo(accessToken: string, userToken?: string) {
   try {
     console.log('🔄 Slackユーザー情報API呼び出し開始');
     
-    // まず auth.test でユーザーIDを取得
+    // User Token が利用可能な場合はそれを使用
+    const tokenToUse = userToken || accessToken;
+    
+    // auth.test でユーザー情報を取得（より基本的なAPI）
     const authResponse = await fetch('https://slack.com/api/auth.test', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${tokenToUse}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     });
@@ -250,33 +253,12 @@ async function getSlackUserInfo(accessToken: string, userId?: string) {
       throw new Error(`Auth test error: ${authData.error}`);
     }
 
-    // 次に users.info でユーザー詳細情報を取得
-    const userResponse = await fetch(`https://slack.com/api/users.info?user=${authData.user_id}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-
-    if (!userResponse.ok) {
-      throw new Error(`User info failed: ${userResponse.status}`);
-    }
-
-    const userData = await userResponse.json();
-    
-    console.log('📋 Slackユーザー情報レスポンス:', {
-      ok: userData.ok,
-      email: userData.user?.profile?.email,
-      name: userData.user?.profile?.real_name,
-      error: userData.error
-    });
-    
-    if (!userData.ok) {
-      throw new Error(`User info error: ${userData.error}`);
-    }
-    
-    return userData.user?.profile;
+    // auth.test から基本情報を返す
+    return {
+      email: authData.user, // auth.testではuser_idが返される
+      user_id: authData.user_id,
+      team_id: authData.team_id
+    };
   } catch (error) {
     console.error('❌ Slackユーザー情報取得エラー:', error);
     return null;
