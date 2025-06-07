@@ -163,36 +163,84 @@ if (!user) {
       botUserId: tokenResponse.bot_user_id
     });
 
-    // データベース保存
-    console.log('💾 Slack統合情報をデータベースに保存開始');
-    
-    await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: user.id,
-          service: 'slack'
-        }
-      },
-      update: {
+    // データベース保存（強化版エラーハンドリング）
+console.log('💾 Slack統合情報をデータベースに保存開始');
+
+try {
+  // 既存の統合を確認
+  const existingIntegration = await prisma.integration.findFirst({
+    where: {
+      userId: user.id,
+      service: 'slack'
+    }
+  });
+
+  console.log('🔍 既存統合確認:', {
+    found: !!existingIntegration,
+    existingId: existingIntegration?.id
+  });
+
+  let savedIntegration;
+
+  if (existingIntegration) {
+    // 既存統合を更新
+    console.log('🔄 既存統合を更新中...');
+    savedIntegration = await prisma.integration.update({
+      where: { id: existingIntegration.id },
+      data: {
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.authed_user?.access_token || null,
         isActive: true,
         teamId: teamId,
         teamName: teamName,
         updatedAt: new Date()
-      },
-      create: {
+      }
+    });
+    console.log('✅ 既存統合更新完了:', savedIntegration.id);
+  } else {
+    // 新規統合作成
+    console.log('🆕 新規統合作成中...');
+    savedIntegration = await prisma.integration.create({
+      data: {
         userId: user.id,
         service: 'slack',
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.authed_user?.access_token || null,
         isActive: true,
         teamId: teamId,
-        teamName: teamName
+        teamName: teamName,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     });
+    console.log('✅ 新規統合作成完了:', savedIntegration.id);
+  }
 
-    console.log('✅ Slack統合情報保存完了');
+  // 保存確認
+  const verifyIntegration = await prisma.integration.findUnique({
+    where: { id: savedIntegration.id }
+  });
+
+  console.log('🔍 保存確認:', {
+    id: verifyIntegration?.id,
+    service: verifyIntegration?.service,
+    isActive: verifyIntegration?.isActive,
+    userId: verifyIntegration?.userId
+  });
+
+  console.log('✅ Slack統合情報保存完了');
+
+} catch (dbError) {
+  console.error('❌ データベース保存エラー詳細:', {
+    error: dbError,
+    message: dbError instanceof Error ? dbError.message : 'Unknown error',
+    stack: dbError instanceof Error ? dbError.stack : 'No stack'
+  });
+  
+  return NextResponse.redirect(
+    new URL('/integrations?error=database_save_failed&details=' + encodeURIComponent(dbError instanceof Error ? dbError.message : 'Unknown error'), request.url)
+  );
+}
 
     // 成功時のリダイレクト
     const successUrl = new URL('/integrations', request.url);
