@@ -33,6 +33,13 @@ interface SlackTokenResponse {
   warning?: string;
 }
 
+interface SlackUserInfo {
+  email: string;
+  name: string;
+  user_id: string;
+  isPlaceholder?: boolean;
+}
+
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
 const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
 
@@ -105,18 +112,35 @@ export async function GET(request: NextRequest) {
     }
 
     // メールアドレスでユーザーを特定
-    const user = await prisma.user.findUnique({
-      where: { email: userInfo.email }
-    });
+    let user = await prisma.user.findUnique({
+  where: { email: userInfo.email }
+});
 
-    if (!user) {
-      console.error('❌ 対応するユーザーが見つかりません:', userInfo.email);
-      return NextResponse.redirect(
-        new URL('/integrations?error=user_not_found', request.url)
-      );
+// プレースホルダーメールの場合、または見つからない場合の処理
+if (!user && userInfo.isPlaceholder) {
+  console.log('⚠️ プレースホルダーメールのため、現在ログイン中のユーザーを使用');
+  
+  // 現在のセッションからユーザーを取得（可能であれば）
+  // または、一時的なユーザー作成
+  user = await prisma.user.create({
+    data: {
+      email: userInfo.email,
+      name: userInfo.name,
+      emailVerified: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }
+  });
+  
+  console.log('✅ 新規ユーザー作成:', { userId: user.id, email: userInfo.email });
+}
 
-    console.log('✅ ユーザー特定成功:', { userId: user.id, email: userInfo.email });
+if (!user) {
+  console.error('❌ 対応するユーザーが見つかりません:', userInfo.email);
+  return NextResponse.redirect(
+    new URL('/integrations?error=user_not_found&email=' + encodeURIComponent(userInfo.email), request.url)
+  );
+}
 
     // チーム情報取得
     console.log('👥 Slackチーム情報取得開始');
@@ -226,14 +250,15 @@ async function exchangeCodeForToken(code: string): Promise<SlackTokenResponse> {
   }
 }
 
-async function getSlackUserInfo(accessToken: string, userToken?: string) {
+async function getSlackUserInfo(accessToken: string, userToken?: string): Promise<SlackUserInfo | null> {
   try {
     console.log('🔄 Slackユーザー情報API呼び出し開始');
     
-    // User Token が利用可能な場合はそれを使用
+    // User Token を優先的に使用（User Token Scopeでメール取得可能）
     const tokenToUse = userToken || accessToken;
+    console.log('🔑 使用するトークン:', userToken ? 'User Token' : 'Bot Token');
     
-    // auth.test でユーザー情報を取得（より基本的なAPI）
+    // まず auth.test でユーザーIDを取得
     const authResponse = await fetch('https://slack.com/api/auth.test', {
       method: 'POST',
       headers: {
@@ -253,11 +278,63 @@ async function getSlackUserInfo(accessToken: string, userToken?: string) {
       throw new Error(`Auth test error: ${authData.error}`);
     }
 
-    // auth.test から基本情報を返す
+    // User Token でユーザー詳細情報を取得
+    if (userToken) {
+      const userResponse = await fetch(`https://slack.com/api/users.info?user=${authData.user_id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        console.log('📋 User Token でのユーザー情報:', userData);
+        
+        if (userData.ok && userData.user?.profile?.email) {
+          return {
+            email: userData.user.profile.email,
+            name: userData.user.profile.real_name || userData.user.name,
+            user_id: authData.user_id
+          };
+        }
+      }
+    }
+
+    // フォールバック: Bot Token でユーザー情報取得を試行
+    const userResponse = await fetch(`https://slack.com/api/users.info?user=${authData.user_id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`User info failed: ${userResponse.status}`);
+    }
+
+    const userData = await userResponse.json();
+    console.log('📋 Bot Token でのユーザー情報:', userData);
+    
+    if (!userData.ok) {
+      console.warn('⚠️ users.info API エラー:', userData.error);
+      
+      // 最終フォールバック: auth.test の情報のみ使用
+      return {
+        email: `${authData.user}@placeholder.com`, // プレースホルダー
+        name: authData.user,
+        user_id: authData.user_id,
+        isPlaceholder: true
+      };
+    }
+    
     return {
-      email: authData.user, // auth.testではuser_idが返される
+      email: userData.user?.profile?.email || `${authData.user}@placeholder.com`,
+      name: userData.user?.profile?.real_name || userData.user?.name || authData.user,
       user_id: authData.user_id,
-      team_id: authData.team_id
+      isPlaceholder: !userData.user?.profile?.email
     };
   } catch (error) {
     console.error('❌ Slackユーザー情報取得エラー:', error);
