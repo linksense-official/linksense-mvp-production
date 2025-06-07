@@ -20,11 +20,9 @@ const getRedirectUri = () => {
 };
 
 const SLACK_SCOPES = [
-  'channels:read',
   'users:read',
   'users:read.email',
-  'team:read',
-  'chat:write'
+  'team:read'
 ].join(',');
 
 export async function GET(request: NextRequest) {
