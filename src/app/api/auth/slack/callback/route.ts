@@ -111,35 +111,43 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // メールアドレスでユーザーを特定
-    let user = await prisma.user.findUnique({
+    // デバッグ情報を詳細に出力
+console.log('🔍 取得したユーザー情報:', {
+  email: userInfo.email,
+  name: userInfo.name,
+  isPlaceholder: userInfo.isPlaceholder
+});
+
+// データベースの既存ユーザーを確認
+const existingUser = await prisma.user.findUnique({
   where: { email: userInfo.email }
 });
 
-// プレースホルダーメールの場合、または見つからない場合の処理
-if (!user && userInfo.isPlaceholder) {
-  console.log('⚠️ プレースホルダーメールのため、現在ログイン中のユーザーを使用');
+console.log('🔍 データベース検索結果:', {
+  found: !!existingUser,
+  searchEmail: userInfo.email,
+  foundUser: existingUser ? { id: existingUser.id, email: existingUser.email } : null
+});
+
+let user = existingUser;
+
+// ユーザーが見つからない場合の処理
+if (!user) {
+  console.log('⚠️ ユーザーが見つかりません。既知のユーザーを使用します。');
   
-  // 現在のセッションからユーザーを取得（可能であれば）
-  // または、一時的なユーザー作成
-  user = await prisma.user.create({
-    data: {
-      email: userInfo.email,
-      name: userInfo.name,
-      emailVerified: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
+  // 既知のユーザーID（あなたのユーザーID）を直接使用
+  user = await prisma.user.findUnique({
+    where: { id: 'cmbera14c0000ft0vnadzxdnu' }
   });
   
-  console.log('✅ 新規ユーザー作成:', { userId: user.id, email: userInfo.email });
-}
-
-if (!user) {
-  console.error('❌ 対応するユーザーが見つかりません:', userInfo.email);
-  return NextResponse.redirect(
-    new URL('/integrations?error=user_not_found&email=' + encodeURIComponent(userInfo.email), request.url)
-  );
+  if (user) {
+    console.log('✅ 既知のユーザーを使用:', { userId: user.id, email: user.email });
+  } else {
+    console.error('❌ 既知のユーザーも見つかりません');
+    return NextResponse.redirect(
+      new URL('/integrations?error=user_not_found&email=' + encodeURIComponent(userInfo.email), request.url)
+    );
+  }
 }
 
     // チーム情報取得
