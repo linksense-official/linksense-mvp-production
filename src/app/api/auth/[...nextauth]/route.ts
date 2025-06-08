@@ -65,22 +65,14 @@ export const authOptions: AuthOptions = {
     
     // Discord OAuth (拡張スコープ版)
     DiscordProvider({
-      clientId: process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: [
-            'identify',
-            'email',
-            'guilds',               // サーバー一覧
-            'guilds.members.read',  // サーバーメンバー取得
-            'relationships.read',   // フレンドリスト取得 ⭐ 重要
-            'messages.read',        // メッセージ読み取り
-            'connections'           // 外部接続
-          ].join(' ')
-        }
-      }
-    }),
+  clientId: process.env.DISCORD_CLIENT_ID!,
+  clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+  authorization: {
+    params: {
+      scope: 'identify email guilds guilds.members.read connections messages.read'
+    }
+  }
+}),
     
     // Azure AD (Teams) OAuth (拡張スコープ版)
     AzureADProvider({
