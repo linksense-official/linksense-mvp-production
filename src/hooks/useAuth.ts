@@ -29,14 +29,17 @@ export const useAuth = (): UseAuthReturn => {
 
   useEffect(() => {
     if (session?.user) {
+      // 型安全なアクセスのためのキャスト
+      const userWithCustomProps = session.user as any;
+      
       setUser({
         id: session.user.id || '',
         name: session.user.name,
         email: session.user.email,
-        image: session.user.image,
-        company: session.user.company,
-        twoFactorEnabled: session.user.twoFactorEnabled || false,
-        requiresTwoFactor: session.user.requiresTwoFactor || false,
+        image: userWithCustomProps.image,
+        company: userWithCustomProps.company,
+        twoFactorEnabled: userWithCustomProps.twoFactorEnabled || false,
+        requiresTwoFactor: userWithCustomProps.requiresTwoFactor || false,
         securityLevel: 1, // デフォルト値を設定
       });
     } else {
