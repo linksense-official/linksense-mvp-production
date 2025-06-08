@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'  // ← この行を追加
+import { NextRequest } from 'next/server'
 import NextAuth, { AuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import SlackProvider from 'next-auth/providers/slack'
@@ -7,7 +7,7 @@ import AzureADProvider from 'next-auth/providers/azure-ad'
 import { PrismaClient } from '@prisma/client'
 import type { OAuthConfig, OAuthUserConfig } from 'next-auth/providers/oauth'
 
-console.log('🚀 LinkSense MVP - OAuth統合修正版（複数サービス同時接続対応）')
+console.log('🚀 LinkSense MVP - 拡張スコープ版（フレンド・チームメンバー取得対応）')
 console.log('🌐 NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
 console.log('🔧 Environment:', process.env.NODE_ENV)
 
@@ -15,116 +15,189 @@ console.log('🔧 Environment:', process.env.NODE_ENV)
 const prisma = new PrismaClient()
 
 export const authOptions: AuthOptions = {
-    providers: [
-    // Google OAuth (Google Meet統合も兼用)
+  providers: [
+    // Google OAuth (拡張スコープ版)
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'openid email profile https://www.googleapis.com/auth/calendar.readonly',
-          prompt: 'consent', // 修正: select_account → consent（再同意を促す）
+          scope: [
+            'openid',
+            'email', 
+            'profile',
+            'https://www.googleapis.com/auth/admin.directory.user.readonly', // 組織ユーザー取得
+            'https://www.googleapis.com/auth/gmail.readonly',                // Gmail連絡先
+            'https://www.googleapis.com/auth/drive.readonly',                // Drive共同作業者
+            'https://www.googleapis.com/auth/calendar.readonly',             // カレンダー・Meet
+            'https://www.googleapis.com/auth/contacts.readonly'              // 連絡先
+          ].join(' '),
+          prompt: 'consent',
           access_type: 'offline',
         },
       },
     }),
+
+    // Slack OAuth (拡張スコープ版)
+    SlackProvider({
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: [
+            'identify',
+            'users:read',
+            'users:read.email',
+            'channels:read',
+            'groups:read',
+            'im:read',              // DM読み取り
+            'im:history',           // DM履歴
+            'mpim:read',            // マルチパーティDM
+            'conversations.list',   // 会話一覧
+            'conversations.history', // 会話履歴
+            'conversations.members', // 会話メンバー
+            'team:read',            // チーム情報
+            'usergroups:read'       // ユーザーグループ
+          ].join(' ')
+        }
+      }
+    }),
     
-    
-    // Discord OAuth
+    // Discord OAuth (拡張スコープ版)
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: 'identify email guilds' // 修正: messages.read を削除（権限過多）
+          scope: [
+            'identify',
+            'email',
+            'guilds',               // サーバー一覧
+            'guilds.members.read',  // サーバーメンバー取得
+            'relationships.read',   // フレンドリスト取得 ⭐ 重要
+            'messages.read',        // メッセージ読み取り
+            'connections'           // 外部接続
+          ].join(' ')
         }
       }
     }),
     
-    // Azure AD (Teams) OAuth - 修正版
+    // Azure AD (Teams) OAuth (拡張スコープ版)
     AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-      tenantId: process.env.AZURE_AD_TENANT_ID!,
+      tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
       authorization: {
         params: {
-          scope: 'openid profile email User.Read',
-          prompt: 'consent' // 追加: 再同意を促す
+          scope: [
+            'openid',
+            'profile',
+            'email',
+            'User.Read',
+            'User.Read.All',        // 全ユーザー読み取り ⭐ 重要
+            'Chat.Read',            // チャット読み取り ⭐ 重要
+            'Chat.ReadBasic',       // 基本チャット情報
+            'Chat.ReadWrite',       // チャット読み書き
+            'Calendars.Read',       // カレンダー（会議情報）
+            'Calendars.Read.Shared', // 共有カレンダー
+            'People.Read',          // 連絡先 ⭐ 重要
+            'People.Read.All',      // 全連絡先
+            'Contacts.Read',        // 連絡先読み取り
+            'Directory.Read.All',   // ディレクトリ読み取り
+            'Group.Read.All',       // グループ読み取り
+            'TeamMember.Read.All'   // チームメンバー読み取り
+          ].join(' '),
+          prompt: 'consent'
         }
       }
     }),
-    // 一時的にコメントアウト
-    /*
-         // LINE WORKS OAuth - TypeScriptエラー修正版
+
+    // ChatWork OAuth (型安全版)
     {
-      id: "line-works",
-      name: "LINE WORKS",
-      type: "oauth",
+      id: "chatwork",
+      name: "ChatWork",
+      type: "oauth" as const,
       authorization: {
-        url: "https://auth.worksmobile.com/oauth2/v2.0/authorize",
+        url: "https://www.chatwork.com/packages/oauth2/login.php",
         params: {
-          scope: "user.read user.profile.read user.email.read",
+          scope: [
+            'users.profile.me:read',
+            'users.profile.others:read',
+            'users.all:read',
+            'rooms.all:read_only',
+            'rooms.messages:read',
+            'rooms.members:read',
+            'contacts.all:read'
+          ].join(' '),
           response_type: "code",
-          access_type: "offline",
         }
       },
-      token: "https://auth.worksmobile.com/oauth2/v2.0/token",
+      token: "https://oauth.chatwork.com/token",
       userinfo: {
-        // 修正: request関数のみを定義
-        async request({ tokens }) {
-          const response = await fetch("https://www.worksapis.com/v1.0/users/me", {
+        async request(context: { tokens: { access_token?: string; [key: string]: any } }) {
+          const { tokens } = context;
+          const response = await fetch("https://api.chatwork.com/v2/me", {
             headers: {
-              Authorization: `Bearer ${tokens.access_token}`,
+              'X-ChatWorkToken': tokens.access_token!,
               'Content-Type': 'application/json',
             },
           });
           
           if (!response.ok) {
-            throw new Error(`Failed to fetch user info: ${response.status}`);
+            throw new Error(`ChatWork API Error: ${response.status}`);
           }
           
           return await response.json();
         }
       },
-      clientId: process.env.LINE_WORKS_CLIENT_ID!,
-      clientSecret: process.env.LINE_WORKS_CLIENT_SECRET!,
+      clientId: process.env.CHATWORK_CLIENT_ID!,
+      clientSecret: process.env.CHATWORK_CLIENT_SECRET!,
       profile(profile: any) {
-        console.log('LINE WORKS Profile:', profile);
+        console.log('ChatWork Profile:', profile);
         return {
-          id: profile.userId || profile.id,
-          name: profile.displayName || profile.userName || profile.name,
-          email: profile.email || profile.userEmail,
-          image: profile.picture || profile.photoUrl || profile.avatarUrl,
+          id: profile.account_id?.toString() || profile.id || 'unknown',
+          name: profile.name || 'ChatWork User',
+          email: `chatwork-${profile.account_id || 'unknown'}@linksense.local`,
+          image: profile.avatar_image_url || null,
         }
       },
-    } as OAuthConfig<any>,
-         */
+    },
   ],
   
   debug: process.env.NODE_ENV === 'development',
   
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log('✅ OAuth認証成功:', {
+      console.log('✅ OAuth認証成功 (拡張スコープ):', {
         provider: account?.provider,
         email: user?.email,
         name: user?.name,
+        scopes: account?.scope,
         timestamp: new Date().toISOString()
       })
       
       try {
         if (account && user?.email) {
+          // ChatWorkの場合、プレースホルダーメールを実際のIDベースに変換
+          let userEmail = user.email;
+          let userName = user.name || '';
+          
+          if (account.provider === 'chatwork' && user.email?.includes('linksense.local')) {
+            // ChatWorkの場合は特別処理（既に適切な形式）
+            console.log('📧 ChatWork用メール確認:', userEmail);
+          }
+
           // ユーザー情報をデータベースに保存/更新
           const userData = await prisma.user.upsert({
-            where: { email: user.email },
+            where: { email: userEmail },
             update: {
-              name: user.name || '',
+              name: userName,
               image: user.image,
               updatedAt: new Date(),
             },
             create: {
-              email: user.email,
-              name: user.name || '',
+              email: userEmail,
+              name: userName,
               image: user.image,
               emailVerified: new Date(),
               createdAt: new Date(),
@@ -132,48 +205,56 @@ export const authOptions: AuthOptions = {
             },
           })
 
-          // 統合情報を保存（既存を無効化せずに追加）
+          // 統合情報を保存（拡張データ含む）
           const existingIntegration = await prisma.integration.findUnique({
-  where: {
-    userId_service: {
-      userId: userData.id,
-      service: account.provider as any,
-    },
-  },
-})
+            where: {
+              userId_service: {
+                userId: userData.id,
+                service: account.provider as any,
+              },
+            },
+          })
 
-if (existingIntegration) {
-  // 既存の統合を更新（他のサービスには影響しない）
-  await prisma.integration.update({
-    where: { id: existingIntegration.id },
-    data: {  // 修正: 'update' → 'data'
-      accessToken: account.access_token || '',
-      refreshToken: account.refresh_token || '',
-      isActive: true,
-      updatedAt: new Date(),
-    },
-  })
-} else {
-  // 新規統合作成（他のサービスには影響しない）
-  await prisma.integration.create({
-    data: {
-      userId: userData.id,
-      service: account.provider as any,
-      accessToken: account.access_token || '',
-      refreshToken: account.refresh_token || '',
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  })
-}
+          const integrationData = {
+            accessToken: account.access_token || '',
+            refreshToken: account.refresh_token || '',
+            expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
+            scope: account.scope || '',
+            tokenType: account.token_type || 'Bearer',
+            isActive: true,
+            updatedAt: new Date(),
+            // プロバイダー固有のデータ
+            teamId: getTeamId(account, profile),
+            teamName: getTeamName(account, profile),
+          }
 
-console.log('💾 統合情報保存完了:', {
-  userId: userData.id,
-  service: account.provider,
-  hasToken: !!account.access_token,
-  action: existingIntegration ? 'updated' : 'created'
-})
+          if (existingIntegration) {
+            // 既存の統合を更新
+            await prisma.integration.update({
+              where: { id: existingIntegration.id },
+              data: integrationData,
+            })
+          } else {
+            // 新規統合作成
+            await prisma.integration.create({
+              data: {
+                userId: userData.id,
+                service: account.provider as any,
+                ...integrationData,
+                createdAt: new Date(),
+              },
+            })
+          }
+
+          console.log('💾 拡張統合情報保存完了:', {
+            userId: userData.id,
+            service: account.provider,
+            hasToken: !!account.access_token,
+            hasRefreshToken: !!account.refresh_token,
+            scope: account.scope,
+            teamId: integrationData.teamId,
+            action: existingIntegration ? 'updated' : 'created'
+          })
         }
       } catch (error) {
         console.error('❌ データベース保存エラー:', error)
@@ -184,7 +265,7 @@ console.log('💾 統合情報保存完了:', {
     },
     
     async redirect({ url, baseUrl }) {
-      console.log('🔄 認証後リダイレクト:', { url, baseUrl })
+      console.log('🔄 認証後リダイレクト (拡張版):', { url, baseUrl })
       
       // エラーハンドリング
       if (url.includes('error=')) {
@@ -192,15 +273,23 @@ console.log('💾 統合情報保存完了:', {
         return `${baseUrl}/integrations?error=oauth_failed`
       }
       
-      // 認証成功後はダッシュボードへ（統合状況を即座反映）
-      return `${baseUrl}/dashboard?success=true&service=${encodeURIComponent(url.includes('provider=') ? url.split('provider=')[1].split('&')[0] : 'unknown')}`
+      // 権限不足エラーの検出
+      if (url.includes('insufficient_scope') || url.includes('access_denied')) {
+        console.error('🚨 権限不足エラー:', url)
+        return `${baseUrl}/integrations?error=insufficient_permissions`
+      }
+      
+      // 認証成功後はダッシュボードへ
+      const provider = url.includes('provider=') ? url.split('provider=')[1].split('&')[0] : 'unknown'
+      return `${baseUrl}/dashboard?success=true&service=${encodeURIComponent(provider)}&scope_expanded=true`
     },
     
     async jwt({ token, user, account }) {
       if (account && user) {
-        console.log('🔑 JWT生成:', {
+        console.log('🔑 JWT生成 (拡張スコープ):', {
           provider: account.provider,
-          user: user.email
+          user: user.email,
+          scope: account.scope
         })
         
         // ユーザーIDを取得してトークンに追加
@@ -217,22 +306,25 @@ console.log('💾 統合情報保存完了:', {
           }
         }
         
-        // アカウント情報をトークンに追加
+        // 拡張アカウント情報をトークンに追加
         token.provider = account.provider
         token.providerAccountId = account.providerAccountId
         token.accessToken = account.access_token
         token.refreshToken = account.refresh_token
+        token.scope = account.scope
+        token.expiresAt = account.expires_at
       }
       return token
     },
     
     async session({ session, token }) {
-      console.log('📱 セッション確立:', {
+      console.log('📱 セッション確立 (拡張版):', {
         user: session.user?.email,
-        provider: token.provider
+        provider: token.provider,
+        hasExtendedScope: !!token.scope
       })
       
-      // セッションに追加情報を含める
+      // セッションに拡張情報を含める
       const extendedSession = {
         ...session,
         user: {
@@ -241,7 +333,9 @@ console.log('💾 統合情報保存完了:', {
         },
         ...(token.provider && {
           provider: token.provider as string,
-          providerAccountId: token.providerAccountId as string
+          providerAccountId: token.providerAccountId as string,
+          scope: token.scope as string,
+          hasExtendedPermissions: checkExtendedPermissions(token.provider as string, token.scope as string)
         })
       }
       
@@ -261,10 +355,12 @@ console.log('💾 統合情報保存完了:', {
   
   events: {
     async signIn({ user, account, profile, isNewUser }) {
-      console.log('🎉 サインインイベント:', {
+      console.log('🎉 サインインイベント (拡張版):', {
         user: user.email,
         provider: account?.provider,
         isNewUser,
+        scope: account?.scope,
+        hasExtendedPermissions: account?.scope ? checkExtendedPermissions(account.provider, account.scope) : false,
         timestamp: new Date().toISOString()
       })
     },
@@ -296,6 +392,54 @@ console.log('💾 統合情報保存完了:', {
       }
     },
   },
+}
+
+// ヘルパー関数: チームIDの取得
+function getTeamId(account: any, profile: any): string | null {
+  switch (account.provider) {
+    case 'discord':
+      return profile?.guild?.id || null
+    case 'slack':
+      return profile?.team?.id || account.team?.id || null
+    case 'azure-ad':
+      return profile?.tid || null
+    case 'chatwork':
+      return profile?.organization_id?.toString() || null
+    default:
+      return null
+  }
+}
+
+// ヘルパー関数: チーム名の取得
+function getTeamName(account: any, profile: any): string | null {
+  switch (account.provider) {
+    case 'discord':
+      return profile?.guild?.name || null
+    case 'slack':
+      return profile?.team?.name || account.team?.name || null
+    case 'azure-ad':
+      return profile?.companyName || null
+    case 'chatwork':
+      return profile?.organization_name || null
+    default:
+      return null
+  }
+}
+
+// ヘルパー関数: 拡張権限の確認
+function checkExtendedPermissions(provider: string, scope: string): boolean {
+  const requiredScopes = {
+    discord: ['relationships.read', 'guilds.members.read'],
+    slack: ['im:read', 'conversations.members'],
+    'azure-ad': ['User.Read.All', 'Chat.Read', 'People.Read'],
+    google: ['admin.directory.user.readonly', 'gmail.readonly'],
+    chatwork: ['rooms.members:read', 'contacts.all:read']
+  }
+
+  const providerRequiredScopes = requiredScopes[provider as keyof typeof requiredScopes]
+  if (!providerRequiredScopes) return false
+
+  return providerRequiredScopes.some(requiredScope => scope?.includes(requiredScope))
 }
 
 const handler = NextAuth(authOptions)
