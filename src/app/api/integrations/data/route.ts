@@ -28,9 +28,24 @@ interface UnifiedUser {
     workingHours?: string;
     timezone?: string;
     joinDate?: string;
+    // Discord関連
+    roles?: number;
+    nickname?: string;
+    // Teams関連
+    userType?: string;
+    // Google関連
+    orgUnit?: string;
+    isEnforcedIn2Sv?: boolean;
+    domain?: string;
+    // ChatWork関連
+    title?: string;
+    organization?: string;
+    chatwork_id?: string;
+    // 共通の追加フィールド
+    note?: string;
+    [key: string]: any; // 追加のメタデータ用
   };
 }
-
 interface TeamHealthMetrics {
   totalMembers: number;
   activeMembers: number;
@@ -84,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     // 全サービスからデータ取得
     const allUsers: UnifiedUser[] = [];
-    const errors: string[] = [];
+    const errors: Array<{service: string, error: string, severity: 'warning' | 'error'}> = [];
 
     for (const integration of integrations) {
       try {
@@ -112,15 +127,33 @@ export async function GET(request: NextRequest) {
             break;
           default:
             console.warn(`⚠️ 未対応サービス: ${integration.service}`);
+            errors.push({
+              service: integration.service,
+              error: '未対応のサービスです',
+              severity: 'warning'
+            });
+            continue;
         }
 
         allUsers.push(...serviceUsers);
         console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了`);
         
       } catch (error) {
-        const errorMsg = `${integration.service}: ${error instanceof Error ? error.message : 'データ取得エラー'}`;
-        errors.push(errorMsg);
-        console.error(`❌ ${errorMsg}`);
+        const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
+        const severity = errorMsg.includes('権限') || errorMsg.includes('個人情報のみ') ? 'warning' : 'error';
+        
+        errors.push({
+          service: integration.service,
+          error: errorMsg,
+          severity
+        });
+        
+        console.error(`❌ ${integration.service}: ${errorMsg}`);
+        
+        // 致命的でないエラーの場合は処理を継続
+        if (severity === 'warning') {
+          console.log(`⚠️ ${integration.service}: 部分的なデータ取得で継続`);
+        }
       }
     }
 
@@ -239,8 +272,20 @@ async function getSlackUsers(integration: any): Promise<UnifiedUser[]> {
 // Microsoft Teams/Azure ADユーザーデータ取得
 async function getTeamsUsers(integration: any): Promise<UnifiedUser[]> {
   try {
-    // Microsoft Graph API でユーザー取得
-    const usersResponse = await fetch('https://graph.microsoft.com/v1.0/users', {
+    // まず現在のユーザー情報で権限確認
+    const meResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: {
+        'Authorization': `Bearer ${integration.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!meResponse.ok) {
+      throw new Error(`Teams認証エラー: ${meResponse.status} - アクセストークンが無効です`);
+    }
+
+    // ユーザー一覧取得（管理者権限が必要）
+    const usersResponse = await fetch('https://graph.microsoft.com/v1.0/users?$top=999&$select=id,displayName,userPrincipalName,mail,department,jobTitle,officeLocation,accountEnabled,createdDateTime,lastSignInDateTime,userType', {
       headers: {
         'Authorization': `Bearer ${integration.accessToken}`,
         'Content-Type': 'application/json'
@@ -248,35 +293,79 @@ async function getTeamsUsers(integration: any): Promise<UnifiedUser[]> {
     });
 
     if (!usersResponse.ok) {
-      throw new Error(`Teams API エラー: ${usersResponse.status}`);
+      // 管理者権限がない場合、現在のユーザーのみ取得
+      console.warn(`Teams ユーザー一覧取得失敗: ${usersResponse.status}. 現在のユーザーのみ取得します`);
+      
+      const currentUser = await meResponse.json();
+      return [{
+        id: currentUser.id,
+        name: currentUser.displayName || '名前未設定',
+        email: currentUser.userPrincipalName || currentUser.mail,
+        avatar: undefined,
+        service: 'teams',
+        role: 'member',
+        department: currentUser.department || '未設定',
+        lastActivity: new Date().toISOString(),
+        isActive: true,
+        activityScore: 80,
+        communicationScore: 70,
+        isolationRisk: 'medium',
+        metadata: {
+          workingHours: currentUser.officeLocation,
+          note: '管理者権限がないため、個人情報のみ取得'
+        }
+      }];
     }
 
     const usersData = await usersResponse.json();
 
-    return usersData.value.map((user: any) => {
-      const activityScore = 80; // Microsoft Graph からの詳細活動データで後で実装
-      const communicationScore = 70;
-      const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
-
-      return {
-        id: user.id,
-        name: user.displayName || '名前未設定',
-        email: user.userPrincipalName || user.mail,
-        avatar: undefined, // Graph API の写真エンドポイントで後で取得可能
-        service: 'teams',
-        role: 'member',
-        department: user.department || '未設定',
-        lastActivity: user.lastSignInDateTime,
-        isActive: user.accountEnabled,
-        activityScore,
-        communicationScore,
-        isolationRisk,
-        metadata: {
-          workingHours: user.officeLocation,
-          joinDate: user.createdDateTime
+    // プロフィール写真の取得を並行実行
+    const usersWithPhotos = await Promise.allSettled(
+      usersData.value.map(async (user: any) => {
+        let photoUrl;
+        try {
+          const photoResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${user.id}/photo/$value`, {
+            headers: {
+              'Authorization': `Bearer ${integration.accessToken}`
+            }
+          });
+          if (photoResponse.ok) {
+            const photoBlob = await photoResponse.blob();
+            photoUrl = URL.createObjectURL(photoBlob);
+          }
+        } catch (photoError) {
+          // 写真取得エラーは無視
         }
-      };
-    });
+
+        const activityScore = calculateTeamsActivityScore(user);
+        const communicationScore = 70;
+        const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
+
+        return {
+          id: user.id,
+          name: user.displayName || '名前未設定',
+          email: user.userPrincipalName || user.mail,
+          avatar: photoUrl,
+          service: 'teams',
+          role: user.userType === 'Guest' ? 'guest' : 'member',
+          department: user.department || user.jobTitle || '未設定',
+          lastActivity: user.lastSignInDateTime,
+          isActive: user.accountEnabled,
+          activityScore,
+          communicationScore,
+          isolationRisk,
+          metadata: {
+            workingHours: user.officeLocation,
+            joinDate: user.createdDateTime,
+            userType: user.userType
+          }
+        };
+      })
+    );
+
+    return usersWithPhotos
+      .filter(result => result.status === 'fulfilled')
+      .map(result => (result as PromiseFulfilledResult<UnifiedUser>).value);
 
   } catch (error) {
     console.error('❌ Teams データ取得エラー:', error);
@@ -284,11 +373,55 @@ async function getTeamsUsers(integration: any): Promise<UnifiedUser[]> {
   }
 }
 
+// Teams活動スコア計算を追加
+function calculateTeamsActivityScore(user: any): number {
+  let score = 50; // ベーススコア
+
+  // アカウント有効性
+  if (user.accountEnabled) score += 20;
+  
+  // プロフィール完成度
+  if (user.displayName) score += 10;
+  if (user.department || user.jobTitle) score += 10;
+  if (user.officeLocation) score += 5;
+  
+  // 最終サインイン
+  if (user.lastSignInDateTime) {
+    const daysSinceSignIn = (Date.now() - new Date(user.lastSignInDateTime).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceSignIn < 7) score += 20;
+    else if (daysSinceSignIn < 30) score += 10;
+    else if (daysSinceSignIn < 90) score += 5;
+  }
+
+  // ゲストユーザーでない
+  if (user.userType !== 'Guest') score += 5;
+
+  return Math.min(100, Math.max(0, score));
+}
+
 // Google Workspace/Meetユーザーデータ取得
 async function getGoogleUsers(integration: any): Promise<UnifiedUser[]> {
   try {
-    // Google Admin SDK でユーザー取得
-    const usersResponse = await fetch('https://admin.googleapis.com/admin/directory/v1/users', {
+    // ドメイン情報を取得（Admin SDK権限確認）
+    let domain = 'primary';
+    
+    // 現在のユーザー情報取得
+    const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        'Authorization': `Bearer ${integration.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (profileResponse.ok) {
+      const profile = await profileResponse.json();
+      if (profile.hd) {
+        domain = profile.hd; // ホストドメイン
+      }
+    }
+
+    // Admin SDK でユーザー取得
+    const usersResponse = await fetch(`https://admin.googleapis.com/admin/directory/v1/users?domain=${domain}&maxResults=500&projection=full`, {
       headers: {
         'Authorization': `Bearer ${integration.accessToken}`,
         'Content-Type': 'application/json'
@@ -296,35 +429,64 @@ async function getGoogleUsers(integration: any): Promise<UnifiedUser[]> {
     });
 
     if (!usersResponse.ok) {
-      throw new Error(`Google API エラー: ${usersResponse.status}`);
+      // Admin権限がない場合、個人情報のみ取得
+      console.warn(`Google Admin SDK アクセス失敗: ${usersResponse.status}. 個人情報のみ取得します`);
+      
+      if (profileResponse.ok) {
+        const profile = await profileResponse.json();
+        return [{
+          id: profile.id,
+          name: profile.name || '名前未設定',
+          email: profile.email,
+          avatar: profile.picture,
+          service: 'google',
+          role: 'member',
+          department: '未設定',
+          lastActivity: new Date().toISOString(),
+          isActive: true,
+          activityScore: 85,
+          communicationScore: 75,
+          isolationRisk: 'medium',
+          metadata: {
+            note: 'Admin権限がないため、個人情報のみ取得',
+            domain: profile.hd
+          }
+        }];
+      }
+      
+      throw new Error(`Google API エラー: ${usersResponse.status} - Admin SDK権限が必要です`);
     }
 
     const usersData = await usersResponse.json();
 
-    return (usersData.users || []).map((user: any) => {
-      const activityScore = 85;
-      const communicationScore = 75;
-      const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
+    return (usersData.users || [])
+      .filter((user: any) => !user.suspended && user.primaryEmail) // アクティブユーザーのみ
+      .map((user: any) => {
+        const activityScore = calculateGoogleActivityScore(user);
+        const communicationScore = 75;
+        const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
 
-      return {
-        id: user.id,
-        name: user.name?.fullName || '名前未設定',
-        email: user.primaryEmail,
-        avatar: user.thumbnailPhotoUrl,
-        service: 'google',
-        role: user.isAdmin ? 'admin' : 'member',
-        department: user.organizations?.[0]?.department || '未設定',
-        lastActivity: user.lastLoginTime,
-        isActive: !user.suspended,
-        activityScore,
-        communicationScore,
-        isolationRisk,
-        metadata: {
-          workingHours: user.locations?.[0]?.area,
-          joinDate: user.creationTime
-        }
-      };
-    });
+        return {
+          id: user.id,
+          name: user.name?.fullName || `${user.name?.givenName || ''} ${user.name?.familyName || ''}`.trim() || '名前未設定',
+          email: user.primaryEmail,
+          avatar: user.thumbnailPhotoUrl,
+          service: 'google',
+          role: user.isAdmin ? 'admin' : user.isDelegatedAdmin ? 'delegated_admin' : 'member',
+          department: user.organizations?.[0]?.department || user.organizations?.[0]?.title || '未設定',
+          lastActivity: user.lastLoginTime,
+          isActive: !user.suspended && !user.archived,
+          activityScore,
+          communicationScore,
+          isolationRisk,
+          metadata: {
+            workingHours: user.locations?.[0]?.area || user.locations?.[0]?.buildingId,
+            joinDate: user.creationTime,
+            orgUnit: user.orgUnitPath,
+            isEnforcedIn2Sv: user.isEnforcedIn2Sv
+          }
+        };
+      });
 
   } catch (error) {
     console.error('❌ Google データ取得エラー:', error);
@@ -332,48 +494,137 @@ async function getGoogleUsers(integration: any): Promise<UnifiedUser[]> {
   }
 }
 
+// Google活動スコア計算を追加
+function calculateGoogleActivityScore(user: any): number {
+  let score = 50; // ベーススコア
+
+  // アカウント状態
+  if (!user.suspended && !user.archived) score += 25;
+  
+  // プロフィール完成度
+  if (user.name?.fullName || (user.name?.givenName && user.name?.familyName)) score += 10;
+  if (user.organizations?.length > 0) score += 10;
+  if (user.locations?.length > 0) score += 5;
+  
+  // 最終ログイン
+  if (user.lastLoginTime) {
+    const daysSinceLogin = (Date.now() - new Date(user.lastLoginTime).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceLogin < 7) score += 20;
+    else if (daysSinceLogin < 30) score += 10;
+    else if (daysSinceLogin < 90) score += 5;
+  }
+
+  // 2段階認証
+  if (user.isEnforcedIn2Sv) score += 10;
+
+  // 管理者権限
+  if (user.isAdmin) score += 5;
+
+  return Math.min(100, Math.max(0, score));
+}
+
 // Discord ユーザーデータ取得
 async function getDiscordUsers(integration: any): Promise<UnifiedUser[]> {
   try {
-    // Discord API でギルドメンバー取得
-    const guildResponse = await fetch(`https://discord.com/api/v10/guilds/${integration.teamId}/members`, {
+    // まずギルド情報を取得してアクセス権限を確認
+    const guildInfoResponse = await fetch(`https://discord.com/api/v10/guilds/${integration.teamId}`, {
       headers: {
         'Authorization': `Bot ${integration.accessToken}`,
         'Content-Type': 'application/json'
       }
     });
 
-    if (!guildResponse.ok) {
-      throw new Error(`Discord API エラー: ${guildResponse.status}`);
+    if (!guildInfoResponse.ok) {
+      // Bot Tokenが無効な場合、User Tokenを試行
+      const userGuildResponse = await fetch(`https://discord.com/api/v10/users/@me/guilds`, {
+        headers: {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!userGuildResponse.ok) {
+        throw new Error(`Discord認証エラー: ${userGuildResponse.status} - Bot権限またはUser権限が必要です`);
+      }
     }
 
-    const members = await guildResponse.json();
-
-    return members.map((member: any) => {
-      const activityScore = 70;
-      const communicationScore = 65;
-      const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
-
-      return {
-        id: member.user.id,
-        name: member.nick || member.user.global_name || member.user.username,
-        email: undefined, // Discord では通常取得不可
-        avatar: member.user.avatar ? 
-          `https://cdn.discordapp.com/avatars/${member.user.id}/${member.user.avatar}.png` : 
-          undefined,
-        service: 'discord',
-        role: 'member',
-        department: '未設定',
-        lastActivity: member.joined_at,
-        isActive: true,
-        activityScore,
-        communicationScore,
-        isolationRisk,
-        metadata: {
-          joinDate: member.joined_at
-        }
-      };
+    // ギルドメンバー取得（制限付きで取得）
+    const membersResponse = await fetch(`https://discord.com/api/v10/guilds/${integration.teamId}/members?limit=1000`, {
+      headers: {
+        'Authorization': `Bot ${integration.accessToken}`,
+        'Content-Type': 'application/json'
+      }
     });
+
+    if (!membersResponse.ok) {
+      // Bot権限でエラーの場合、基本的なギルド情報のみ取得
+      console.warn(`Discord メンバー一覧取得失敗: ${membersResponse.status}. 基本情報のみ取得します`);
+      
+      // 現在のユーザー情報のみ取得
+      const currentUserResponse = await fetch(`https://discord.com/api/v10/users/@me`, {
+        headers: {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (currentUserResponse.ok) {
+        const currentUser = await currentUserResponse.json();
+        return [{
+          id: currentUser.id,
+          name: currentUser.global_name || currentUser.username,
+          email: currentUser.email || undefined,
+          avatar: currentUser.avatar ? 
+            `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png` : 
+            undefined,
+          service: 'discord',
+          role: 'member',
+          department: '未設定',
+          lastActivity: new Date().toISOString(),
+          isActive: true,
+          activityScore: 70,
+          communicationScore: 65,
+          isolationRisk: 'medium',
+          metadata: {
+            note: '限定的なアクセス権限のため、個人情報のみ取得'
+          }
+        }];
+      }
+      
+      throw new Error(`Discord API エラー: ${membersResponse.status} - 適切な権限が設定されていません`);
+    }
+
+    const members = await membersResponse.json();
+
+    return members
+      .filter((member: any) => member.user && !member.user.bot) // Bot除外
+      .map((member: any) => {
+        const activityScore = calculateDiscordActivityScore(member);
+        const communicationScore = 65;
+        const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
+
+        return {
+          id: member.user.id,
+          name: member.nick || member.user.global_name || member.user.username,
+          email: undefined, // Discord では通常取得不可
+          avatar: member.user.avatar ? 
+            `https://cdn.discordapp.com/avatars/${member.user.id}/${member.user.avatar}.png` : 
+            undefined,
+          service: 'discord',
+          role: member.roles?.includes(integration.adminRoleId) ? 'admin' : 'member',
+          department: member.roles?.length > 1 ? 'ロール有り' : '未設定',
+          lastActivity: member.communication_disabled_until || member.joined_at,
+          isActive: !member.communication_disabled_until,
+          activityScore,
+          communicationScore,
+          isolationRisk,
+          metadata: {
+            joinDate: member.joined_at,
+            roles: member.roles?.length || 0,
+            nickname: member.nick
+          }
+        };
+      });
 
   } catch (error) {
     console.error('❌ Discord データ取得エラー:', error);
@@ -381,10 +632,50 @@ async function getDiscordUsers(integration: any): Promise<UnifiedUser[]> {
   }
 }
 
+// Discord活動スコア計算を追加
+function calculateDiscordActivityScore(member: any): number {
+  let score = 50; // ベーススコア
+
+  // ニックネーム設定
+  if (member.nick) score += 10;
+  
+  // ロール数
+  if (member.roles && member.roles.length > 1) score += 15;
+  
+  // アバター設定
+  if (member.user.avatar) score += 10;
+  
+  // 参加からの経過時間（新しいメンバーは活動的とみなす）
+  if (member.joined_at) {
+    const daysSinceJoin = (Date.now() - new Date(member.joined_at).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceJoin < 30) score += 15;
+    else if (daysSinceJoin < 90) score += 10;
+  }
+
+  // 制限状態でない
+  if (!member.communication_disabled_until) score += 10;
+
+  return Math.min(100, Math.max(0, score));
+}
+
 // ChatWork ユーザーデータ取得
 async function getChatWorkUsers(integration: any): Promise<UnifiedUser[]> {
   try {
-    // ChatWork API でコンタクト取得
+    // 自分の情報を取得
+    const meResponse = await fetch('https://api.chatwork.com/v2/me', {
+      headers: {
+        'X-ChatWorkToken': integration.accessToken,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!meResponse.ok) {
+      throw new Error(`ChatWork認証エラー: ${meResponse.status} - APIトークンが無効です`);
+    }
+
+    const meData = await meResponse.json();
+
+    // コンタクト一覧取得
     const contactsResponse = await fetch('https://api.chatwork.com/v2/contacts', {
       headers: {
         'X-ChatWorkToken': integration.accessToken,
@@ -393,30 +684,57 @@ async function getChatWorkUsers(integration: any): Promise<UnifiedUser[]> {
     });
 
     if (!contactsResponse.ok) {
-      throw new Error(`ChatWork API エラー: ${contactsResponse.status}`);
+      // コンタクト取得失敗時は自分の情報のみ返す
+      console.warn(`ChatWork コンタクト取得失敗: ${contactsResponse.status}. 個人情報のみ取得します`);
+      
+      return [{
+        id: meData.account_id.toString(),
+        name: meData.name,
+        email: undefined,
+        avatar: meData.avatar_image_url,
+        service: 'chatwork',
+        role: 'member',
+        department: meData.department || '未設定',
+        lastActivity: new Date().toISOString(),
+        isActive: true,
+        activityScore: 75,
+        communicationScore: 70,
+        isolationRisk: 'medium',
+        metadata: {
+          title: meData.title,
+          note: 'コンタクト権限制限のため、個人情報のみ取得'
+        }
+      }];
     }
 
     const contacts = await contactsResponse.json();
 
-    return contacts.map((contact: any) => {
-      const activityScore = 75;
+    // 自分の情報も含める
+    const allUsers = [meData, ...contacts];
+
+    return allUsers.map((contact: any) => {
+      const activityScore = calculateChatWorkActivityScore(contact);
       const communicationScore = 70;
       const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
 
       return {
         id: contact.account_id.toString(),
         name: contact.name,
-        email: undefined,
+        email: undefined, // ChatWorkでは通常取得不可
         avatar: contact.avatar_image_url,
         service: 'chatwork',
-        role: 'member',
-        department: contact.department || '未設定',
-        lastActivity: undefined,
+        role: contact.account_id === meData.account_id ? 'self' : 'contact',
+        department: contact.department || contact.organization_name || '未設定',
+        lastActivity: undefined, // ChatWork APIでは最終活動時刻は取得不可
         isActive: true,
         activityScore,
         communicationScore,
         isolationRisk,
-        metadata: {}
+        metadata: {
+          title: contact.title,
+          organization: contact.organization_name,
+          chatwork_id: contact.chatwork_id
+        }
       };
     });
 
@@ -424,6 +742,22 @@ async function getChatWorkUsers(integration: any): Promise<UnifiedUser[]> {
     console.error('❌ ChatWork データ取得エラー:', error);
     throw error;
   }
+}
+
+// ChatWork活動スコア計算を追加
+function calculateChatWorkActivityScore(contact: any): number {
+  let score = 50; // ベーススコア
+
+  // プロフィール完成度
+  if (contact.name) score += 15;
+  if (contact.avatar_image_url) score += 10;
+  if (contact.department || contact.organization_name) score += 10;
+  if (contact.title) score += 10;
+  
+  // ChatWork ID設定
+  if (contact.chatwork_id) score += 15;
+
+  return Math.min(100, Math.max(0, score));
 }
 
 // ユーザーデータ統合・重複排除
