@@ -72,42 +72,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 統合を無効化（完全削除ではなく、isActiveをfalseに設定）
-    const updatedIntegration = await prisma.integration.update({
-      where: {
-        id: existingIntegration.id,
-      },
-      data: {
+    // 手動統合データ（manual_token）の場合は完全削除、通常の統合は無効化
+    const isManualIntegration = existingIntegration.accessToken === 'manual_token';
+    
+    console.log('🔍 統合タイプ判定:', {
+      service: serviceToDisconnect,
+      isManual: isManualIntegration,
+      accessToken: existingIntegration.accessToken?.substring(0, 10) + '...'
+    });
+
+    let result;
+    
+    if (isManualIntegration) {
+      // 手動統合データは完全削除
+      console.log('🗑️ 手動統合データを完全削除中...');
+      result = await prisma.integration.delete({
+        where: {
+          id: existingIntegration.id,
+        },
+      });
+      
+      console.log('✅ 手動統合データ完全削除完了:', {
+        userId: user.id,
+        service: serviceToDisconnect,
+        deletedId: existingIntegration.id
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: '手動統合データを完全削除しました',
+        service: serviceToDisconnect,
+        deleted: true,
+      });
+    } else {
+      // 通常の統合は無効化（履歴保持）
+      console.log('🔄 通常統合を無効化中...');
+      result = await prisma.integration.update({
+        where: {
+          id: existingIntegration.id,
+        },
+        data: {
+          isActive: false,
+          accessToken: '', // セキュリティのためトークンをクリア
+          refreshToken: null,
+          updatedAt: new Date(),
+        },
+      });
+
+      console.log('✅ 統合サービス無効化完了:', {
+        userId: user.id,
+        service: serviceToDisconnect,
+        integrationDbId: result.id
+      });
+
+      // フロントエンド用にデータ形式を変換
+      const formattedIntegration = {
+        id: result.id,
+        service: result.service,
         isActive: false,
-        accessToken: '', // セキュリティのためトークンをクリア
-        refreshToken: null,
-        updatedAt: new Date(),
-      },
-    });
+        createdAt: result.createdAt.toISOString(),
+        updatedAt: result.updatedAt.toISOString(),
+        teamId: result.teamId,
+        teamName: result.teamName,
+      };
 
-    console.log('✅ 統合サービス切断完了:', {
-      userId: user.id,
-      service: serviceToDisconnect,
-      integrationDbId: updatedIntegration.id
-    });
-
-    // フロントエンド用にデータ形式を変換（統合ページの期待形式に合わせる）
-    const formattedIntegration = {
-      id: updatedIntegration.id,
-      service: updatedIntegration.service,
-      isActive: false,
-      createdAt: updatedIntegration.createdAt.toISOString(),
-      updatedAt: updatedIntegration.updatedAt.toISOString(),
-      teamId: updatedIntegration.teamId,
-      teamName: updatedIntegration.teamName,
-    };
-
-    return NextResponse.json({
-      success: true,
-      message: '統合サービスの切断が完了しました',
-      integration: formattedIntegration,
-      service: serviceToDisconnect,
-    });
+      return NextResponse.json({
+        success: true,
+        message: '統合サービスの切断が完了しました',
+        integration: formattedIntegration,
+        service: serviceToDisconnect,
+        deleted: false,
+      });
+    }
 
   } catch (error) {
     console.error('❌ 統合サービス切断エラー:', error);
