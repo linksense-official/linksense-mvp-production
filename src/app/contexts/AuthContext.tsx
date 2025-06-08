@@ -40,10 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [socialLoginProviderId, setSocialLoginProviderId] = useState<string | null>(null);
   
   // NextAuth.jsセッション統合
-  const { data: nextAuthSession, status: nextAuthStatus } = useSession();
-  const isNextAuthAuthenticated = !!nextAuthSession && !nextAuthSession.user?.requiresTwoFactor;
-
-  const isAuthenticated = (user !== null || isNextAuthAuthenticated) && !requiresTwoFactor;
+   const { data: nextAuthSession, status: nextAuthStatus } = useSession();
+  const isNextAuthAuthenticated = !!nextAuthSession && !requiresTwoFactor;
 
   // ソーシャルプロバイダー名の取得（GitHubを削除）
   const getSocialProviderName = (provider: string): string => {
@@ -105,16 +103,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // NextAuth.jsセッションからユーザー情報を同期
   useEffect(() => {
     if (nextAuthSession?.user && !user) {
-      // 2FA検証が必要かチェック
-      if (nextAuthSession.user.requiresTwoFactor) {
+      // 2FA検証が必要かチェック（カスタムプロパティの安全な確認）
+      const userWithCustomProps = nextAuthSession.user as any;
+      if (userWithCustomProps.requiresTwoFactor) {
         setRequiresTwoFactor(true);
         setIsLoading(false);
         return;
       }
 
       // ソーシャルログイン情報の取得
-      const provider = (nextAuthSession.user as any).provider || 'credentials';
-      const providerId = (nextAuthSession.user as any).providerId || null;
+      const provider = userWithCustomProps.provider || 'credentials';
+      const providerId = userWithCustomProps.providerId || null;
       
       setSocialLoginProvider(provider);
       setSocialLoginProviderId(providerId);
@@ -124,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: nextAuthSession.user.id || 'nextauth-user',
         email: nextAuthSession.user.email || '',
         name: nextAuthSession.user.name || '',
-        avatar: nextAuthSession.user.image || '/api/placeholder/40/40',
+        avatar: (nextAuthSession.user as any).image || '/api/placeholder/40/40',
         role: 'member',
         department: (nextAuthSession.user as any).company || getDepartmentByProvider(provider),
         status: 'active',
@@ -564,10 +563,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+ // isAuthenticated を計算済みの値として定義
+  const calculatedIsAuthenticated = (user !== null || isNextAuthAuthenticated) && !requiresTwoFactor;
+
   return (
     <AuthContext.Provider value={{ 
       user, 
-      isAuthenticated,
+      isAuthenticated: calculatedIsAuthenticated,
       login, 
       logout, 
       updateUser, 
