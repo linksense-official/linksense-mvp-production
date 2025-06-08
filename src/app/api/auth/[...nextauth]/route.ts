@@ -64,12 +64,12 @@ export const authOptions: AuthOptions = {
     }),
     
     // Discord OAuth (拡張スコープ版)
-    DiscordProvider({
+   DiscordProvider({
   clientId: process.env.DISCORD_CLIENT_ID!,
   clientSecret: process.env.DISCORD_CLIENT_SECRET!,
   authorization: {
     params: {
-      scope: 'identify email guilds guilds.members.read connections messages.read'
+      scope: 'identify email guilds' // 最小限のスコープ
     }
   }
 }),
