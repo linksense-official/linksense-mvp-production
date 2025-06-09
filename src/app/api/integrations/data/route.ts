@@ -249,79 +249,119 @@ export async function GET(request: NextRequest) {
 }
 // 権限不足時のフォールバック用ユーザーデータ取得
 async function getFallbackUserData(integration: any): Promise<UnifiedUser | null> {
+  console.log(`🔄 ${integration.service}: フォールバック処理開始（強化版）`);
+  
   try {
+    let fallbackEndpoint = '';
+    let headers: Record<string, string> = {};
+    
+    // 各サービスの最も基本的なエンドポイントを使用
     switch (integration.service) {
       case 'slack':
-        const slackResponse = await fetch('https://slack.com/api/users.identity', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (slackResponse.ok) {
-          const userData = await slackResponse.json();
-          return createFallbackUser(userData.user, 'slack');
-        }
+        fallbackEndpoint = 'https://slack.com/api/auth.test';
+        headers = {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        };
         break;
         
       case 'azure-ad':
       case 'teams':
-        const teamsResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (teamsResponse.ok) {
-          const userData = await teamsResponse.json();
-          return createFallbackUser(userData, 'teams');
-        }
+        fallbackEndpoint = 'https://graph.microsoft.com/v1.0/me';
+        headers = {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        };
         break;
         
       case 'google':
-        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (googleResponse.ok) {
-          const userData = await googleResponse.json();
-          return createFallbackUser(userData, 'google');
-        }
+        fallbackEndpoint = 'https://www.googleapis.com/oauth2/v2/userinfo';
+        headers = {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        };
         break;
         
       case 'discord':
-        const discordResponse = await fetch('https://discord.com/api/v10/users/@me', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (discordResponse.ok) {
-          const userData = await discordResponse.json();
-          return createFallbackUser(userData, 'discord');
-        }
+        fallbackEndpoint = 'https://discord.com/api/v10/users/@me';
+        headers = {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        };
         break;
         
       case 'chatwork':
-        const chatworkResponse = await fetch('https://api.chatwork.com/v2/me', {
-          headers: {
-            'X-ChatWorkToken': integration.accessToken,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (chatworkResponse.ok) {
-          const userData = await chatworkResponse.json();
-          return createFallbackUser(userData, 'chatwork');
-        }
+        fallbackEndpoint = 'https://api.chatwork.com/v2/me';
+        headers = {
+          'X-ChatWorkToken': integration.accessToken,
+          'Content-Type': 'application/json'
+        };
         break;
+        
+      default:
+        console.warn(`⚠️ ${integration.service}: フォールバック未対応`);
+        return null;
     }
-    return null;
+
+    console.log(`🌐 ${integration.service}: ${fallbackEndpoint} にアクセス中...`);
+    
+    const response = await fetch(fallbackEndpoint, { headers });
+    
+    console.log(`📡 ${integration.service}: レスポンス ${response.status}`);
+    
+    if (!response.ok) {
+      console.warn(`⚠️ ${integration.service}: フォールバックAPI失敗 ${response.status}`);
+      
+      // 完全にアクセストークンが無効な場合の最終フォールバック
+      return createEmergencyFallbackUser(integration);
+    }
+
+    const userData = await response.json();
+    console.log(`✅ ${integration.service}: フォールバックデータ取得成功`);
+    
+    // サービス別のデータ処理
+    let processedData = userData;
+    if (integration.service === 'slack' && userData.user) {
+      processedData = userData.user;
+    }
+    
+    return createFallbackUser(processedData, integration.service);
+    
   } catch (error) {
-    console.warn('フォールバック取得エラー:', error);
-    return null;
+    console.warn(`❌ ${integration.service}: フォールバック処理エラー:`, error);
+    
+    // 最終的なエラー時は緊急フォールバック
+    return createEmergencyFallbackUser(integration);
   }
+}
+
+// 緊急時の最小限ユーザー作成（アクセストークンが完全に無効な場合）
+function createEmergencyFallbackUser(integration: any): UnifiedUser {
+  console.log(`🚨 ${integration.service}: 緊急フォールバック実行`);
+  
+  return {
+    id: `emergency-${integration.service}-${Date.now()}`,
+    name: `${integration.service.toUpperCase()}ユーザー（認証失敗）`,
+    email: undefined,
+    avatar: undefined,
+    service: integration.service,
+    role: 'unknown',
+    department: '認証エラー',
+    lastActivity: new Date().toISOString(),
+    isActive: false,
+    activityScore: 0,
+    communicationScore: 0,
+    isolationRisk: 'high',
+    relationshipType: 'self',
+    relationshipStrength: 0,
+    metadata: {
+      note: `${integration.service}の認証が完全に失敗しました。再認証が必要です。`,
+      fallbackMode: true,
+      emergencyMode: true,
+      limitedPermissions: true,
+      authenticationFailed: true
+    }
+  };
 }
 
 // フォールバック用ユーザーオブジェクト作成
