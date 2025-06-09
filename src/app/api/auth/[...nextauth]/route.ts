@@ -194,45 +194,45 @@ export const authOptions: AuthOptions = {
           })
 
           // 統合情報を保存（拡張データ含む）
-          const existingIntegration = await prisma.integration.findUnique({
-            where: {
-              userId_service: {
-                userId: userData.id,
-                service: account.provider as any,
-              },
-            },
-          })
+const existingIntegration = await prisma.integration.findUnique({
+  where: {
+    userId_service: {
+      userId: userData.id,
+      service: account.provider as any,
+    },
+  },
+})
 
-          const integrationData = {
-            accessToken: account.access_token || '',
-            refreshToken: account.refresh_token || '',
-            expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null,
-            scope: account.scope || '',
-            tokenType: account.token_type || 'Bearer',
-            isActive: true,
-            updatedAt: new Date(),
-            // プロバイダー固有のデータ
-            teamId: getTeamId(account, profile),
-            teamName: getTeamName(account, profile),
-          }
+const integrationData = {
+  accessToken: account.access_token || '',
+  refreshToken: account.refresh_token || '',
+  // expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null, // この行を削除またはコメントアウト
+  scope: account.scope || '',
+  tokenType: account.token_type || 'Bearer',
+  isActive: true,
+  updatedAt: new Date(),
+  // プロバイダー固有のデータ
+  teamId: getTeamId(account, profile),
+  teamName: getTeamName(account, profile),
+}
 
-          if (existingIntegration) {
-            // 既存の統合を更新
-            await prisma.integration.update({
-              where: { id: existingIntegration.id },
-              data: integrationData,
-            })
-          } else {
-            // 新規統合作成
-            await prisma.integration.create({
-              data: {
-                userId: userData.id,
-                service: account.provider as any,
-                ...integrationData,
-                createdAt: new Date(),
-              },
-            })
-          }
+if (existingIntegration) {
+  // 既存の統合を更新
+  await prisma.integration.update({
+    where: { id: existingIntegration.id },
+    data: integrationData,
+  })
+} else {
+  // 新規統合作成
+  await prisma.integration.create({
+    data: {
+      userId: userData.id,
+      service: account.provider as any,
+      ...integrationData,
+      createdAt: new Date(),
+    },
+  })
+}
 
           console.log('💾 拡張統合情報保存完了:', {
             userId: userData.id,
