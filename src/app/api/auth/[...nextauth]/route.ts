@@ -194,7 +194,7 @@ export const authOptions: AuthOptions = {
           })
 
           // 統合情報を保存（拡張データ含む）
-const existingIntegration = await prisma.integrations.findUnique({
+const existingIntegration = await prisma.integration.findUnique({
   where: {
     userId_service: {
       userId: userData.id,
