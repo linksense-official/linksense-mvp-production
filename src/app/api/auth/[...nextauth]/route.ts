@@ -194,7 +194,7 @@ export const authOptions: AuthOptions = {
           })
 
           // 統合情報を保存（拡張データ含む）
-const existingIntegration = await prisma.integration.findUnique({
+const existingIntegration = await prisma.integrations.findUnique({
   where: {
     userId_service: {
       userId: userData.id,
@@ -206,12 +206,10 @@ const existingIntegration = await prisma.integration.findUnique({
 const integrationData = {
   accessToken: account.access_token || '',
   refreshToken: account.refresh_token || '',
-  // expiresAt: account.expires_at ? new Date(account.expires_at * 1000) : null, // この行を削除またはコメントアウト
   scope: account.scope || '',
   tokenType: account.token_type || 'Bearer',
   isActive: true,
   updatedAt: new Date(),
-  // プロバイダー固有のデータ
   teamId: getTeamId(account, profile),
   teamName: getTeamName(account, profile),
 }
