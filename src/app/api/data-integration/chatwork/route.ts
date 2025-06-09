@@ -43,8 +43,8 @@ export async function GET(request: NextRequest) {
     // ChatWork APIでルーム一覧取得
     const roomsResponse = await fetch(`${CHATWORK_API_BASE}/rooms`, {
       headers: {
-        'X-ChatWorkToken': integration.accessToken
-      }
+  'X-ChatWorkToken': integration.accessToken!  // non-null assertion追加
+}
     });
 
     if (!roomsResponse.ok) {
@@ -68,7 +68,7 @@ for (const room of rooms.slice(0, 10)) { // 最初の10ルームのみ（レー�
       `${CHATWORK_API_BASE}/rooms/${room.room_id}/messages?force=1`, 
       {
         headers: {
-          'X-ChatWorkToken': integration.accessToken
+          'X-ChatWorkToken': integration.accessToken! // ← ここに ! を追加
         }
       }
     );
@@ -164,13 +164,13 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'send_message':
         const response = await fetch(`${CHATWORK_API_BASE}/rooms/${roomId}/messages`, {
-          method: 'POST',
-          headers: {
-            'X-ChatWorkToken': integration.accessToken,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: `body=${encodeURIComponent(message)}`
-        });
+  method: 'POST',
+  headers: {
+    'X-ChatWorkToken': integration.accessToken!, // ← ここにも ! を追加
+    'Content-Type': 'application/x-www-form-urlencoded'
+  },
+  body: `body=${encodeURIComponent(message)}`
+});
 
         const result = await response.json();
         return NextResponse.json({

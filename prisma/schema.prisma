@@ -127,14 +127,14 @@ model Subscription {
   @@map("subscriptions")
 }
 
-model Integration {  // 大文字のIで始まる単数形
+model Integration {
   id           String   @id @default(cuid())
   userId       String
   service      String
-  accessToken  String?  // String? に変更（nullableに）
+  accessToken  String   // String? から String に変更（non-nullable）
   refreshToken String?
-  scope        String?  // 追加
-  tokenType    String?  // 追加
+  scope        String?
+  tokenType    String?
   teamId       String?
   teamName     String?
   isActive     Boolean  @default(true)
@@ -143,5 +143,5 @@ model Integration {  // 大文字のIで始まる単数形
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, service])
-  @@map("integrations")  // データベーステーブル名は既存のまま
+  @@map("integrations")
 }
