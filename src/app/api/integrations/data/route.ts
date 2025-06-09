@@ -159,40 +159,50 @@ export async function GET(request: NextRequest) {
     console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了`);
     
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
-    
-    // 権限エラーの詳細判定
-    let severity: 'warning' | 'error' = 'error';
-    if (errorMsg.includes('権限') || 
-        errorMsg.includes('個人情報のみ') || 
-        errorMsg.includes('Admin権限') ||
-        errorMsg.includes('管理者権限') ||
-        errorMsg.includes('403') ||
-        errorMsg.includes('Forbidden')) {
-      severity = 'warning';
-    }
-    
-    errors.push({
-      service: integration.service,
-      error: errorMsg,
-      severity
-    });
-    
-    console.error(`❌ ${integration.service}: ${errorMsg}`);
-    
-    // 権限エラーの場合は基本情報のみ取得を試行
-    if (severity === 'warning') {
-      try {
-        const fallbackUser = await getFallbackUserData(integration);
-        if (fallbackUser) {
-          allUsers.push(fallbackUser);
-          console.log(`⚠️ ${integration.service}: フォールバック情報で継続`);
-        }
-      } catch (fallbackError) {
-        console.warn(`⚠️ ${integration.service}: フォールバック取得も失敗`);
+  const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
+  
+  // 権限エラーの詳細判定を強化
+  let severity: 'warning' | 'error' = 'error';
+  
+  // より広範囲な権限エラーパターンをキャッチ
+  if (errorMsg.includes('401') || 
+      errorMsg.includes('403') || 
+      errorMsg.includes('権限') || 
+      errorMsg.includes('認証エラー') ||
+      errorMsg.includes('アクセストークンが無効') ||
+      errorMsg.includes('APIトークンが無効') ||
+      errorMsg.includes('個人情報のみ') || 
+      errorMsg.includes('Admin権限') ||
+      errorMsg.includes('管理者権限') ||
+      errorMsg.includes('Forbidden')) {
+    severity = 'warning'; // 権限エラーは警告として扱う
+  }
+  
+  errors.push({
+    service: integration.service,
+    error: errorMsg,
+    severity
+  });
+  
+  console.error(`❌ ${integration.service}: ${errorMsg}`);
+  
+  // 権限エラーの場合は必ずフォールバック処理を実行
+  if (severity === 'warning') {
+    try {
+      console.log(`🔄 ${integration.service}: フォールバック処理開始`);
+      const fallbackUser = await getFallbackUserData(integration);
+      if (fallbackUser) {
+        allUsers.push(fallbackUser);
+        console.log(`✅ ${integration.service}: フォールバック成功 - ${fallbackUser.name}`);
+      } else {
+        console.warn(`⚠️ ${integration.service}: フォールバック失敗 - ユーザーデータなし`);
       }
+    } catch (fallbackError) {
+      const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : 'フォールバック不明エラー';
+      console.warn(`⚠️ ${integration.service}: フォールバック取得エラー - ${fallbackMsg}`);
     }
   }
+}
 }
 
     // データ統合・重複排除
@@ -1846,110 +1856,6 @@ function generateCriticalInsights(
       actionRequired: false
     });
   }
-  // 権限不足時のフォールバック用ユーザーデータ取得
-async function getFallbackUserData(integration: any): Promise<UnifiedUser | null> {
-  try {
-    switch (integration.service) {
-      case 'slack':
-        const slackResponse = await fetch('https://slack.com/api/users.identity', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (slackResponse.ok) {
-          const userData = await slackResponse.json();
-          return createFallbackUser(userData.user, 'slack');
-        }
-        break;
-        
-      case 'azure-ad':
-      case 'teams':
-        const teamsResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (teamsResponse.ok) {
-          const userData = await teamsResponse.json();
-          return createFallbackUser(userData, 'teams');
-        }
-        break;
-        
-      case 'google':
-        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (googleResponse.ok) {
-          const userData = await googleResponse.json();
-          return createFallbackUser(userData, 'google');
-        }
-        break;
-        
-      case 'discord':
-        const discordResponse = await fetch('https://discord.com/api/v10/users/@me', {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (discordResponse.ok) {
-          const userData = await discordResponse.json();
-          return createFallbackUser(userData, 'discord');
-        }
-        break;
-        
-      case 'chatwork':
-        const chatworkResponse = await fetch('https://api.chatwork.com/v2/me', {
-          headers: {
-            'X-ChatWorkToken': integration.accessToken,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (chatworkResponse.ok) {
-          const userData = await chatworkResponse.json();
-          return createFallbackUser(userData, 'chatwork');
-        }
-        break;
-    }
-    return null;
-  } catch (error) {
-    console.warn('フォールバック取得エラー:', error);
-    return null;
-  }
-}
 
-// フォールバック用ユーザーオブジェクト作成
-function createFallbackUser(userData: any, service: string): UnifiedUser {
-  const baseUser: UnifiedUser = {
-    id: userData.id || userData.account_id?.toString() || 'fallback-user',
-    name: userData.name || userData.displayName || userData.username || userData.global_name || '名前未設定',
-    email: userData.email || userData.userPrincipalName || userData.mail,
-    avatar: userData.avatar_image_url || userData.picture || 
-            (userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : undefined),
-    service,
-    role: 'self',
-    department: userData.department || userData.organization_name || '未設定',
-    lastActivity: new Date().toISOString(),
-    isActive: true,
-    activityScore: 70,
-    communicationScore: 60,
-    isolationRisk: 'medium',
-    relationshipType: 'self',
-    relationshipStrength: 100,
-    metadata: {
-      note: `権限制限により個人情報のみ取得（${service}）`,
-      fallbackMode: true,
-      limitedPermissions: true
-    }
-  };
-
-  return baseUser;
-}
-
-  return insights;
+  return insights; // ⭐ この行が重要！
 }
