@@ -122,60 +122,78 @@ export async function GET(request: NextRequest) {
     const errors: Array<{service: string, error: string, severity: 'warning' | 'error'}> = [];
 
     for (const integration of integrations) {
-      try {
-        console.log(`🔍 ${integration.service} データ取得開始`);
-        
-        let serviceUsers: UnifiedUser[] = [];
-        
-        switch (integration.service) {
-          case 'slack':
-            serviceUsers = await getSlackUsersExtended(integration);
-            break;
-          case 'azure-ad':
-          case 'teams':
-            serviceUsers = await getTeamsUsersExtended(integration);
-            break;
-          case 'google':
-          case 'google-meet':
-            serviceUsers = await getGoogleUsersExtended(integration);
-            break;
-          case 'discord':
-            serviceUsers = await getDiscordUsersExtended(integration);
-            break;
-          case 'chatwork':
-            serviceUsers = await getChatWorkUsersExtended(integration);
-            break;
-          default:
-            console.warn(`⚠️ 未対応サービス: ${integration.service}`);
-            errors.push({
-              service: integration.service,
-              error: '未対応のサービスです',
-              severity: 'warning'
-            });
-            continue;
-        }
-
-        allUsers.push(...serviceUsers);
-        console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了`);
-        
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
-        const severity = errorMsg.includes('権限') || errorMsg.includes('個人情報のみ') ? 'warning' : 'error';
-        
+  try {
+    console.log(`🔍 ${integration.service} データ取得開始`);
+    
+    let serviceUsers: UnifiedUser[] = [];
+    
+    switch (integration.service) {
+      case 'slack':
+        serviceUsers = await getSlackUsersExtended(integration);
+        break;
+      case 'azure-ad':
+      case 'teams':
+        serviceUsers = await getTeamsUsersExtended(integration);
+        break;
+      case 'google':
+      case 'google-meet':
+        serviceUsers = await getGoogleUsersExtended(integration);
+        break;
+      case 'discord':
+        serviceUsers = await getDiscordUsersExtended(integration);
+        break;
+      case 'chatwork':
+        serviceUsers = await getChatWorkUsersExtended(integration);
+        break;
+      default:
+        console.warn(`⚠️ 未対応サービス: ${integration.service}`);
         errors.push({
           service: integration.service,
-          error: errorMsg,
-          severity
+          error: '未対応のサービスです',
+          severity: 'warning'
         });
-        
-        console.error(`❌ ${integration.service}: ${errorMsg}`);
-        
-        // 致命的でないエラーの場合は処理を継続
-        if (severity === 'warning') {
-          console.log(`⚠️ ${integration.service}: 部分的なデータ取得で継続`);
+        continue;
+    }
+
+    allUsers.push(...serviceUsers);
+    console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了`);
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
+    
+    // 権限エラーの詳細判定
+    let severity: 'warning' | 'error' = 'error';
+    if (errorMsg.includes('権限') || 
+        errorMsg.includes('個人情報のみ') || 
+        errorMsg.includes('Admin権限') ||
+        errorMsg.includes('管理者権限') ||
+        errorMsg.includes('403') ||
+        errorMsg.includes('Forbidden')) {
+      severity = 'warning';
+    }
+    
+    errors.push({
+      service: integration.service,
+      error: errorMsg,
+      severity
+    });
+    
+    console.error(`❌ ${integration.service}: ${errorMsg}`);
+    
+    // 権限エラーの場合は基本情報のみ取得を試行
+    if (severity === 'warning') {
+      try {
+        const fallbackUser = await getFallbackUserData(integration);
+        if (fallbackUser) {
+          allUsers.push(fallbackUser);
+          console.log(`⚠️ ${integration.service}: フォールバック情報で継続`);
         }
+      } catch (fallbackError) {
+        console.warn(`⚠️ ${integration.service}: フォールバック取得も失敗`);
       }
     }
+  }
+}
 
     // データ統合・重複排除
     const unifiedUsers = mergeUserDataExtended(allUsers);
@@ -218,6 +236,110 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+// 権限不足時のフォールバック用ユーザーデータ取得
+async function getFallbackUserData(integration: any): Promise<UnifiedUser | null> {
+  try {
+    switch (integration.service) {
+      case 'slack':
+        const slackResponse = await fetch('https://slack.com/api/users.identity', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (slackResponse.ok) {
+          const userData = await slackResponse.json();
+          return createFallbackUser(userData.user, 'slack');
+        }
+        break;
+        
+      case 'azure-ad':
+      case 'teams':
+        const teamsResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (teamsResponse.ok) {
+          const userData = await teamsResponse.json();
+          return createFallbackUser(userData, 'teams');
+        }
+        break;
+        
+      case 'google':
+        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (googleResponse.ok) {
+          const userData = await googleResponse.json();
+          return createFallbackUser(userData, 'google');
+        }
+        break;
+        
+      case 'discord':
+        const discordResponse = await fetch('https://discord.com/api/v10/users/@me', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (discordResponse.ok) {
+          const userData = await discordResponse.json();
+          return createFallbackUser(userData, 'discord');
+        }
+        break;
+        
+      case 'chatwork':
+        const chatworkResponse = await fetch('https://api.chatwork.com/v2/me', {
+          headers: {
+            'X-ChatWorkToken': integration.accessToken,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (chatworkResponse.ok) {
+          const userData = await chatworkResponse.json();
+          return createFallbackUser(userData, 'chatwork');
+        }
+        break;
+    }
+    return null;
+  } catch (error) {
+    console.warn('フォールバック取得エラー:', error);
+    return null;
+  }
+}
+
+// フォールバック用ユーザーオブジェクト作成
+function createFallbackUser(userData: any, service: string): UnifiedUser {
+  const baseUser: UnifiedUser = {
+    id: userData.id || userData.account_id?.toString() || 'fallback-user',
+    name: userData.name || userData.displayName || userData.username || userData.global_name || '名前未設定',
+    email: userData.email || userData.userPrincipalName || userData.mail,
+    avatar: userData.avatar_image_url || userData.picture || 
+            (userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : undefined),
+    service,
+    role: 'self',
+    department: userData.department || userData.organization_name || '未設定',
+    lastActivity: new Date().toISOString(),
+    isActive: true,
+    activityScore: 70,
+    communicationScore: 60,
+    isolationRisk: 'medium',
+    relationshipType: 'self',
+    relationshipStrength: 100,
+    metadata: {
+      note: `権限制限により個人情報のみ取得（${service}）`,
+      fallbackMode: true,
+      limitedPermissions: true
+    }
+  };
+
+  return baseUser;
 }
 
 // Slackユーザーデータ取得（DM相手含む）
@@ -681,8 +803,7 @@ try {
           if (toHeader && toHeader.value) {
             const emails = toHeader.value.match(/[\w\.-]+@[\w\.-]+\.\w+/g) || [];
             emails.forEach((email: string) => {
-              // currentUserの存在チェックを追加
-              if (currentUser && email !== currentUser.email) {
+              if (currentUser?.email && email !== currentUser.email) {
                 emailUsers.add(email);
                 emailFrequency[email] = (emailFrequency[email] || 0) + 1;
                 
@@ -695,6 +816,7 @@ try {
         }
       } catch (error) {
         // メッセージ詳細取得エラーは無視
+        console.warn('メッセージ詳細取得エラー:', error);
       }
     }
   }
@@ -721,8 +843,7 @@ try {
       // ファイル所有者
       if (file.owners) {
         file.owners.forEach((owner: any) => {
-          // currentUserの存在チェックを追加
-          if (owner.emailAddress && currentUser && owner.emailAddress !== currentUser.email) {
+          if (owner.emailAddress && currentUser?.email && owner.emailAddress !== currentUser.email) {
             driveUsers.add(owner.emailAddress);
             driveCollaboration[owner.emailAddress] = (driveCollaboration[owner.emailAddress] || 0) + 1;
           }
@@ -732,8 +853,7 @@ try {
       // 共有権限
       if (file.permissions) {
         file.permissions.forEach((permission: any) => {
-          // currentUserの存在チェックを追加
-          if (permission.emailAddress && currentUser && permission.emailAddress !== currentUser.email) {
+          if (permission.emailAddress && currentUser?.email && permission.emailAddress !== currentUser.email) {
             driveUsers.add(permission.emailAddress);
             driveCollaboration[permission.emailAddress] = (driveCollaboration[permission.emailAddress] || 0) + 1;
           }
@@ -878,88 +998,46 @@ async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]>
 
     // 2. フレンドリスト取得
     const friendsResponse = await fetch(`https://discord.com/api/v10/users/@me/relationships`, {
-      headers: {
-        'Authorization': `Bearer ${integration.accessToken}`,
-        'Content-Type': 'application/json'
+  headers: {
+    'Authorization': `Bearer ${integration.accessToken}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+// 権限不足の場合の処理を追加
+if (!friendsResponse.ok) {
+  if (friendsResponse.status === 403) {
+    console.warn('Discord フレンドリスト取得権限なし。個人情報のみ取得します。');
+    // 自分の情報のみ追加して終了
+    allUsers.push({
+      id: currentUser.id,
+      name: currentUser.global_name || currentUser.username,
+      email: currentUser.email || undefined,
+      avatar: currentUser.avatar ? 
+        `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png` : 
+        undefined,
+      service: 'discord',
+      role: 'self',
+      department: '本人',
+      lastActivity: new Date().toISOString(),
+      isActive: true,
+      activityScore: 90,
+      communicationScore: 80,
+      isolationRisk: 'low',
+      relationshipType: 'self',
+      relationshipStrength: 100,
+      metadata: {
+        note: 'フレンドリスト権限制限のため個人情報のみ',
+        limitedPermissions: true
       }
     });
-
-    if (friendsResponse.ok) {
-      const friends = await friendsResponse.json();
-      console.log(`📱 Discord フレンド数: ${friends.length}`);
-
-      // フレンドの詳細情報を並行取得
-      const friendDetails = await Promise.allSettled(
-        friends
-          .filter((friend: any) => friend.type === 1) // type 1 = フレンド
-          .map(async (friend: any) => {
-            try {
-              // 共通ギルド数取得
-              const mutualGuildsResponse = await fetch(`https://discord.com/api/v10/users/@me/channels`, {
-                headers: {
-                  'Authorization': `Bearer ${integration.accessToken}`,
-                  'Content-Type': 'application/json'
-                }
-              });
-
-              let mutualGuilds = 0;
-              let lastDMActivity;
-              
-              if (mutualGuildsResponse.ok) {
-                const channels = await mutualGuildsResponse.json();
-                const dmChannel = channels.find((ch: any) => 
-                  ch.type === 1 && ch.recipients?.some((r: any) => r.id === friend.user.id)
-                );
-                
-                if (dmChannel) {
-                  mutualGuilds = 1;
-                  lastDMActivity = dmChannel.last_message_id;
-                }
-              }
-
-              const activityScore = calculateDiscordFriendActivityScore(friend.user, friend);
-              const communicationScore = calculateDiscordCommunicationScore(friend, mutualGuilds);
-              const relationshipStrength = calculateRelationshipStrength(friend, mutualGuilds);
-
-              return {
-                id: friend.user.id,
-                name: friend.user.global_name || friend.user.username,
-                email: undefined,
-                avatar: friend.user.avatar ? 
-                  `https://cdn.discordapp.com/avatars/${friend.user.id}/${friend.user.avatar}.png` : 
-                  undefined,
-                service: 'discord',
-                role: 'friend',
-                department: 'フレンド',
-                lastActivity: friend.since || new Date().toISOString(),
-                isActive: true,
-                activityScore,
-                communicationScore,
-                isolationRisk: determineIsolationRisk(activityScore, communicationScore),
-                relationshipType: 'friend' as const,
-                relationshipStrength,
-                metadata: {
-                  friendSince: friend.since || new Date().toISOString(),
-                  mutualGuilds,
-                  gameActivity: friend.user.activities?.[0]?.name,
-                  interactionScore: communicationScore,
-                  lastInteraction: friend.since
-                }
-              };
-            } catch (error) {
-              console.warn(`⚠️ フレンド詳細取得失敗: ${friend.user.username}`, error);
-              return null;
-            }
-          })
-      );
-
-      const validFriends = friendDetails
-        .filter(result => result.status === 'fulfilled' && result.value !== null)
-        .map(result => (result as PromiseFulfilledResult<UnifiedUser>).value);
-
-      allUsers.push(...validFriends);
-    }
-
+    
+    console.log(`✅ Discord 総取得数: 1人 (権限制限)`);
+    return allUsers;
+  } else {
+    throw new Error(`Discord フレンドリスト取得エラー: ${friendsResponse.status}`);
+  }
+}
     // 3. ギルドメンバー取得（teamIdが設定されている場合）
     if (integration.teamId) {
       try {
@@ -1768,6 +1846,110 @@ function generateCriticalInsights(
       actionRequired: false
     });
   }
+  // 権限不足時のフォールバック用ユーザーデータ取得
+async function getFallbackUserData(integration: any): Promise<UnifiedUser | null> {
+  try {
+    switch (integration.service) {
+      case 'slack':
+        const slackResponse = await fetch('https://slack.com/api/users.identity', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (slackResponse.ok) {
+          const userData = await slackResponse.json();
+          return createFallbackUser(userData.user, 'slack');
+        }
+        break;
+        
+      case 'azure-ad':
+      case 'teams':
+        const teamsResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (teamsResponse.ok) {
+          const userData = await teamsResponse.json();
+          return createFallbackUser(userData, 'teams');
+        }
+        break;
+        
+      case 'google':
+        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (googleResponse.ok) {
+          const userData = await googleResponse.json();
+          return createFallbackUser(userData, 'google');
+        }
+        break;
+        
+      case 'discord':
+        const discordResponse = await fetch('https://discord.com/api/v10/users/@me', {
+          headers: {
+            'Authorization': `Bearer ${integration.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (discordResponse.ok) {
+          const userData = await discordResponse.json();
+          return createFallbackUser(userData, 'discord');
+        }
+        break;
+        
+      case 'chatwork':
+        const chatworkResponse = await fetch('https://api.chatwork.com/v2/me', {
+          headers: {
+            'X-ChatWorkToken': integration.accessToken,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (chatworkResponse.ok) {
+          const userData = await chatworkResponse.json();
+          return createFallbackUser(userData, 'chatwork');
+        }
+        break;
+    }
+    return null;
+  } catch (error) {
+    console.warn('フォールバック取得エラー:', error);
+    return null;
+  }
+}
+
+// フォールバック用ユーザーオブジェクト作成
+function createFallbackUser(userData: any, service: string): UnifiedUser {
+  const baseUser: UnifiedUser = {
+    id: userData.id || userData.account_id?.toString() || 'fallback-user',
+    name: userData.name || userData.displayName || userData.username || userData.global_name || '名前未設定',
+    email: userData.email || userData.userPrincipalName || userData.mail,
+    avatar: userData.avatar_image_url || userData.picture || 
+            (userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png` : undefined),
+    service,
+    role: 'self',
+    department: userData.department || userData.organization_name || '未設定',
+    lastActivity: new Date().toISOString(),
+    isActive: true,
+    activityScore: 70,
+    communicationScore: 60,
+    isolationRisk: 'medium',
+    relationshipType: 'self',
+    relationshipStrength: 100,
+    metadata: {
+      note: `権限制限により個人情報のみ取得（${service}）`,
+      fallbackMode: true,
+      limitedPermissions: true
+    }
+  };
+
+  return baseUser;
+}
 
   return insights;
 }
