@@ -175,86 +175,94 @@ export const authOptions: AuthOptions = {
             },
           },
         });
-        console.log('既存統合:', existingIntegration ? '更新' : '新規作成');
+           // 🆕 修正: 他の統合情報を確認
+    const allUserIntegrations = await prisma.integration.findMany({
+      where: { userId: userData.id },
+      select: { id: true, service: true, isActive: true }
+    });
+    
+    console.log('📊 既存統合情報:', allUserIntegrations);
 
-        // 🆕 チーム情報の拡張取得
-        const extendedProfile = profile as ExtendedProfile;
-        const teamId = getTeamId(account, extendedProfile);
-        const teamName = getTeamName(account, extendedProfile);
-        
-        // 🆕 権限レベルの判定
-        const hasAdminPermission = checkAdminPermission(account, extendedProfile);
+    // チーム情報の取得
+    const extendedProfile = profile as ExtendedProfile;
+    const teamId = getTeamId(account, extendedProfile);
+    const teamName = getTeamName(account, extendedProfile);
+    
+    const hasAdminPermission = checkAdminPermission(account, extendedProfile);
 
-        const integrationData = {
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token || '',
-          scope: account.scope || '',
-          tokenType: account.token_type || 'Bearer',
-          isActive: true,
-          updatedAt: new Date(),
-          teamId,
-          teamName,
-          // 🆕 権限情報を追加保存
-          metadata: JSON.stringify({
-            hasAdminPermission,
-            tenantId: extendedProfile?.tid,
-            organizationName: extendedProfile?.companyName,
-            userPrincipalName: extendedProfile?.userPrincipalName,
-            domain: extendedProfile?.hd
-          })
-        };
+    const integrationData = {
+      accessToken: account.access_token,
+      refreshToken: account.refresh_token || '',
+      scope: account.scope || '',
+      tokenType: account.token_type || 'Bearer',
+      isActive: true,
+      updatedAt: new Date(),
+      teamId,
+      teamName,
+      metadata: JSON.stringify({
+        hasAdminPermission,
+        tenantId: extendedProfile?.tid,
+        organizationName: extendedProfile?.companyName,
+        userPrincipalName: extendedProfile?.userPrincipalName,
+        domain: extendedProfile?.hd
+      })
+    };
 
-        console.log('💾 保存データ:', {
-          provider: account.provider,
-          accessTokenLength: integrationData.accessToken.length,
-          hasRefreshToken: !!integrationData.refreshToken,
-          scope: integrationData.scope,
-          teamId: integrationData.teamId,
-          teamName: integrationData.teamName,
-          hasAdminPermission
-        });
-
-        if (existingIntegration) {
-          console.log('🔄 既存統合更新中...');
-          const updated = await prisma.integration.update({
-            where: { id: existingIntegration.id },
-            data: integrationData,
-          });
-          console.log('✅ 更新完了:', { id: updated.id, hasToken: !!updated.accessToken });
-        } else {
-          console.log('🆕 新規統合作成中...');
-          const created = await prisma.integration.create({
-            data: {
-              userId: userData.id,
-              service: account.provider as any,
-              ...integrationData,
-              createdAt: new Date(),
-            },
-          });
-          console.log('✅ 作成完了:', { id: created.id, hasToken: !!created.accessToken });
-        }
-
-        console.log('🎉 認証・保存完了:', {
-          provider: account.provider,
+    if (existingIntegration) {
+      console.log('🔄 統合情報更新中...');
+      const updated = await prisma.integration.update({
+        where: { id: existingIntegration.id },
+        data: integrationData,
+      });
+      console.log('✅ 更新完了:', { 
+        id: updated.id, 
+        service: updated.service,
+        hasToken: !!updated.accessToken 
+      });
+    } else {
+      console.log('🆕 新規統合作成中...');
+      const created = await prisma.integration.create({
+        data: {
           userId: userData.id,
-          tokenSaved: true,
-          hasAdminPermission
-        });
-        
-        return true;
-        
-      } catch (error) {
-        console.error('❌ signIn エラー詳細:', {
-          error: error instanceof Error ? error.message : error,
-          stack: error instanceof Error ? error.stack : undefined,
-          provider: account?.provider,
-          timestamp: new Date().toISOString()
-        });
-        
-        // エラーでも認証は継続
-        return true;
-      }
-    },
+          service: account.provider as any,
+          ...integrationData,
+          createdAt: new Date(),
+        },
+      });
+      console.log('✅ 作成完了:', { 
+        id: created.id, 
+        service: created.service,
+        hasToken: !!created.accessToken 
+      });
+    }
+
+    // 🆕 追加: 最終確認
+    const finalIntegrations = await prisma.integration.findMany({
+      where: { userId: userData.id },
+      select: { service: true, isActive: true }
+    });
+    
+    console.log('🎉 認証・保存完了後の統合状況:', {
+      provider: account.provider,
+      userId: userData.id,
+      totalIntegrations: finalIntegrations.length,
+      activeIntegrations: finalIntegrations.filter(i => i.isActive).length,
+      services: finalIntegrations.map(i => i.service)
+    });
+    
+    return true;
+    
+  } catch (error) {
+    console.error('❌ signIn エラー詳細:', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      provider: account?.provider,
+      timestamp: new Date().toISOString()
+    });
+    
+    return true; // エラーでも認証は継続
+  }
+},
     
     async redirect({ url, baseUrl }) {
       console.log('🔄 認証後リダイレクト:', { url, baseUrl });

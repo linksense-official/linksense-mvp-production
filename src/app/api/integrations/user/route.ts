@@ -36,7 +36,14 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ ユーザー確認:', { id: user.id, email: user.email });
 
-    // ユーザーの統合情報を取得
+    // 🆕 詳細なクエリログ追加
+    console.log('📊 データベースクエリ実行:', {
+      userId: user.id,
+      query: 'integration.findMany',
+      timestamp: new Date().toISOString()
+    });
+
+    // ユーザーの統合情報を取得（metadataフィールドを削除）
     const userIntegrations = await prisma.integration.findMany({
       where: {
         userId: user.id,
@@ -51,21 +58,40 @@ export async function GET(request: NextRequest) {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        scope: true,        // 🆕 スコープ情報を追加
+        tokenType: true,    // 🆕 トークンタイプを追加
       },
       orderBy: {
         updatedAt: 'desc',
       },
     });
 
-    console.log('📊 データベースから取得した統合情報:', {
+    console.log('📊 データベースから取得した統合情報（詳細）:', {
       count: userIntegrations.length,
       services: userIntegrations.map(i => ({
+        id: i.id,
         service: i.service,
         isActive: i.isActive,
         hasToken: !!i.accessToken,
-        teamName: i.teamName
+        tokenLength: i.accessToken?.length || 0,
+        teamName: i.teamName,
+        createdAt: i.createdAt,
+        updatedAt: i.updatedAt,
+        scope: i.scope,
+        tokenType: i.tokenType
       }))
     });
+
+    // 🆕 サービス重複チェック
+    const serviceCounts = userIntegrations.reduce((acc, integration) => {
+      acc[integration.service] = (acc[integration.service] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const duplicateServices = Object.entries(serviceCounts).filter(([_, count]) => count > 1);
+    if (duplicateServices.length > 0) {
+      console.warn('⚠️ 重複サービス検出:', duplicateServices);
+    }
 
     // フロントエンド用にデータ形式を変換（ダッシュボードの期待形式に合わせる）
     const formattedIntegrations = userIntegrations.map(integration => ({
@@ -79,6 +105,12 @@ export async function GET(request: NextRequest) {
       teamName: integration.teamName,
       hasToken: !!integration.accessToken,
       hasRefreshToken: !!integration.refreshToken,
+      scope: integration.scope,
+      tokenType: integration.tokenType,
+      // 🆕 権限情報の推定
+      hasAdminPermission: integration.scope?.includes('User.Read.All') || 
+                         integration.scope?.includes('admin.directory.user.readonly') || 
+                         false
     }));
 
     // 統計情報計算
@@ -93,14 +125,16 @@ export async function GET(request: NextRequest) {
         : Date.now()
     };
 
-    console.log('✅ ユーザー統合情報取得成功:', {
+    console.log('✅ 最終レスポンス準備完了:', {
       userId: user.id,
       stats,
+      duplicateServices: duplicateServices.length > 0 ? duplicateServices : 'なし',
       integrations: formattedIntegrations.map(i => ({ 
         service: i.service, 
         isActive: i.isActive,
         hasToken: i.hasToken,
-        teamName: i.teamName
+        teamName: i.teamName,
+        hasAdminPermission: i.hasAdminPermission
       }))
     });
 
@@ -113,6 +147,13 @@ export async function GET(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name
+      },
+      debug: {
+        duplicateServices,
+        rawCount: userIntegrations.length,
+        formattedCount: formattedIntegrations.length,
+        servicesWithTokens: formattedIntegrations.filter(i => i.hasToken).map(i => i.service),
+        servicesWithAdminPermission: formattedIntegrations.filter(i => i.hasAdminPermission).map(i => i.service)
       },
       timestamp: new Date().toISOString()
     };
@@ -180,7 +221,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { serviceId, serviceName, status, settings, accessToken, refreshToken, teamId, teamName } = body;
+    const { serviceId, serviceName, status, settings, accessToken, refreshToken, teamId, teamName, scope } = body;
 
     console.log('📝 統合情報更新リクエスト:', {
       userId: user.id,
@@ -188,7 +229,8 @@ export async function POST(request: NextRequest) {
       status,
       hasAccessToken: !!accessToken,
       hasRefreshToken: !!refreshToken,
-      teamName
+      teamName,
+      scope
     });
 
     if (!serviceId) {
@@ -221,6 +263,7 @@ export async function POST(request: NextRequest) {
           refreshToken: refreshToken || existingIntegration.refreshToken,
           teamId: teamId || existingIntegration.teamId,
           teamName: teamName || serviceName || existingIntegration.teamName,
+          scope: scope || existingIntegration.scope,
           updatedAt: new Date(),
         },
       });
@@ -239,6 +282,7 @@ export async function POST(request: NextRequest) {
           refreshToken: refreshToken || null,
           teamId: teamId || null,
           teamName: teamName || serviceName || serviceId,
+          scope: scope || null,
           isActive: isActive,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -261,6 +305,7 @@ export async function POST(request: NextRequest) {
       teamId: integration.teamId,
       teamName: integration.teamName,
       hasToken: !!integration.accessToken,
+      scope: integration.scope,
     };
 
     return NextResponse.json({
