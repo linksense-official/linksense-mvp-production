@@ -48,13 +48,13 @@ const services: ServiceConfig[] = [
     isNextAuth: true,
   },
   {
-     id: 'slack',
-  name: 'Slack',
-  description: 'チームコミュニケーション',
-  icon: MessageSquare,
-  color: 'bg-purple-500',
-  authUrl: '/api/auth/slack',  // ✅ 正しい
-  isNextAuth: false,           // ✅ カスタム実装に変更
+    id: 'slack',
+    name: 'Slack',
+    description: 'チームコミュニケーション',
+    icon: MessageSquare,
+    color: 'bg-purple-500',
+    authUrl: '/api/auth/slack',
+    isNextAuth: false,
   },
   {
     id: 'discord',
@@ -80,18 +80,18 @@ const services: ServiceConfig[] = [
     description: 'ビジネスチャット',
     icon: Calendar,
     color: 'bg-orange-500',
-    authUrl: '/api/auth/chatwork',
+    authUrl: '/api/integrations/chatwork',  // ⭐ 修正: 新しいAPIエンドポイント
     isNextAuth: false,
   },
-    {
-     id: 'lineworks',
-  name: 'LINE WORKS',
-  description: 'ビジネス向けLINE',
-  icon: Phone,
-  color: 'bg-green-500',
-  authUrl: '/api/auth/lineworks-service', // ✅ Service Account用エンドポイント
-  isNextAuth: false,
-},
+  {
+    id: 'lineworks',
+    name: 'LINE WORKS',
+    description: 'ビジネス向けLINE',
+    icon: Phone,
+    color: 'bg-green-500',
+    authUrl: '/api/auth/lineworks-service',
+    isNextAuth: false,
+  },
 ]
 
 export default function IntegrationsPage() {
