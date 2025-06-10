@@ -160,99 +160,138 @@ export const authOptions: AuthOptions = {
   
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log('✅ OAuth認証成功 (拡張スコープ):', {
-        provider: account?.provider,
-        email: user?.email,
-        name: user?.name,
-        scopes: account?.scope,
-        timestamp: new Date().toISOString()
-      })
+  console.log('✅ OAuth認証成功 (拡張スコープ):', {
+    provider: account?.provider,
+    email: user?.email,
+    name: user?.name,
+    scopes: account?.scope,
+    timestamp: new Date().toISOString()
+  })
+  
+  try {
+    if (account && user?.email) {
+      console.log('🔄 データベース保存開始:', {
+        provider: account.provider,
+        hasAccessToken: !!account.access_token,
+        scope: account.scope
+      });
+
+      // ChatWorkの場合、プレースホルダーメールを実際のIDベースに変換
+      let userEmail = user.email;
+      let userName = user.name || '';
       
-      try {
-        if (account && user?.email) {
-          // ChatWorkの場合、プレースホルダーメールを実際のIDベースに変換
-          let userEmail = user.email;
-          let userName = user.name || '';
-          
-          if (account.provider === 'chatwork' && user.email?.includes('linksense.local')) {
-            // ChatWorkの場合は特別処理（既に適切な形式）
-            console.log('📧 ChatWork用メール確認:', userEmail);
-          }
-
-          // ユーザー情報をデータベースに保存/更新
-          const userData = await prisma.user.upsert({
-            where: { email: userEmail },
-            update: {
-              name: userName,
-              image: user.image,
-              updatedAt: new Date(),
-            },
-            create: {
-              email: userEmail,
-              name: userName,
-              image: user.image,
-              emailVerified: new Date(),
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          })
-
-          // 統合情報を保存（拡張データ含む）
-const existingIntegration = await prisma.integration.findUnique({
-  where: {
-    userId_service: {
-      userId: userData.id,
-      service: account.provider as any,
-    },
-  },
-})
-
-const integrationData = {
-  accessToken: account.access_token || '',
-  refreshToken: account.refresh_token || '',
-  scope: account.scope || '',
-  tokenType: account.token_type || 'Bearer',
-  isActive: true,
-  updatedAt: new Date(),
-  teamId: getTeamId(account, profile),
-  teamName: getTeamName(account, profile),
-}
-
-if (existingIntegration) {
-  // 既存の統合を更新
-  await prisma.integration.update({
-    where: { id: existingIntegration.id },
-    data: integrationData,
-  })
-} else {
-  // 新規統合作成
-  await prisma.integration.create({
-    data: {
-      userId: userData.id,
-      service: account.provider as any,
-      ...integrationData,
-      createdAt: new Date(),
-    },
-  })
-}
-
-          console.log('💾 拡張統合情報保存完了:', {
-            userId: userData.id,
-            service: account.provider,
-            hasToken: !!account.access_token,
-            hasRefreshToken: !!account.refresh_token,
-            scope: account.scope,
-            teamId: integrationData.teamId,
-            action: existingIntegration ? 'updated' : 'created'
-          })
-        }
-      } catch (error) {
-        console.error('❌ データベース保存エラー:', error)
-        // 認証は成功させるが、エラーをログに記録
+      if (account.provider === 'chatwork' && user.email?.includes('linksense.local')) {
+        console.log('📧 ChatWork用メール確認:', userEmail);
       }
-      
-      return true
-    },
+
+      // ユーザー情報をデータベースに保存/更新
+      console.log('👤 ユーザー情報保存開始');
+      const userData = await prisma.user.upsert({
+        where: { email: userEmail },
+        update: {
+          name: userName,
+          image: user.image,
+          updatedAt: new Date(),
+        },
+        create: {
+          email: userEmail,
+          name: userName,
+          image: user.image,
+          emailVerified: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+      console.log('✅ ユーザー情報保存完了:', userData.id);
+
+      // 統合情報を保存（拡張データ含む）
+      console.log('🔗 統合情報保存開始');
+      const existingIntegration = await prisma.integration.findUnique({
+        where: {
+          userId_service: {
+            userId: userData.id,
+            service: account.provider as any,
+          },
+        },
+      });
+
+      const integrationData = {
+        accessToken: account.access_token || '',
+        refreshToken: account.refresh_token || '',
+        scope: account.scope || '',
+        tokenType: account.token_type || 'Bearer',
+        isActive: true,
+        updatedAt: new Date(),
+        teamId: getTeamId(account, profile),
+        teamName: getTeamName(account, profile),
+      };
+
+      console.log('💾 保存データ確認:', {
+        hasAccessToken: !!integrationData.accessToken,
+        scope: integrationData.scope,
+        teamId: integrationData.teamId,
+        teamName: integrationData.teamName
+      });
+
+      if (existingIntegration) {
+        console.log('🔄 既存統合更新中');
+        await prisma.integration.update({
+          where: { id: existingIntegration.id },
+          data: integrationData,
+        });
+        console.log('✅ 既存統合更新完了');
+      } else {
+        console.log('🆕 新規統合作成中');
+        await prisma.integration.create({
+          data: {
+            userId: userData.id,
+            service: account.provider as any,
+            ...integrationData,
+            createdAt: new Date(),
+          },
+        });
+        console.log('✅ 新規統合作成完了');
+      }
+
+      console.log('💾 拡張統合情報保存完了:', {
+        userId: userData.id,
+        service: account.provider,
+        hasToken: !!account.access_token,
+        hasRefreshToken: !!account.refresh_token,
+        scope: account.scope,
+        teamId: integrationData.teamId,
+        action: existingIntegration ? 'updated' : 'created'
+      });
+    } else {
+      console.warn('⚠️ 必要な認証情報が不足:', {
+        hasAccount: !!account,
+        hasEmail: !!user?.email,
+        provider: account?.provider
+      });
+    }
+  } catch (error) {
+    console.error('❌ データベース保存エラー詳細:', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      provider: account?.provider,
+      timestamp: new Date().toISOString()
+    });
+    
+    // エラーの詳細をログに記録
+    if (error instanceof Error) {
+      console.error('エラー名:', error.name);
+      console.error('エラーメッセージ:', error.message);
+      if (error.stack) {
+        console.error('スタックトレース:', error.stack);
+      }
+    }
+    
+    // 認証は成功させるが、エラーをログに記録
+    // throw error; // この行をコメントアウトして認証を継続
+  }
+  
+  return true;
+},
     
     async redirect({ url, baseUrl }) {
       console.log('🔄 認証後リダイレクト (拡張版):', { url, baseUrl })
