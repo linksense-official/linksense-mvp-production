@@ -10,6 +10,18 @@ console.log('🚀 LinkSense MVP - 安全版（スコープ拡張・アクセス�
 
 const prisma = new PrismaClient()
 
+// 🆕 型定義の拡張
+interface ExtendedProfile {
+  tid?: string;
+  companyName?: string;
+  organizationName?: string;
+  tenantDisplayName?: string;
+  userPrincipalName?: string;
+  hd?: string; // Google Workspace domain
+  guild?: { id: string; name: string };
+  team?: { id: string; name: string };
+}
+
 export const authOptions: AuthOptions = {
   providers: [
     GoogleProvider({
@@ -21,7 +33,9 @@ export const authOptions: AuthOptions = {
             'openid',
             'email', 
             'profile',
-            'https://www.googleapis.com/auth/contacts.readonly'
+            // Google Meet統合用スコープを追加
+            'https://www.googleapis.com/auth/calendar.readonly',
+            'https://www.googleapis.com/auth/admin.directory.user.readonly'
           ].join(' '),
           prompt: 'consent',
           access_type: 'offline',
@@ -69,8 +83,10 @@ export const authOptions: AuthOptions = {
             'profile',
             'email',
             'User.Read',
+            'User.Read.All',      // 🆕 組織メンバー取得用
             'People.Read',
-            'Calendars.Read'
+            'Calendars.Read',
+            'Directory.Read.All'  // 🆕 ディレクトリ読み取り用
           ].join(' '),
           prompt: 'consent'
         }
@@ -86,148 +102,159 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   
   callbacks: {
-   async signIn({ user, account, profile }) {
-  console.log('🔄 signIn コールバック開始:', {
-    provider: account?.provider,
-    email: user?.email,
-    hasAccessToken: !!account?.access_token,
-    accessTokenLength: account?.access_token?.length || 0,
-    scope: account?.scope,
-    timestamp: new Date().toISOString()
-  });
-  
-  if (!account) {
-    console.error('❌ account が null です');
-    return false;
-  }
-  
-  if (!user?.email) {
-    console.error('❌ user.email が null です');
-    return false;
-  }
-  
-  if (!account.access_token) {
-    console.error('❌ access_token が null です');
-    return false;
-  }
-  
-  try {
-    console.log('📝 データベース保存開始');
-    
-    let userEmail = user.email;
-    let userName = user.name || '';
-  
-
-    console.log('👤 ユーザー保存中...', { email: userEmail });
-    
-    // ⭐ 修正: upsertを使用してエラーを回避
-    const userData = await prisma.user.upsert({
-      where: { email: userEmail },
-      update: {
-        name: userName,
-        image: user.image,
-        updatedAt: new Date(),
-      },
-      create: {
-        email: userEmail,
-        name: userName,
-        image: user.image,
-        emailVerified: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    }).catch(async (error) => {
-      // ⭐ 追加: 既存ユーザーが存在する場合の処理
-      if (error.code === 'P2002') {
-        console.log('👤 既存ユーザーを取得:', userEmail);
-        return await prisma.user.findUnique({
-          where: { email: userEmail }
-        });
+    async signIn({ user, account, profile }) {
+      console.log('🔄 signIn コールバック開始:', {
+        provider: account?.provider,
+        email: user?.email,
+        hasAccessToken: !!account?.access_token,
+        accessTokenLength: account?.access_token?.length || 0,
+        scope: account?.scope,
+        timestamp: new Date().toISOString()
+      });
+      
+      if (!account) {
+        console.error('❌ account が null です');
+        return false;
       }
-      throw error;
-    });
-    
-    if (!userData) {
-      throw new Error('ユーザーデータの作成/取得に失敗しました');
-    }
-    
-    console.log('✅ ユーザー保存完了:', userData.id);
+      
+      if (!user?.email) {
+        console.error('❌ user.email が null です');
+        return false;
+      }
+      
+      if (!account.access_token) {
+        console.error('❌ access_token が null です');
+        return false;
+      }
+      
+      try {
+        console.log('📝 データベース保存開始');
+        
+        let userEmail = user.email;
+        let userName = user.name || '';
+        
+        console.log('👤 ユーザー保存中...', { email: userEmail });
+        
+        const userData = await prisma.user.upsert({
+          where: { email: userEmail },
+          update: {
+            name: userName,
+            image: user.image,
+            updatedAt: new Date(),
+          },
+          create: {
+            email: userEmail,
+            name: userName,
+            image: user.image,
+            emailVerified: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        }).catch(async (error) => {
+          if (error.code === 'P2002') {
+            console.log('👤 既存ユーザーを取得:', userEmail);
+            return await prisma.user.findUnique({
+              where: { email: userEmail }
+            });
+          }
+          throw error;
+        });
+        
+        if (!userData) {
+          throw new Error('ユーザーデータの作成/取得に失敗しました');
+        }
+        
+        console.log('✅ ユーザー保存完了:', userData.id);
 
-    console.log('🔗 統合情報確認中...');
-    const existingIntegration = await prisma.integration.findUnique({
-      where: {
-        userId_service: {
+        console.log('🔗 統合情報確認中...');
+        const existingIntegration = await prisma.integration.findUnique({
+          where: {
+            userId_service: {
+              userId: userData.id,
+              service: account.provider as any,
+            },
+          },
+        });
+        console.log('既存統合:', existingIntegration ? '更新' : '新規作成');
+
+        // 🆕 チーム情報の拡張取得
+        const extendedProfile = profile as ExtendedProfile;
+        const teamId = getTeamId(account, extendedProfile);
+        const teamName = getTeamName(account, extendedProfile);
+        
+        // 🆕 権限レベルの判定
+        const hasAdminPermission = checkAdminPermission(account, extendedProfile);
+
+        const integrationData = {
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token || '',
+          scope: account.scope || '',
+          tokenType: account.token_type || 'Bearer',
+          isActive: true,
+          updatedAt: new Date(),
+          teamId,
+          teamName,
+          // 🆕 権限情報を追加保存
+          metadata: JSON.stringify({
+            hasAdminPermission,
+            tenantId: extendedProfile?.tid,
+            organizationName: extendedProfile?.companyName,
+            userPrincipalName: extendedProfile?.userPrincipalName,
+            domain: extendedProfile?.hd
+          })
+        };
+
+        console.log('💾 保存データ:', {
+          provider: account.provider,
+          accessTokenLength: integrationData.accessToken.length,
+          hasRefreshToken: !!integrationData.refreshToken,
+          scope: integrationData.scope,
+          teamId: integrationData.teamId,
+          teamName: integrationData.teamName,
+          hasAdminPermission
+        });
+
+        if (existingIntegration) {
+          console.log('🔄 既存統合更新中...');
+          const updated = await prisma.integration.update({
+            where: { id: existingIntegration.id },
+            data: integrationData,
+          });
+          console.log('✅ 更新完了:', { id: updated.id, hasToken: !!updated.accessToken });
+        } else {
+          console.log('🆕 新規統合作成中...');
+          const created = await prisma.integration.create({
+            data: {
+              userId: userData.id,
+              service: account.provider as any,
+              ...integrationData,
+              createdAt: new Date(),
+            },
+          });
+          console.log('✅ 作成完了:', { id: created.id, hasToken: !!created.accessToken });
+        }
+
+        console.log('🎉 認証・保存完了:', {
+          provider: account.provider,
           userId: userData.id,
-          service: account.provider as any,
-        },
-      },
-    });
-    console.log('既存統合:', existingIntegration ? '更新' : '新規作成');
-
-    // チーム情報の取得
-    const teamId = getTeamId(account, profile);
-    const teamName = getTeamName(account, profile);
-
-    const integrationData = {
-      accessToken: account.access_token,
-      refreshToken: account.refresh_token || '',
-      scope: account.scope || '',
-      tokenType: account.token_type || 'Bearer',
-      isActive: true,
-      updatedAt: new Date(),
-      teamId,
-      teamName,
-    };
-
-    console.log('💾 保存データ:', {
-      provider: account.provider,
-      accessTokenLength: integrationData.accessToken.length,
-      hasRefreshToken: !!integrationData.refreshToken,
-      scope: integrationData.scope,
-      teamId: integrationData.teamId,
-      teamName: integrationData.teamName
-    });
-
-    if (existingIntegration) {
-      console.log('🔄 既存統合更新中...');
-      const updated = await prisma.integration.update({
-        where: { id: existingIntegration.id },
-        data: integrationData,
-      });
-      console.log('✅ 更新完了:', { id: updated.id, hasToken: !!updated.accessToken });
-    } else {
-      console.log('🆕 新規統合作成中...');
-      const created = await prisma.integration.create({
-        data: {
-          userId: userData.id,
-          service: account.provider as any,
-          ...integrationData,
-          createdAt: new Date(),
-        },
-      });
-      console.log('✅ 作成完了:', { id: created.id, hasToken: !!created.accessToken });
-    }
-
-    console.log('🎉 認証・保存完了:', {
-      provider: account.provider,
-      userId: userData.id,
-      tokenSaved: true
-    });
-    
-    return true;
-    
-  } catch (error) {
-    console.error('❌ signIn エラー詳細:', {
-      error: error instanceof Error ? error.message : error,
-      stack: error instanceof Error ? error.stack : undefined,
-      provider: account?.provider,
-      timestamp: new Date().toISOString()
-    });
-    
-    // エラーでも認証は継続
-    return true;
-  }
-},
+          tokenSaved: true,
+          hasAdminPermission
+        });
+        
+        return true;
+        
+      } catch (error) {
+        console.error('❌ signIn エラー詳細:', {
+          error: error instanceof Error ? error.message : error,
+          stack: error instanceof Error ? error.stack : undefined,
+          provider: account?.provider,
+          timestamp: new Date().toISOString()
+        });
+        
+        // エラーでも認証は継続
+        return true;
+      }
+    },
     
     async redirect({ url, baseUrl }) {
       console.log('🔄 認証後リダイレクト:', { url, baseUrl });
@@ -334,8 +361,23 @@ export const authOptions: AuthOptions = {
   },
 }
 
-// ヘルパー関数: チームIDの取得
-function getTeamId(account: any, profile: any): string | null {
+// 🆕 権限レベル判定関数
+function checkAdminPermission(account: any, profile: ExtendedProfile): boolean {
+  switch (account.provider) {
+    case 'azure-ad':
+      // Azure ADの管理者権限チェック
+      return account.scope?.includes('User.Read.All') && 
+             account.scope?.includes('Directory.Read.All');
+    case 'google':
+      // Google Workspaceの管理者権限チェック
+      return account.scope?.includes('admin.directory.user.readonly');
+    default:
+      return false;
+  }
+}
+
+// 🔧 修正: ヘルパー関数: チームIDの取得
+function getTeamId(account: any, profile: ExtendedProfile): string | null {
   switch (account.provider) {
     case 'discord':
       return profile?.guild?.id || null;
@@ -348,15 +390,24 @@ function getTeamId(account: any, profile: any): string | null {
   }
 }
 
-// ヘルパー関数: チーム名の取得
-function getTeamName(account: any, profile: any): string | null {
+// 🔧 修正: ヘルパー関数: チーム名の取得
+function getTeamName(account: any, profile: ExtendedProfile): string | null {
   switch (account.provider) {
     case 'discord':
       return profile?.guild?.name || null;
     case 'slack':
       return profile?.team?.name || account.team?.name || null;
     case 'azure-ad':
-      return profile?.companyName || null;
+      // 🆕 Azure ADの組織名取得を拡張
+      return profile?.companyName || 
+             profile?.organizationName || 
+             profile?.tenantDisplayName || 
+             null;
+    case 'google':
+      // 🆕 Google Workspaceの組織名取得
+      return profile?.hd || // ホストドメイン
+             profile?.organizationName || 
+             null;
     default:
       return null;
   }
