@@ -21,8 +21,8 @@ interface UnifiedUser {
   activityScore: number;
   communicationScore: number;
   isolationRisk: 'low' | 'medium' | 'high';
-  relationshipType: 'teammate' | 'friend' | 'contact' | 'frequent_contact' | 'self'; // 関係性タイプ
-  relationshipStrength: number; // 0-100: 関係性の強さ
+  relationshipType: 'teammate' | 'friend' | 'contact' | 'frequent_contact' | 'self';
+  relationshipStrength: number;
   metadata: {
     messageCount?: number;
     meetingCount?: number;
@@ -30,37 +30,44 @@ interface UnifiedUser {
     workingHours?: string;
     timezone?: string;
     joinDate?: string;
-    // Discord関連
     roles?: number;
     nickname?: string;
-    friendSince?: string; // フレンド開始日
-    mutualGuilds?: number; // 共通サーバー数
-    gameActivity?: string; // ゲーム活動
-    // Teams関連
+    friendSince?: string;
+    mutualGuilds?: number;
+    gameActivity?: string;
     userType?: string;
-    chatFrequency?: number; // チャット頻度
-    meetingFrequency?: number; // 会議頻度
-    callFrequency?: number; // 通話頻度
-    // Google関連
+    chatFrequency?: number;
+    meetingFrequency?: number;
+    callFrequency?: number;
     orgUnit?: string;
     isEnforcedIn2Sv?: boolean;
     domain?: string;
-    emailFrequency?: number; // メール頻度
-    meetFrequency?: number; // Meet頻度
-    driveCollaboration?: number; // Drive共同作業
-    // Slack関連
-    dmFrequency?: number; // DM頻度
-    channelActivity?: number; // チャンネル活動度
-    // ChatWork関連
+    emailFrequency?: number;
+    meetFrequency?: number;
+    driveCollaboration?: number;
+    dmFrequency?: number;
+    channelActivity?: number;
     title?: string;
     organization?: string;
     chatwork_id?: string;
-    contactType?: 'direct' | 'group' | 'organization'; // コンタクトタイプ
-    roomParticipation?: number; // ルーム参加数
-    // 共通の追加フィールド
+    contactType?: 'direct' | 'group' | 'organization';
+    roomParticipation?: number;
     note?: string;
-    lastInteraction?: string; // 最終やり取り日時
-    interactionScore?: number; // やり取りスコア
+    lastInteraction?: string;
+    interactionScore?: number;
+    fallbackMode?: boolean;
+    emergencyMode?: boolean;
+    limitedPermissions?: boolean;
+    authenticationFailed?: boolean;
+    guildsCount?: number;
+    connectionsCount?: number;
+    availableScopes?: string;
+    guildId?: string;
+    guildName?: string;
+    isOwner?: boolean;
+    permissions?: string;
+    error?: string;
+    needsPermissions?: string;
     [key: string]: any;
   };
 }
@@ -75,8 +82,41 @@ interface TeamHealthMetrics {
     low: number;
   };
   serviceDistribution: Record<string, number>;
-  relationshipDistribution: Record<string, number>; // 関係性分布
+  relationshipDistribution: Record<string, number>;
   lastUpdated: string;
+}
+
+// 🆕 追加の型定義
+interface RiskAnalysis {
+  summary: {
+    total: number;
+    highRisk: number;
+    mediumRisk: number;
+    lowRisk: number;
+    isolated: number;
+    weakRelationships: number;
+  };
+  relationshipRiskAnalysis: Record<string, { high: number; medium: number; low: number; total: number }>;
+  recommendations: Array<{
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    action: string;
+    targets: string[];
+    reason: string;
+    details: string;
+    timeline: string;
+  }>;
+  trends: {
+    improving: number;
+    declining: number;
+    stable: number;
+  };
+  criticalInsights: Array<{
+    type: 'warning' | 'info' | 'success';
+    title: string;
+    message: string;
+    impact: 'high' | 'medium' | 'low' | 'positive';
+    actionRequired: boolean;
+  }>;
 }
 
 export async function GET(request: NextRequest) {
@@ -122,88 +162,88 @@ export async function GET(request: NextRequest) {
     const errors: Array<{service: string, error: string, severity: 'warning' | 'error'}> = [];
 
     for (const integration of integrations) {
-  try {
-    console.log(`🔍 ${integration.service} データ取得開始`);
-    
-    let serviceUsers: UnifiedUser[] = [];
-    
-    switch (integration.service) {
-      case 'slack':
-        serviceUsers = await getSlackUsersExtended(integration);
-        break;
-      case 'azure-ad':
-      case 'teams':
-        serviceUsers = await getTeamsUsersExtended(integration);
-        break;
-      case 'google':
-      case 'google-meet':
-        serviceUsers = await getGoogleUsersExtended(integration);
-        break;
-      case 'discord':
-        serviceUsers = await getDiscordUsersExtended(integration);
-        break;
-      case 'chatwork':
-        serviceUsers = await getChatWorkUsersExtended(integration);
-        break;
-      default:
-        console.warn(`⚠️ 未対応サービス: ${integration.service}`);
+      try {
+        console.log(`🔍 ${integration.service} データ取得開始`);
+        
+        let serviceUsers: UnifiedUser[] = [];
+        
+        switch (integration.service) {
+          case 'slack':
+            serviceUsers = await getSlackUsersExtended(integration);
+            break;
+          case 'azure-ad':
+          case 'teams':
+            serviceUsers = await getTeamsUsersExtended(integration);
+            break;
+          case 'google':
+          case 'google-meet':
+            serviceUsers = await getGoogleUsersExtended(integration);
+            break;
+          case 'discord':
+            serviceUsers = await getDiscordUsersExtended(integration);
+            break;
+          case 'chatwork':
+            serviceUsers = await getChatWorkUsersExtended(integration);
+            break;
+          default:
+            console.warn(`⚠️ 未対応サービス: ${integration.service}`);
+            errors.push({
+              service: integration.service,
+              error: '未対応のサービスです',
+              severity: 'warning'
+            });
+            continue;
+        }
+
+        allUsers.push(...serviceUsers);
+        console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了`);
+        
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
+        
+        // 権限エラーの詳細判定を強化
+        let severity: 'warning' | 'error' = 'error';
+        
+        // より広範囲な権限エラーパターンをキャッチ
+        if (errorMsg.includes('401') || 
+            errorMsg.includes('403') || 
+            errorMsg.includes('権限') || 
+            errorMsg.includes('認証エラー') ||
+            errorMsg.includes('アクセストークンが無効') ||
+            errorMsg.includes('APIトークンが無効') ||
+            errorMsg.includes('個人情報のみ') || 
+            errorMsg.includes('Admin権限') ||
+            errorMsg.includes('管理者権限') ||
+            errorMsg.includes('Forbidden')) {
+          severity = 'warning';
+        }
+        
         errors.push({
           service: integration.service,
-          error: '未対応のサービスです',
-          severity: 'warning'
+          error: errorMsg,
+          severity
         });
-        continue;
-    }
-
-    allUsers.push(...serviceUsers);
-    console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了`);
-    
-  } catch (error) {
-  const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
-  
-  // 権限エラーの詳細判定を強化
-  let severity: 'warning' | 'error' = 'error';
-  
-  // より広範囲な権限エラーパターンをキャッチ
-  if (errorMsg.includes('401') || 
-      errorMsg.includes('403') || 
-      errorMsg.includes('権限') || 
-      errorMsg.includes('認証エラー') ||
-      errorMsg.includes('アクセストークンが無効') ||
-      errorMsg.includes('APIトークンが無効') ||
-      errorMsg.includes('個人情報のみ') || 
-      errorMsg.includes('Admin権限') ||
-      errorMsg.includes('管理者権限') ||
-      errorMsg.includes('Forbidden')) {
-    severity = 'warning'; // 権限エラーは警告として扱う
-  }
-  
-  errors.push({
-    service: integration.service,
-    error: errorMsg,
-    severity
-  });
-  
-  console.error(`❌ ${integration.service}: ${errorMsg}`);
-  
-  // 権限エラーの場合は必ずフォールバック処理を実行
-  if (severity === 'warning') {
-    try {
-      console.log(`🔄 ${integration.service}: フォールバック処理開始`);
-      const fallbackUser = await getFallbackUserData(integration);
-      if (fallbackUser) {
-        allUsers.push(fallbackUser);
-        console.log(`✅ ${integration.service}: フォールバック成功 - ${fallbackUser.name}`);
-      } else {
-        console.warn(`⚠️ ${integration.service}: フォールバック失敗 - ユーザーデータなし`);
+        
+        console.error(`❌ ${integration.service}: ${errorMsg}`);
+        
+        // 権限エラーの場合は必ずフォールバック処理を実行
+        if (severity === 'warning') {
+          try {
+            console.log(`🔄 ${integration.service}: フォールバック処理開始`);
+            const fallbackUser = await getFallbackUserData(integration);
+            if (fallbackUser) {
+              allUsers.push(fallbackUser);
+              console.log(`✅ ${integration.service}: フォールバック成功 - ${fallbackUser.name}`);
+            } else {
+              console.warn(`⚠️ ${integration.service}: フォールバック失敗 - ユーザーデータなし`);
+            }
+          } catch (fallbackError) {
+            const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : 'フォールバック不明エラー';
+            console.warn(`⚠️ ${integration.service}: フォールバック取得エラー - ${fallbackMsg}`);
+          }
+        }
       }
-    } catch (fallbackError) {
-      const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : 'フォールバック不明エラー';
-      console.warn(`⚠️ ${integration.service}: フォールバック取得エラー - ${fallbackMsg}`);
     }
-  }
-}
-}
 
     // データ統合・重複排除
     const unifiedUsers = mergeUserDataExtended(allUsers);
@@ -247,6 +287,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 // 権限不足時のフォールバック用ユーザーデータ取得
 async function getFallbackUserData(integration: any): Promise<UnifiedUser | null> {
   console.log(`🔄 ${integration.service}: フォールバック処理開始（強化版）`);
@@ -809,111 +850,111 @@ async function getGoogleUsersExtended(integration: any): Promise<UnifiedUser[]> 
     });
 
     let domain = 'primary';
-    let currentUser: any = null; // 型を明示的に指定
+    let currentUser: any = null;
     
     if (profileResponse.ok) {
       currentUser = await profileResponse.json();
       if (currentUser.hd) {
-        domain = currentUser.hd; // ホストドメイン
+        domain = currentUser.hd;
       }
     }
 
     // 2. Gmail連絡先の頻度分析（最近のメール）
-const emailFrequency: Record<string, number> = {};
-const emailUsers = new Set<string>();
-const lastEmailInteraction: Record<string, string> = {};
+    const emailFrequency: Record<string, number> = {};
+    const emailUsers = new Set<string>();
+    const lastEmailInteraction: Record<string, string> = {};
 
-try {
-  const messagesResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=in:sent', {
-    headers: {
-      'Authorization': `Bearer ${integration.accessToken}`,
-      'Content-Type': 'application/json'
-    }
-  });
+    try {
+      const messagesResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=in:sent', {
+        headers: {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-  if (messagesResponse.ok) {
-    const messages = await messagesResponse.json();
-    
-    for (const message of (messages.messages || []).slice(0, 50)) {
-      try {
-        const messageDetailResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=metadata&metadataHeaders=To&metadataHeaders=Date`, {
-          headers: {
-            'Authorization': `Bearer ${integration.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
+      if (messagesResponse.ok) {
+        const messages = await messagesResponse.json();
         
-        if (messageDetailResponse.ok) {
-          const messageDetail = await messageDetailResponse.json();
-          const headers = messageDetail.payload?.headers || [];
+        for (const message of (messages.messages || []).slice(0, 50)) {
+          try {
+            const messageDetailResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=metadata&metadataHeaders=To&metadataHeaders=Date`, {
+              headers: {
+                'Authorization': `Bearer ${integration.accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (messageDetailResponse.ok) {
+              const messageDetail = await messageDetailResponse.json();
+              const headers = messageDetail.payload?.headers || [];
+              
+              const toHeader = headers.find((h: any) => h.name === 'To');
+              const dateHeader = headers.find((h: any) => h.name === 'Date');
+              
+              if (toHeader && toHeader.value) {
+                const emails = toHeader.value.match(/[\w\.-]+@[\w\.-]+\.\w+/g) || [];
+                emails.forEach((email: string) => {
+                  if (currentUser?.email && email !== currentUser.email) {
+                    emailUsers.add(email);
+                    emailFrequency[email] = (emailFrequency[email] || 0) + 1;
+                    
+                    if (dateHeader && (!lastEmailInteraction[email] || new Date(dateHeader.value) > new Date(lastEmailInteraction[email]))) {
+                      lastEmailInteraction[email] = new Date(dateHeader.value).toISOString();
+                    }
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            console.warn('メッセージ詳細取得エラー:', error);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Gmail データ取得をスキップ:', error);
+    }
+
+    // 3. Google Driveの共同作業者取得
+    const driveCollaboration: Record<string, number> = {};
+    const driveUsers = new Set<string>();
+
+    try {
+      const filesResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=sharedWithMe=true&fields=files(id,name,owners,permissions)&pageSize=50', {
+        headers: {
+          'Authorization': `Bearer ${integration.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (filesResponse.ok) {
+        const files = await filesResponse.json();
+        
+        for (const file of files.files || []) {
+          // ファイル所有者
+          if (file.owners) {
+            file.owners.forEach((owner: any) => {
+              if (owner.emailAddress && currentUser?.email && owner.emailAddress !== currentUser.email) {
+                driveUsers.add(owner.emailAddress);
+                driveCollaboration[owner.emailAddress] = (driveCollaboration[owner.emailAddress] || 0) + 1;
+              }
+            });
+          }
           
-          const toHeader = headers.find((h: any) => h.name === 'To');
-          const dateHeader = headers.find((h: any) => h.name === 'Date');
-          
-          if (toHeader && toHeader.value) {
-            const emails = toHeader.value.match(/[\w\.-]+@[\w\.-]+\.\w+/g) || [];
-            emails.forEach((email: string) => {
-              if (currentUser?.email && email !== currentUser.email) {
-                emailUsers.add(email);
-                emailFrequency[email] = (emailFrequency[email] || 0) + 1;
-                
-                if (dateHeader && (!lastEmailInteraction[email] || new Date(dateHeader.value) > new Date(lastEmailInteraction[email]))) {
-                  lastEmailInteraction[email] = new Date(dateHeader.value).toISOString();
-                }
+          // 共有権限
+          if (file.permissions) {
+            file.permissions.forEach((permission: any) => {
+              if (permission.emailAddress && currentUser?.email && permission.emailAddress !== currentUser.email) {
+                driveUsers.add(permission.emailAddress);
+                driveCollaboration[permission.emailAddress] = (driveCollaboration[permission.emailAddress] || 0) + 1;
               }
             });
           }
         }
-      } catch (error) {
-        // メッセージ詳細取得エラーは無視
-        console.warn('メッセージ詳細取得エラー:', error);
       }
+    } catch (error) {
+      console.warn('Google Drive データ取得をスキップ:', error);
     }
-  }
-} catch (error) {
-  console.warn('Gmail データ取得をスキップ:', error);
-}
 
-    // 3. Google Driveの共同作業者取得
-const driveCollaboration: Record<string, number> = {};
-const driveUsers = new Set<string>();
-
-try {
-  const filesResponse = await fetch('https://www.googleapis.com/drive/v3/files?q=sharedWithMe=true&fields=files(id,name,owners,permissions)&pageSize=50', {
-    headers: {
-      'Authorization': `Bearer ${integration.accessToken}`,
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (filesResponse.ok) {
-    const files = await filesResponse.json();
-    
-    for (const file of files.files || []) {
-      // ファイル所有者
-      if (file.owners) {
-        file.owners.forEach((owner: any) => {
-          if (owner.emailAddress && currentUser?.email && owner.emailAddress !== currentUser.email) {
-            driveUsers.add(owner.emailAddress);
-            driveCollaboration[owner.emailAddress] = (driveCollaboration[owner.emailAddress] || 0) + 1;
-          }
-        });
-      }
-      
-      // 共有権限
-      if (file.permissions) {
-        file.permissions.forEach((permission: any) => {
-          if (permission.emailAddress && currentUser?.email && permission.emailAddress !== currentUser.email) {
-            driveUsers.add(permission.emailAddress);
-            driveCollaboration[permission.emailAddress] = (driveCollaboration[permission.emailAddress] || 0) + 1;
-          }
-        });
-      }
-    }
-  }
-} catch (error) {
-  console.warn('Google Drive データ取得をスキップ:', error);
-}
     // 4. Admin SDK でユーザー取得
     const usersResponse = await fetch(`https://admin.googleapis.com/admin/directory/v1/users?domain=${domain}&maxResults=500&projection=full`, {
       headers: {
@@ -934,7 +975,7 @@ try {
           avatar: currentUser.picture,
           service: 'google',
           role: 'self',
-             department: '未設定',
+          department: '未設定',
           lastActivity: new Date().toISOString(),
           isActive: true,
           activityScore: 85,
@@ -956,7 +997,7 @@ try {
 
     // 5. ユーザーデータ統合
     const organizationUsers = (usersData.users || [])
-      .filter((user: any) => !user.suspended && user.primaryEmail) // アクティブユーザーのみ
+      .filter((user: any) => !user.suspended && user.primaryEmail)
       .map((user: any) => {
         const activityScore = calculateGoogleActivityScore(user);
         const hasEmail = emailUsers.has(user.primaryEmail);
@@ -964,7 +1005,6 @@ try {
         const emailCount = emailFrequency[user.primaryEmail] || 0;
         const driveCount = driveCollaboration[user.primaryEmail] || 0;
         
-        // メール・Drive共同作業に基づくコミュニケーションスコア
         let communicationScore = 50;
         if (hasEmail) {
           communicationScore += 20;
@@ -977,7 +1017,6 @@ try {
         
         const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
         
-        // 関係性タイプの決定
         let relationshipType: 'teammate' | 'frequent_contact' = 'teammate';
         let relationshipStrength = 30;
         
@@ -1119,8 +1158,6 @@ async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]>
       guilds.forEach((guild: any, index: number) => {
         console.log(`  ${index + 1}. ${guild.name} (${guild.id})`);
         
-        // サーバー情報から仮想的なチームメンバーを作成
-        // 注意: 実際のメンバー情報は取得できないため、サーバー存在の情報のみ
         allUsers.push({
           id: `guild-${guild.id}`,
           name: `${guild.name} サーバー`,
@@ -1155,7 +1192,6 @@ async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]>
   } catch (error) {
     console.error('❌ Discord データ取得エラー:', error);
     
-    // フォールバック処理
     return [{
       id: 'discord-fallback',
       name: 'Discord ユーザー（制限モード）',
@@ -1215,10 +1251,8 @@ async function getChatWorkUsersExtended(integration: any): Promise<UnifiedUser[]
       const rooms = await roomsResponse.json();
       console.log(`📱 ChatWork 参加ルーム数: ${rooms.length}`);
 
-      // 各ルームのメンバーと最新メッセージを取得
-      for (const room of rooms.slice(0, 20)) { // 最初の20ルームのみ
+      for (const room of rooms.slice(0, 20)) {
         try {
-          // ルームメンバー取得
           const membersResponse = await fetch(`https://api.chatwork.com/v2/rooms/${room.room_id}/members`, {
             headers: {
               'X-ChatWorkToken': integration.accessToken,
@@ -1236,7 +1270,6 @@ async function getChatWorkUsersExtended(integration: any): Promise<UnifiedUser[]
             });
           }
 
-          // ルームの最新メッセージ取得
           const messagesResponse = await fetch(`https://api.chatwork.com/v2/rooms/${room.room_id}/messages?force=0`, {
             headers: {
               'X-ChatWorkToken': integration.accessToken,
@@ -1271,7 +1304,6 @@ async function getChatWorkUsersExtended(integration: any): Promise<UnifiedUser[]
     });
 
     if (!contactsResponse.ok) {
-      // コンタクト取得失敗時は自分の情報のみ返す
       console.warn(`ChatWork コンタクト取得失敗: ${contactsResponse.status}. 個人情報のみ取得します`);
       
       return [{
@@ -1302,70 +1334,68 @@ async function getChatWorkUsersExtended(integration: any): Promise<UnifiedUser[]
     const allContacts = [meData, ...contacts];
 
     // 5. ユーザーデータ統合
-const chatworkUsers = allContacts.map((contact: any) => {
-  const activityScore = calculateChatWorkActivityScore(contact);
-  const accountId = contact.account_id.toString();
-  const isInRooms = roomUsers.has(accountId);
-  const roomCount = roomParticipation[accountId] || 0;
-  const isSelf = contact.account_id === meData.account_id;
-  
-  // ルーム参加数に基づくコミュニケーションスコア
-  let communicationScore = 50;
-  if (isInRooms) {
-    communicationScore += 20;
-    communicationScore += Math.min(20, roomCount * 3);
-  }
-  
-  const isolationRisk = isSelf ? 'low' : determineIsolationRisk(activityScore, communicationScore);
-  
-  // 関係性タイプの決定
-  let relationshipType: 'teammate' | 'contact' | 'frequent_contact' | 'self' = isSelf ? 'self' : 'contact';
-  let relationshipStrength = isSelf ? 100 : 25;
-  
-  // contactTypeの型安全な設定
-  let contactType: 'direct' | 'group' | 'organization' = 'direct';
-  if (isInRooms && roomCount > 1) {
-    contactType = 'group';
-  } else if (contact.organization_name) {
-    contactType = 'organization';
-  }
-  
-  if (!isSelf) {
-    if (isInRooms && roomCount > 3) {
-      relationshipType = 'frequent_contact';
-      relationshipStrength = 50 + Math.min(30, roomCount * 5);
-    } else if (isInRooms) {
-      relationshipType = 'contact';
-      relationshipStrength = 30 + roomCount * 2;
-    }
-  }
+    const chatworkUsers = allContacts.map((contact: any) => {
+      const activityScore = calculateChatWorkActivityScore(contact);
+      const accountId = contact.account_id.toString();
+      const isInRooms = roomUsers.has(accountId);
+      const roomCount = roomParticipation[accountId] || 0;
+      const isSelf = contact.account_id === meData.account_id;
+      
+      let communicationScore = 50;
+      if (isInRooms) {
+        communicationScore += 20;
+        communicationScore += Math.min(20, roomCount * 3);
+      }
+      
+      const isolationRisk = isSelf ? 'low' : determineIsolationRisk(activityScore, communicationScore);
+      
+      let relationshipType: 'teammate' | 'contact' | 'frequent_contact' | 'self' = isSelf ? 'self' : 'contact';
+      let relationshipStrength = isSelf ? 100 : 25;
+      
+      let contactType: 'direct' | 'group' | 'organization' = 'direct';
+      if (isInRooms && roomCount > 1) {
+        contactType = 'group';
+      } else if (contact.organization_name) {
+        contactType = 'organization';
+      }
+      
+      if (!isSelf) {
+        if (isInRooms && roomCount > 3) {
+          relationshipType = 'frequent_contact';
+          relationshipStrength = 50 + Math.min(30, roomCount * 5);
+        } else if (isInRooms) {
+          relationshipType = 'contact';
+          relationshipStrength = 30 + roomCount * 2;
+        }
+      }
 
-  return {
-    id: accountId,
-    name: contact.name,
-    email: undefined, // ChatWorkでは通常取得不可
-    avatar: contact.avatar_image_url,
-    service: 'chatwork',
-    role: isSelf ? 'self' : 'contact',
-    department: contact.department || contact.organization_name || '未設定',
-    lastActivity: lastRoomInteraction[accountId] || undefined,
-    isActive: true,
-    activityScore,
-    communicationScore,
-    isolationRisk,
-    relationshipType,
-    relationshipStrength,
-    metadata: {
-      title: contact.title,
-      organization: contact.organization_name,
-      chatwork_id: contact.chatwork_id,
-      contactType, // 型安全な値を使用
-      roomParticipation: roomCount,
-      interactionScore: communicationScore,
-      lastInteraction: lastRoomInteraction[accountId]
-    }
-  };
-});
+      return {
+        id: accountId,
+        name: contact.name,
+        email: undefined,
+        avatar: contact.avatar_image_url,
+        service: 'chatwork',
+        role: isSelf ? 'self' : 'contact',
+        department: contact.department || contact.organization_name || '未設定',
+        lastActivity: lastRoomInteraction[accountId] || undefined,
+        isActive: true,
+        activityScore,
+        communicationScore,
+        isolationRisk,
+        relationshipType,
+        relationshipStrength,
+        metadata: {
+          title: contact.title,
+          organization: contact.organization_name,
+          chatwork_id: contact.chatwork_id,
+          contactType,
+          roomParticipation: roomCount,
+          interactionScore: communicationScore,
+          lastInteraction: lastRoomInteraction[accountId]
+        }
+      };
+    });
+
     allUsers.push(...chatworkUsers);
 
     console.log(`✅ ChatWork 総取得数: ${allUsers.length}人 (頻繁な連絡先: ${allUsers.filter(u => u.relationshipType === 'frequent_contact').length}人)`);
@@ -1379,38 +1409,32 @@ const chatworkUsers = allContacts.map((contact: any) => {
 
 // 活動スコア計算関数群
 function calculateSlackActivityScore(member: any): number {
-  let score = 50; // ベーススコア
+  let score = 50;
 
-  // プロフィール完成度
   if (member.profile?.real_name) score += 10;
   if (member.profile?.email) score += 10;
   if (member.profile?.image_192) score += 5;
 
-  // 最終更新からの経過時間
   if (member.updated) {
     const daysSinceUpdate = (Date.now() - (member.updated * 1000)) / (1000 * 60 * 60 * 24);
     if (daysSinceUpdate < 7) score += 20;
     else if (daysSinceUpdate < 30) score += 10;
   }
 
-  // ステータス
   if (!member.deleted && !member.is_restricted) score += 15;
 
   return Math.min(100, Math.max(0, score));
 }
 
 function calculateTeamsActivityScore(user: any): number {
-  let score = 50; // ベーススコア
+  let score = 50;
 
-  // アカウント有効性
   if (user.accountEnabled) score += 20;
   
-  // プロフィール完成度
   if (user.displayName) score += 10;
   if (user.department || user.jobTitle) score += 10;
   if (user.officeLocation) score += 5;
   
-  // 最終サインイン
   if (user.lastSignInDateTime) {
     const daysSinceSignIn = (Date.now() - new Date(user.lastSignInDateTime).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceSignIn < 7) score += 20;
@@ -1418,24 +1442,20 @@ function calculateTeamsActivityScore(user: any): number {
     else if (daysSinceSignIn < 90) score += 5;
   }
 
-  // ゲストユーザーでない
   if (user.userType !== 'Guest') score += 5;
 
   return Math.min(100, Math.max(0, score));
 }
 
 function calculateGoogleActivityScore(user: any): number {
-  let score = 50; // ベーススコア
+  let score = 50;
 
-  // アカウント状態
   if (!user.suspended && !user.archived) score += 25;
   
-  // プロフィール完成度
   if (user.name?.fullName || (user.name?.givenName && user.name?.familyName)) score += 10;
   if (user.organizations?.length > 0) score += 10;
   if (user.locations?.length > 0) score += 5;
   
-  // 最終ログイン
   if (user.lastLoginTime) {
     const daysSinceLogin = (Date.now() - new Date(user.lastLoginTime).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceLogin < 7) score += 20;
@@ -1443,129 +1463,22 @@ function calculateGoogleActivityScore(user: any): number {
     else if (daysSinceLogin < 90) score += 5;
   }
 
-  // 2段階認証
   if (user.isEnforcedIn2Sv) score += 10;
-
-  // 管理者権限
   if (user.isAdmin) score += 5;
 
   return Math.min(100, Math.max(0, score));
 }
 
-function calculateDiscordActivityScore(member: any): number {
-  let score = 50; // ベーススコア
-
-  // ニックネーム設定
-  if (member.nick) score += 10;
-  
-  // ロール数
-  if (member.roles && member.roles.length > 1) score += 15;
-  
-  // アバター設定
-  if (member.user.avatar) score += 10;
-  
-  // 参加からの経過時間（新しいメンバーは活動的とみなす）
-  if (member.joined_at) {
-    const daysSinceJoin = (Date.now() - new Date(member.joined_at).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceJoin < 30) score += 15;
-    else if (daysSinceJoin < 90) score += 10;
-  }
-
-  // 制限状態でない
-  if (!member.communication_disabled_until) score += 10;
-
-  return Math.min(100, Math.max(0, score));
-}
-
-function calculateDiscordFriendActivityScore(friendDetail: any, friend: any): number {
-  let score = 60; // フレンドベーススコア
-
-  // アバター設定
-  if (friendDetail.avatar) score += 10;
-  
-  // アクティビティ（ゲーム等）
-  if (friendDetail.activities && friendDetail.activities.length > 0) score += 15;
-  
-  // プレミアム会員
-  if (friendDetail.premium_type) score += 10;
-  
-  // フレンド期間
-  if (friend.since) {
-    const daysSinceFriend = (Date.now() - new Date(friend.since).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceFriend > 365) score += 10; // 1年以上のフレンド
-    else if (daysSinceFriend > 90) score += 5;
-  }
-
-  return Math.min(100, Math.max(0, score));
-}
-
-function calculateDiscordCommunicationScore(friend: any, mutualGuilds: number): number {
+function calculateChatWorkActivityScore(contact: any): number {
   let score = 50;
 
-  // 共通ギルド数
-  score += Math.min(20, mutualGuilds * 5);
-  
-  // フレンド期間の長さ
-  if (friend.since) {
-    const daysSinceFriend = (Date.now() - new Date(friend.since).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceFriend < 30) score += 20; // 最近のフレンド = 活発
-    else if (daysSinceFriend > 365) score += 15; // 長期フレンド = 安定
-  }
-
-  return Math.min(100, Math.max(0, score));
-}
-
-function calculateChatWorkActivityScore(contact: any): number {
-  let score = 50; // ベーススコア
-
-  // プロフィール完成度
   if (contact.name) score += 15;
   if (contact.avatar_image_url) score += 10;
   if (contact.department || contact.organization_name) score += 10;
   if (contact.title) score += 10;
-  
-  // ChatWork ID設定
   if (contact.chatwork_id) score += 15;
 
   return Math.min(100, Math.max(0, score));
-}
-
-// 関係性の強さ計算
-function calculateRelationshipStrength(friend: any, mutualGuilds: number): number {
-  let strength = 30; // ベース
-
-  // 共通ギルド数
-  strength += Math.min(30, mutualGuilds * 10);
-  
-  // フレンド期間
-  if (friend.since) {
-    const daysSinceFriend = (Date.now() - new Date(friend.since).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceFriend > 365) strength += 25; // 長期関係
-    else if (daysSinceFriend > 90) strength += 15;
-  }
-
-  return Math.min(100, Math.max(0, strength));
-}
-
-function calculateGuildRelationshipStrength(member: any): number {
-  let strength = 20; // ベース
-
-  // ロール数
-  if (member.roles) {
-    strength += Math.min(20, member.roles.length * 5);
-  }
-
-  // 参加期間
-  if (member.joined_at) {
-    const daysSinceJoin = (Date.now() - new Date(member.joined_at).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceJoin > 365) strength += 20;
-    else if (daysSinceJoin > 90) strength += 10;
-  }
-
-  // ニックネーム設定
-  if (member.nick) strength += 10;
-
-  return Math.min(100, Math.max(0, strength));
 }
 
 // 孤立リスク判定
@@ -1586,13 +1499,12 @@ function mergeUserDataExtended(users: UnifiedUser[]): UnifiedUser[] {
     const existing = userMap.get(key);
 
     if (existing) {
-      // 既存ユーザーがいる場合、データをマージ
       const merged: UnifiedUser = {
         ...existing,
         name: user.name || existing.name,
         email: user.email || existing.email,
         avatar: user.avatar || existing.avatar,
-        service: `${existing.service},${user.service}`, // 複数サービス
+        service: `${existing.service},${user.service}`,
         activityScore: Math.max(existing.activityScore, user.activityScore),
         communicationScore: Math.max(existing.communicationScore, user.communicationScore),
         isolationRisk: existing.isolationRisk === 'high' || user.isolationRisk === 'high' ? 'high' :
@@ -1654,13 +1566,13 @@ function calculateTeamHealthExtended(users: UnifiedUser[]): TeamHealthMetrics {
   
   // 関係性の多様性ボーナス
   const relationshipTypes = Object.keys(relationshipDistribution).length;
-  if (relationshipTypes >= 4) healthScore += 5; // 多様な関係性
+  if (relationshipTypes >= 4) healthScore += 5;
   else if (relationshipTypes >= 3) healthScore += 3;
   
   // 強い関係性の割合ボーナス
   const strongRelationships = users.filter(u => u.relationshipStrength > 70).length;
   const strongRelationshipRatio = users.length > 0 ? strongRelationships / users.length : 0;
-  if (strongRelationshipRatio > 0.3) healthScore += 5; // 30%以上が強い関係
+  if (strongRelationshipRatio > 0.3) healthScore += 5;
   else if (strongRelationshipRatio > 0.2) healthScore += 3;
 
   healthScore = Math.min(100, healthScore);
@@ -1677,7 +1589,7 @@ function calculateTeamHealthExtended(users: UnifiedUser[]): TeamHealthMetrics {
 }
 
 // 離職リスク分析（拡張版）
-function analyzeIsolationRisksExtended(users: UnifiedUser[]) {
+function analyzeIsolationRisksExtended(users: UnifiedUser[]): RiskAnalysis {
   const highRiskUsers = users.filter(u => u.isolationRisk === 'high');
   const mediumRiskUsers = users.filter(u => u.isolationRisk === 'medium');
   const lowRiskUsers = users.filter(u => u.isolationRisk === 'low');
@@ -1714,7 +1626,6 @@ function analyzeIsolationRisksExtended(users: UnifiedUser[]) {
     relationshipRiskAnalysis,
     recommendations: generateExtendedRecommendations(highRiskUsers, mediumRiskUsers, isolatedUsers, weakRelationships),
     trends: {
-      // 今後の実装で時系列データから傾向分析
       improving: 0,
       declining: 0,
       stable: users.length
@@ -1729,13 +1640,20 @@ function generateExtendedRecommendations(
   mediumRisk: UnifiedUser[], 
   isolated: UnifiedUser[],
   weakRelationships: UnifiedUser[]
-) {
+): Array<{
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  action: string;
+  targets: string[];
+  reason: string;
+  details: string;
+  timeline: string;
+}> {
   const recommendations = [];
 
   // 緊急対応が必要な孤立ユーザー
   if (isolated.length > 0) {
     recommendations.push({
-      priority: 'critical',
+      priority: 'critical' as const,
       action: '緊急1on1ミーティングの実施',
       targets: isolated.map(u => u.name),
       reason: '高い離職リスクと弱い人間関係の組み合わせが検出されました',
@@ -1751,7 +1669,7 @@ function generateExtendedRecommendations(
 
     if (friendsInHighRisk.length > 0) {
       recommendations.push({
-        priority: 'high',
+        priority: 'high' as const,
         action: 'フレンド・親しい関係者への配慮',
         targets: friendsInHighRisk.map(u => u.name),
         reason: '親しい関係の人が離職リスクを抱えています',
@@ -1762,7 +1680,7 @@ function generateExtendedRecommendations(
 
     if (teammatesInHighRisk.length > 0) {
       recommendations.push({
-        priority: 'high',
+        priority: 'high' as const,
         action: 'チーム内1on1ミーティングの実施',
         targets: teammatesInHighRisk.map(u => u.name),
         reason: 'チームメンバーの活動量低下が見られます',
@@ -1778,7 +1696,7 @@ function generateExtendedRecommendations(
     
     if (frequentContacts.length > 0) {
       recommendations.push({
-        priority: 'medium',
+        priority: 'medium' as const,
         action: '頻繁な連絡先との関係性強化',
         targets: frequentContacts.slice(0, 5).map(u => u.name),
         reason: 'よく連絡を取る相手のエンゲージメント低下が見られます',
@@ -1789,7 +1707,7 @@ function generateExtendedRecommendations(
 
     if (mediumRisk.length > frequentContacts.length) {
       recommendations.push({
-        priority: 'medium',
+        priority: 'medium' as const,
         action: 'チームビルディング活動の企画',
         targets: mediumRisk.filter(u => u.relationshipType !== 'frequent_contact').slice(0, 5).map(u => u.name),
         reason: 'コミュニケーション機会の増加が必要です',
@@ -1802,7 +1720,7 @@ function generateExtendedRecommendations(
   // 弱い関係性の改善
   if (weakRelationships.length > 0) {
     recommendations.push({
-      priority: 'low',
+      priority: 'low' as const,
       action: '関係性構築のサポート',
       targets: weakRelationships.slice(0, 8).map(u => u.name),
       reason: '人間関係の構築が不十分な可能性があります',
@@ -1819,17 +1737,23 @@ function generateCriticalInsights(
   users: UnifiedUser[], 
   isolated: UnifiedUser[], 
   relationshipRiskAnalysis: Record<string, { high: number; medium: number; low: number; total: number }>
-) {
+): Array<{
+  type: 'warning' | 'info' | 'success';
+  title: string;
+  message: string;
+  impact: 'high' | 'medium' | 'low' | 'positive';
+  actionRequired: boolean;
+}> {
   const insights = [];
 
   // 孤立リスクの警告
   if (isolated.length > 0) {
     const isolationRate = (isolated.length / users.length) * 100;
     insights.push({
-      type: 'warning',
+      type: 'warning' as const,
       title: '孤立リスク警告',
       message: `${isolated.length}人（${isolationRate.toFixed(1)}%）が孤立リスクの高い状態です。`,
-      impact: 'high',
+      impact: 'high' as const,
       actionRequired: true
     });
   }
@@ -1838,10 +1762,10 @@ function generateCriticalInsights(
   const friendsAtRisk = users.filter(u => u.relationshipType === 'friend' && u.isolationRisk !== 'low');
   if (friendsAtRisk.length > 0) {
     insights.push({
-      type: 'info',
+      type: 'info' as const,
       title: 'フレンド関係者のリスク',
       message: `${friendsAtRisk.length}人のフレンド・親しい関係者が離職リスクを抱えています。`,
-      impact: 'medium',
+      impact: 'medium' as const,
       actionRequired: true
     });
   }
@@ -1862,10 +1786,10 @@ function generateCriticalInsights(
     const highRiskRate = (risks.high / risks.total) * 100;
     if (highRiskRate > 30 && risks.total > 3) {
       insights.push({
-        type: 'warning',
+        type: 'warning' as const,
         title: `${service.toUpperCase()}での高リスク集中`,
         message: `${service}ユーザーの${highRiskRate.toFixed(1)}%が高リスク状態です。`,
-        impact: 'medium',
+        impact: 'medium' as const,
         actionRequired: true
       });
     }
@@ -1875,10 +1799,10 @@ function generateCriticalInsights(
   const relationshipTypes = Object.keys(relationshipRiskAnalysis).length;
   if (relationshipTypes <= 2) {
     insights.push({
-      type: 'info',
+      type: 'info' as const,
       title: '関係性の多様性不足',
       message: '人間関係の種類が限定的です。より多様な関係性の構築を推奨します。',
-      impact: 'low',
+      impact: 'low' as const,
       actionRequired: false
     });
   }
@@ -1889,21 +1813,21 @@ function generateCriticalInsights(
   
   if (strongRelationshipRate < 20) {
     insights.push({
-      type: 'warning',
+      type: 'warning' as const,
       title: '強い関係性の不足',
       message: `強い人間関係を持つ人が${strongRelationshipRate.toFixed(1)}%と少ない状況です。`,
-      impact: 'medium',
+      impact: 'medium' as const,
       actionRequired: true
     });
   } else if (strongRelationshipRate > 50) {
     insights.push({
-      type: 'success',
+      type: 'success' as const,
       title: '良好な関係性',
       message: `${strongRelationshipRate.toFixed(1)}%の人が強い人間関係を築いています。`,
-      impact: 'positive',
+      impact: 'positive' as const,
       actionRequired: false
     });
   }
 
-  return insights; // ⭐ この行が重要！
+  return insights;
 }
