@@ -6,7 +6,7 @@ import DiscordProvider from 'next-auth/providers/discord'
 import AzureADProvider from 'next-auth/providers/azure-ad'
 import { PrismaClient } from '@prisma/client'
 
-console.log('🚀 LinkSense MVP - 安全版（スコープ拡張・アクセストークン保存対応）')
+console.log('🚀 LinkSense MVP - 完全再構築版')
 
 const prisma = new PrismaClient()
 
@@ -17,70 +17,57 @@ interface ExtendedProfile {
   organizationName?: string;
   tenantDisplayName?: string;
   userPrincipalName?: string;
-  hd?: string; // Google Workspace domain
+  hd?: string;
   guild?: { id: string; name: string };
   team?: { id: string; name: string };
 }
 
 export const authOptions: AuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    // 🔧 Slack設定の完全修正
+    SlackProvider({
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: [
-            'openid',
-            'email', 
-            'profile',
-            // Google Meet統合用スコープを追加
-            'https://www.googleapis.com/auth/calendar.readonly',
-            'https://www.googleapis.com/auth/admin.directory.user.readonly'
-          ].join(' '),
-          prompt: 'consent',
-          access_type: 'offline',
-        },
-      },
+          // 最小限のスコープから開始
+          scope: 'identify users:read users:read.email',
+        }
+      }
     }),
 
-   SlackProvider({
-  clientId: process.env.SLACK_CLIENT_ID!,
-  clientSecret: process.env.SLACK_CLIENT_SECRET!,
-  authorization: {
-    params: {
-      // 🔧 修正: 最小限のスコープから開始
-      scope: 'identify users:read users:read.email',
-      // user_scopeを削除してシンプルに
-    }
-  }
-}),
-    
+    // 🔧 Discord設定の分離
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: "identify email guilds connections"
+          scope: "identify email guilds"
         }
       }
     }),
     
+    // 🔧 Google設定の分離
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: 'openid email profile https://www.googleapis.com/auth/calendar.readonly',
+          prompt: 'consent',
+          access_type: 'offline',
+        },
+      },
+    }),
+    
+    // 🔧 Azure AD設定の分離
     AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
       tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
       authorization: {
         params: {
-          scope: [
-            'openid',
-            'profile',
-            'email',
-            'User.Read',
-            'User.Read.All',      // 🆕 組織メンバー取得用
-            'People.Read',
-            'Calendars.Read',
-            'Directory.Read.All'  // 🆕 ディレクトリ読み取り用
-          ].join(' '),
+          scope: 'openid profile email User.Read User.Read.All',
           prompt: 'consent'
         }
       }
@@ -95,226 +82,130 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   
   callbacks: {
-  async signIn({ user, account, profile }) {
-  console.log('🔄 signIn コールバック開始:', {
-    provider: account?.provider,
-    email: user?.email,
-    hasAccessToken: !!account?.access_token,
-    timestamp: new Date().toISOString()
-  });
-  
-  if (!account || !user?.email || !account.access_token) {
-    console.error('❌ 必須情報不足');
-    return false;
-  }
-  
-  try {
-    console.log('📝 データベース保存開始 - 統合保持版');
-    
-    // 🆕 重要: トランザクション外で事前にユーザーを確保
-    const userData = await prisma.user.upsert({
-      where: { email: user.email },
-      update: {
-        name: user.name || '',
-        image: user.image,
-        updatedAt: new Date(),
-      },
-      create: {
-        email: user.email,
-        name: user.name || '',
-        image: user.image,
-        emailVerified: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    console.log('✅ ユーザー確保完了:', userData.id);
-
-    // 🆕 現在の全統合状況を事前に記録
-    const beforeIntegrations = await prisma.integration.findMany({
-      where: { userId: userData.id },
-      select: { 
-        id: true, 
-        service: true, 
-        isActive: true, 
-        accessToken: true,
-        refreshToken: true,
-        scope: true,
-        teamId: true,
-        teamName: true,
-        createdAt: true,
-        updatedAt: true
-      }
-    });
-
-    console.log('📊 認証前の統合状況:', beforeIntegrations.map(i => ({ 
-      service: i.service, 
-      isActive: i.isActive,
-      hasToken: !!i.accessToken,
-      updatedAt: i.updatedAt.toISOString()
-    })));
-
-    // 🆕 現在のプロバイダーの統合のみを更新（他は触らない）
-    const extendedProfile = profile as ExtendedProfile;
-    const teamId = getTeamId(account, extendedProfile);
-    const teamName = getTeamName(account, extendedProfile);
-
-    const accessToken: string = account.access_token || '';
-    const refreshToken: string = account.refresh_token || '';
-    const scope: string = account.scope || '';
-    const tokenType: string = account.token_type || 'Bearer';
-
-    // 🆕 現在のプロバイダーのみの統合を処理
-    const currentProviderIntegration = await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: userData.id,
-          service: account.provider,
-        },
-      },
-      update: {
-        accessToken,
-        refreshToken,
-        scope,
-        tokenType,
-        isActive: true,
-        updatedAt: new Date(),
-        teamId,
-        teamName,
-      },
-      create: {
-        userId: userData.id,
-        service: account.provider,
-        accessToken,
-        refreshToken,
-        scope,
-        tokenType,
-        isActive: true,
-        teamId,
-        teamName,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    console.log('✅ 現在プロバイダー統合完了:', {
-      id: currentProviderIntegration.id,
-      service: currentProviderIntegration.service,
-      hasToken: !!currentProviderIntegration.accessToken
-    });
-
-    // 🆕 他の統合が維持されているかチェック
-    const afterIntegrations = await prisma.integration.findMany({
-      where: { userId: userData.id },
-      select: { 
-        id: true, 
-        service: true, 
-        isActive: true, 
-        accessToken: true,
-        updatedAt: true
-      }
-    });
-
-    console.log('📊 認証後の統合状況:', afterIntegrations.map(i => ({ 
-      service: i.service, 
-      isActive: i.isActive,
-      hasToken: !!i.accessToken,
-      updatedAt: i.updatedAt.toISOString()
-    })));
-
-    // 🆕 統合数の変化をチェック
-    const beforeActiveCount = beforeIntegrations.filter(i => i.isActive && i.accessToken).length;
-    const afterActiveCount = afterIntegrations.filter(i => i.isActive && i.accessToken).length;
-    
-    console.log('📈 統合数の変化:', {
-      before: beforeActiveCount,
-      after: afterActiveCount,
-      change: afterActiveCount - beforeActiveCount
-    });
-
-    if (afterActiveCount < beforeActiveCount) {
-      console.error('🚨 統合数が減少しました！', {
-        lost: beforeIntegrations.filter(before => 
-          before.isActive && before.accessToken &&
-          !afterIntegrations.find(after => 
-            after.service === before.service && after.isActive && after.accessToken
-          )
-        ).map(i => i.service)
+    // 🆕 完全に分離されたsignInコールバック
+    async signIn({ user, account, profile }) {
+      console.log('🔄 分離版signIn開始:', {
+        provider: account?.provider,
+        email: user?.email,
+        hasAccessToken: !!account?.access_token,
+        timestamp: new Date().toISOString()
       });
       
-      // 🆕 失われた統合を復旧
-      for (const lostIntegration of beforeIntegrations) {
-        if (lostIntegration.isActive && lostIntegration.accessToken) {
-          const stillExists = afterIntegrations.find(after => 
-            after.service === lostIntegration.service && after.isActive && after.accessToken
-          );
-          
-          if (!stillExists && lostIntegration.service !== account.provider) {
-            console.log('🔄 統合復旧中:', lostIntegration.service);
-            await prisma.integration.update({
-              where: { id: lostIntegration.id },
-              data: {
-                isActive: true,
-                accessToken: lostIntegration.accessToken,
-                refreshToken: lostIntegration.refreshToken,
-                scope: lostIntegration.scope,
-                updatedAt: new Date(),
-              }
-            });
-            console.log('✅ 統合復旧完了:', lostIntegration.service);
-          }
-        }
+      // 🆕 厳密な検証
+      if (!account?.provider) {
+        console.error('❌ プロバイダーが特定できません');
+        return false;
       }
-    }
+      
+      if (!user?.email) {
+        console.error('❌ ユーザーメールが取得できません');
+        return false;
+      }
+      
+      if (!account.access_token) {
+        console.error('❌ アクセストークンが取得できません');
+        return false;
+      }
+      
+      // 🆕 有効なプロバイダーのみ許可
+      const validProviders = ['slack', 'discord', 'google', 'azure-ad'];
+      if (!validProviders.includes(account.provider)) {
+        console.error('❌ 無効なプロバイダー:', account.provider);
+        return false;
+      }
+      
+      try {
+        console.log(`📝 ${account.provider} 専用処理開始`);
+        
+        // ユーザー確保
+        const userData = await prisma.user.upsert({
+          where: { email: user.email },
+          update: {
+            name: user.name || '',
+            image: user.image,
+            updatedAt: new Date(),
+          },
+          create: {
+            email: user.email,
+            name: user.name || '',
+            image: user.image,
+            emailVerified: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
 
-    // 🆕 最終確認
-    const finalIntegrations = await prisma.integration.findMany({
-      where: { userId: userData.id },
-      select: { service: true, isActive: true, accessToken: true }
-    });
+        console.log('✅ ユーザー確保:', userData.id);
 
-    console.log('🎉 認証・保存完了:', {
-      currentProvider: account.provider,
-      userId: userData.id,
-      totalIntegrations: finalIntegrations.length,
-      activeIntegrations: finalIntegrations.filter(i => i.isActive && i.accessToken).length,
-      services: finalIntegrations.filter(i => i.isActive && i.accessToken).map(i => i.service)
-    });
-    
-    return true;
-    
-  } catch (error) {
-    console.error('❌ signIn エラー詳細:', {
-      error: error instanceof Error ? error.message : error,
-      stack: error instanceof Error ? error.stack : undefined,
-      provider: account?.provider,
-      timestamp: new Date().toISOString()
-    });
-    
-    return true;
-  }
-},
+        // 🆕 現在のプロバイダーのみの統合を処理
+        const extendedProfile = profile as ExtendedProfile;
+        const teamId = getTeamId(account, extendedProfile);
+        const teamName = getTeamName(account, extendedProfile);
+
+        const integrationData = {
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token || '',
+          scope: account.scope || '',
+          tokenType: account.token_type || 'Bearer',
+          isActive: true,
+          updatedAt: new Date(),
+          teamId,
+          teamName,
+        };
+
+        console.log(`💾 ${account.provider} 統合データ保存:`, {
+          hasToken: !!integrationData.accessToken,
+          tokenLength: integrationData.accessToken.length,
+          scope: integrationData.scope
+        });
+
+        // 🆕 プロバイダー専用の統合処理
+        const integration = await prisma.integration.upsert({
+          where: {
+            userId_service: {
+              userId: userData.id,
+              service: account.provider,
+            },
+          },
+          update: integrationData,
+          create: {
+            userId: userData.id,
+            service: account.provider,
+            ...integrationData,
+            createdAt: new Date(),
+          },
+        });
+
+        console.log(`✅ ${account.provider} 統合完了:`, {
+          id: integration.id,
+          service: integration.service,
+          hasToken: !!integration.accessToken
+        });
+        
+        return true;
+        
+      } catch (error) {
+        console.error(`❌ ${account.provider} 統合エラー:`, error);
+        return false; // 🆕 エラー時は認証を拒否
+      }
+    },
     
     async redirect({ url, baseUrl }) {
-      console.log('🔄 認証後リダイレクト:', { url, baseUrl });
+      console.log('🔄 リダイレクト:', { url, baseUrl });
       
       if (url.includes('error=')) {
         console.error('🚨 OAuth認証エラー:', url);
         return `${baseUrl}/integrations?error=oauth_failed`;
       }
       
-      // 認証成功後はダッシュボードへ
-      const provider = url.includes('provider=') ? url.split('provider=')[1].split('&')[0] : 'unknown';
-      return `${baseUrl}/dashboard?success=true&service=${encodeURIComponent(provider)}`;
+      return `${baseUrl}/integrations?success=true`;
     },
     
     async jwt({ token, user, account }) {
       if (account && user) {
         console.log('🔑 JWT生成:', {
           provider: account.provider,
-          user: user.email,
-          scope: account.scope
+          user: user.email
         });
         
         if (user.email) {
@@ -330,7 +221,6 @@ export const authOptions: AuthOptions = {
           }
         }
         
-        // 拡張情報をトークンに追加
         token.provider = account.provider;
         token.scope = account.scope;
       }
@@ -338,12 +228,6 @@ export const authOptions: AuthOptions = {
     },
     
     async session({ session, token }) {
-      console.log('📱 セッション確立:', {
-        user: session.user?.email,
-        provider: token.provider,
-        hasScope: !!token.scope
-      });
-      
       return {
         ...session,
         user: {
@@ -360,69 +244,15 @@ export const authOptions: AuthOptions = {
     signIn: '/login',
     error: '/login',
   },
-  
-  events: {
-    async signIn({ user, account, profile, isNewUser }) {
-      console.log('🎉 サインインイベント:', {
-        user: user.email,
-        provider: account?.provider,
-        isNewUser,
-        scope: account?.scope,
-        timestamp: new Date().toISOString()
-      });
-    },
-    async signOut({ token }) {
-      console.log('👋 サインアウトイベント:', {
-        user: token?.email,
-        timestamp: new Date().toISOString()
-      });
-    },
-  },
-  
-  logger: {
-    error(code: any, metadata: any) {
-      console.error('🚨 NextAuth ERROR:', { 
-        code, 
-        metadata, 
-        timestamp: new Date().toISOString() 
-      });
-    },
-    warn(code: any) {
-      console.warn('⚠️ NextAuth WARNING:', { 
-        code, 
-        timestamp: new Date().toISOString() 
-      });
-    },
-    debug(code: any, metadata: any) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 NextAuth DEBUG:', { code, metadata });
-      }
-    },
-  },
 }
 
-// 🆕 権限レベル判定関数
-function checkAdminPermission(account: any, profile: ExtendedProfile): boolean {
-  switch (account.provider) {
-    case 'azure-ad':
-      // Azure ADの管理者権限チェック
-      return account.scope?.includes('User.Read.All') && 
-             account.scope?.includes('Directory.Read.All');
-    case 'google':
-      // Google Workspaceの管理者権限チェック
-      return account.scope?.includes('admin.directory.user.readonly');
-    default:
-      return false;
-  }
-}
-
-// 🔧 修正: ヘルパー関数: チームIDの取得
+// ヘルパー関数
 function getTeamId(account: any, profile: ExtendedProfile): string | null {
   switch (account.provider) {
     case 'discord':
       return profile?.guild?.id || null;
     case 'slack':
-      return profile?.team?.id || account.team?.id || null;
+      return profile?.team?.id || null;
     case 'azure-ad':
       return profile?.tid || null;
     default:
@@ -430,24 +260,16 @@ function getTeamId(account: any, profile: ExtendedProfile): string | null {
   }
 }
 
-// 🔧 修正: ヘルパー関数: チーム名の取得
 function getTeamName(account: any, profile: ExtendedProfile): string | null {
   switch (account.provider) {
     case 'discord':
       return profile?.guild?.name || null;
     case 'slack':
-      return profile?.team?.name || account.team?.name || null;
+      return profile?.team?.name || null;
     case 'azure-ad':
-      // 🆕 Azure ADの組織名取得を拡張
-      return profile?.companyName || 
-             profile?.organizationName || 
-             profile?.tenantDisplayName || 
-             null;
+      return profile?.companyName || profile?.organizationName || null;
     case 'google':
-      // 🆕 Google Workspaceの組織名取得
-      return profile?.hd || // ホストドメイン
-             profile?.organizationName || 
-             null;
+      return profile?.hd || null;
     default:
       return null;
   }
