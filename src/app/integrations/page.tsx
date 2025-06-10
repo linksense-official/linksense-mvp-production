@@ -127,11 +127,51 @@ export default function IntegrationsPage() {
   }, [])
 
   // サービスが統合済みかチェック
-  const isServiceConnected = (serviceId: string): boolean => {
-    return integrations.some(integration => 
-      integration.service === serviceId && integration.isActive
-    )
-  }
+const isServiceConnected = (serviceId: string): boolean => {
+  console.log(`🔍 ${serviceId} の接続状況チェック中...`);
+  
+  const matchingIntegrations = integrations.filter(integration => {
+    const normalizedService = integration.service.toLowerCase().trim();
+    const normalizedServiceId = serviceId.toLowerCase().trim();
+    
+    console.log(`  比較: "${normalizedService}" vs "${normalizedServiceId}"`);
+    
+    // 完全一致
+    if (normalizedService === normalizedServiceId) {
+      console.log(`  ✅ 完全一致: ${integration.isActive}`);
+      return integration.isActive;
+    }
+    
+    // Google関連の特別処理
+    if (serviceId === 'google') {
+      const isGoogleService = normalizedService === 'google' || 
+                             normalizedService === 'google-meet' || 
+                             normalizedService === 'google_meet';
+      if (isGoogleService) {
+        console.log(`  ✅ Google関連一致: ${integration.isActive}`);
+        return integration.isActive;
+      }
+    }
+    
+    // Teams関連の特別処理
+    if (serviceId === 'azure-ad') {
+      const isTeamsService = normalizedService === 'azure-ad' || 
+                             normalizedService === 'azure_ad' || 
+                             normalizedService === 'teams';
+      if (isTeamsService) {
+        console.log(`  ✅ Teams関連一致: ${integration.isActive}`);
+        return integration.isActive;
+      }
+    }
+    
+    return false;
+  });
+  
+  const isConnected = matchingIntegrations.length > 0;
+  console.log(`🔍 ${serviceId} 最終結果: ${isConnected ? '✅ 接続済み' : '❌ 未接続'}`);
+  
+  return isConnected;
+}
 
   // 統合解除
   const handleDisconnect = async (serviceId: string) => {
