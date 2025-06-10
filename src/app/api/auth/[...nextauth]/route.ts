@@ -67,7 +67,20 @@ export const authOptions: AuthOptions = {
  DiscordProvider({
   clientId: process.env.DISCORD_CLIENT_ID!,
   clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-  // スコープはデフォルトのみ
+  authorization: {
+    params: {
+      scope: [
+        'identify',
+        'email',
+        'guilds',
+        'guilds.members.read',  // サーバーメンバー取得 ⭐ 重要
+        'relationships.read',   // フレンドリスト取得 ⭐ 重要
+        'messages.read',        // メッセージ読み取り
+        'connections'           // 接続情報
+      ].join(' '),
+      prompt: 'consent'
+    }
+  }
 }),
     
     // Azure AD (Teams) OAuth (拡張スコープ版)
