@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'  // ⭐ NextResponseを追加
+import { NextRequest } from 'next/server'
 import NextAuth, { AuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import SlackProvider from 'next-auth/providers/slack'
@@ -364,83 +364,5 @@ function getTeamName(account: any, profile: any): string | null {
 
 const handler = NextAuth(authOptions)
 
-// ⭐ 修正: より詳細なデバッグとエラーハンドリング
-export async function GET(request: NextRequest) {
-  try {
-    console.log('🔍 NextAuth GET リクエスト:', {
-      url: request.url,
-      method: request.method,
-      headers: Object.fromEntries(request.headers.entries()),
-      timestamp: new Date().toISOString()
-    });
-    
-    return handler(request);
-  } catch (error) {
-    console.error('❌ NextAuth GET エラー:', error);
-    return NextResponse.json(
-      { error: 'NextAuth GET処理エラー', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    console.log('🔍 NextAuth POST リクエスト:', {
-      url: request.url,
-      method: request.method,
-      timestamp: new Date().toISOString()
-    });
-    
-    return handler(request);
-  } catch (error) {
-    console.error('❌ NextAuth POST エラー:', error);
-    return NextResponse.json(
-      { error: 'NextAuth POST処理エラー', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
-}
-
-// ⭐ 追加: サポートされていないメソッドのハンドリング
-export async function PUT(request: NextRequest) {
-  console.warn('⚠️ NextAuth PUT リクエスト（サポート外）:', request.url);
-  return NextResponse.json(
-    { error: 'PUT method is not supported by NextAuth.js' },
-    { status: 405 }
-  );
-}
-
-export async function DELETE(request: NextRequest) {
-  console.warn('⚠️ NextAuth DELETE リクエスト（サポート外）:', request.url);
-  return NextResponse.json(
-    { error: 'DELETE method is not supported by NextAuth.js' },
-    { status: 405 }
-  );
-}
-
-export async function PATCH(request: NextRequest) {
-  console.warn('⚠️ NextAuth PATCH リクエスト（サポート外）:', request.url);
-  return NextResponse.json(
-    { error: 'PATCH method is not supported by NextAuth.js' },
-    { status: 405 }
-  );
-}
-
-// ⭐ 追加: 一時的なデバッグ用ハンドラー
-export async function HEAD(request: NextRequest) {
-  console.log('🔍 NextAuth HEAD リクエスト:', request.url);
-  return new NextResponse(null, { status: 200 });
-}
-
-export async function OPTIONS(request: NextRequest) {
-  console.log('🔍 NextAuth OPTIONS リクエスト:', request.url);
-  return new NextResponse(null, { 
-    status: 200,
-    headers: {
-      'Allow': 'GET, POST',
-      'Access-Control-Allow-Methods': 'GET, POST',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    }
-  });
-}
+export { handler as GET, handler as POST }
