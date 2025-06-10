@@ -95,82 +95,86 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   
   callbacks: {
-   async signIn({ user, account, profile }) {
+  async signIn({ user, account, profile }) {
   console.log('🔄 signIn コールバック開始:', {
     provider: account?.provider,
     email: user?.email,
     hasAccessToken: !!account?.access_token,
-    accessTokenLength: account?.access_token?.length || 0,
-    scope: account?.scope,
     timestamp: new Date().toISOString()
   });
   
-  if (!account) {
-    console.error('❌ account が null です');
-    return false;
-  }
-  
-  if (!user?.email) {
-    console.error('❌ user.email が null です');
-    return false;
-  }
-  
-  if (!account.access_token) {
-    console.error('❌ access_token が null です');
+  if (!account || !user?.email || !account.access_token) {
+    console.error('❌ 必須情報不足');
     return false;
   }
   
   try {
-    console.log('📝 データベース保存開始 - トランザクション使用');
+    console.log('📝 データベース保存開始 - 統合保持版');
     
-    // 🆕 トランザクションで整合性を保証
-    const result = await prisma.$transaction(async (tx) => {
-      // ユーザー保存・取得
-      const userData = await tx.user.upsert({
-        where: { email: user.email! },
-        update: {
-          name: user.name || '',
-          image: user.image,
-          updatedAt: new Date(),
+    // 🆕 重要: トランザクション外で事前にユーザーを確保
+    const userData = await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        name: user.name || '',
+        image: user.image,
+        updatedAt: new Date(),
+      },
+      create: {
+        email: user.email,
+        name: user.name || '',
+        image: user.image,
+        emailVerified: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log('✅ ユーザー確保完了:', userData.id);
+
+    // 🆕 現在の全統合状況を事前に記録
+    const beforeIntegrations = await prisma.integration.findMany({
+      where: { userId: userData.id },
+      select: { 
+        id: true, 
+        service: true, 
+        isActive: true, 
+        accessToken: true,
+        refreshToken: true,
+        scope: true,
+        teamId: true,
+        teamName: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    console.log('📊 認証前の統合状況:', beforeIntegrations.map(i => ({ 
+      service: i.service, 
+      isActive: i.isActive,
+      hasToken: !!i.accessToken,
+      updatedAt: i.updatedAt.toISOString()
+    })));
+
+    // 🆕 現在のプロバイダーの統合のみを更新（他は触らない）
+    const extendedProfile = profile as ExtendedProfile;
+    const teamId = getTeamId(account, extendedProfile);
+    const teamName = getTeamName(account, extendedProfile);
+
+    const accessToken: string = account.access_token || '';
+    const refreshToken: string = account.refresh_token || '';
+    const scope: string = account.scope || '';
+    const tokenType: string = account.token_type || 'Bearer';
+
+    // 🆕 現在のプロバイダーのみの統合を処理
+    const currentProviderIntegration = await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: userData.id,
+          service: account.provider,
         },
-        create: {
-          email: user.email!,
-          name: user.name || '',
-          image: user.image,
-          emailVerified: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      });
-
-      console.log('✅ ユーザー保存完了:', userData.id);
-
-      // 🆕 現在の全統合状況を記録
-      const beforeIntegrations = await tx.integration.findMany({
-        where: { userId: userData.id },
-        select: { id: true, service: true, isActive: true, updatedAt: true }
-      });
-
-      console.log('📊 認証前の統合状況:', beforeIntegrations.map(i => ({ 
-        service: i.service, 
-        isActive: i.isActive,
-        updatedAt: i.updatedAt.toISOString()
-      })));
-
-      // チーム情報の取得
-      const extendedProfile = profile as ExtendedProfile;
-      const teamId = getTeamId(account, extendedProfile);
-      const teamName = getTeamName(account, extendedProfile);
-      const hasAdminPermission = checkAdminPermission(account, extendedProfile);
-
-      // 🔧 修正: accessTokenの型安全性を保証
-      const accessToken = account.access_token || '';
-      const refreshToken = account.refresh_token || '';
-      const scope = account.scope || '';
-      const tokenType = account.token_type || 'Bearer';
-
-      const integrationData = {
-        accessToken, // 🔧 修正: 確実にstringになるように
+      },
+      update: {
+        accessToken,
         refreshToken,
         scope,
         tokenType,
@@ -178,105 +182,105 @@ export const authOptions: AuthOptions = {
         updatedAt: new Date(),
         teamId,
         teamName,
-      };
-
-      console.log('💾 保存データ:', {
-        provider: account.provider,
-        accessTokenLength: accessToken.length, // 🔧 修正: 安全にアクセス
-        hasRefreshToken: !!refreshToken,
+      },
+      create: {
+        userId: userData.id,
+        service: account.provider,
+        accessToken,
+        refreshToken,
         scope,
+        tokenType,
+        isActive: true,
         teamId,
         teamName,
-        hasAdminPermission
-      });
-
-      // 既存統合の確認・更新
-      const existingIntegration = await tx.integration.findUnique({
-        where: {
-          userId_service: {
-            userId: userData.id,
-            service: account.provider as any,
-          },
-        },
-      });
-
-      let currentIntegration;
-      if (existingIntegration) {
-        console.log('🔄 既存統合更新中...', existingIntegration.id);
-        currentIntegration = await tx.integration.update({
-          where: { id: existingIntegration.id },
-          data: integrationData,
-        });
-        console.log('✅ 更新完了:', { id: currentIntegration.id, hasToken: !!currentIntegration.accessToken });
-      } else {
-        console.log('🆕 新規統合作成中...');
-        // 🔧 修正: 型安全なcreateデータ
-        const createData = {
-          userId: userData.id,
-          service: account.provider as any,
-          accessToken, // 🔧 修正: 確実にstringを渡す
-          refreshToken,
-          scope,
-          tokenType,
-          isActive: true,
-          teamId,
-          teamName,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-
-        currentIntegration = await tx.integration.create({
-          data: createData,
-        });
-        console.log('✅ 作成完了:', { id: currentIntegration.id, hasToken: !!currentIntegration.accessToken });
-      }
-
-      // 🆕 認証後の全統合状況を確認
-      const afterIntegrations = await tx.integration.findMany({
-        where: { userId: userData.id },
-        select: { id: true, service: true, isActive: true, updatedAt: true }
-      });
-
-      console.log('📊 認証後の統合状況:', afterIntegrations.map(i => ({ 
-        service: i.service, 
-        isActive: i.isActive,
-        updatedAt: i.updatedAt.toISOString()
-      })));
-
-      // 🆕 統合数の変化をチェック
-      const beforeCount = beforeIntegrations.filter(i => i.isActive).length;
-      const afterCount = afterIntegrations.filter(i => i.isActive).length;
-      
-      if (beforeCount > afterCount) {
-        console.error('🚨 統合数が減少しました！', {
-          before: beforeCount,
-          after: afterCount,
-          lost: beforeIntegrations.filter(before => 
-            !afterIntegrations.find(after => after.service === before.service && after.isActive)
-          ).map(i => i.service)
-        });
-      }
-
-      return {
-        userId: userData.id,
-        currentService: account.provider,
-        beforeCount,
-        afterCount,
-        totalIntegrations: afterIntegrations.length,
-        activeIntegrations: afterIntegrations.filter(i => i.isActive).length,
-        services: afterIntegrations.map(i => i.service),
-        hasAdminPermission
-      };
-    }, {
-      maxWait: 10000, // 10秒
-      timeout: 15000, // 15秒
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     });
 
-    console.log('🎉 認証・保存完了:', result);
+    console.log('✅ 現在プロバイダー統合完了:', {
+      id: currentProviderIntegration.id,
+      service: currentProviderIntegration.service,
+      hasToken: !!currentProviderIntegration.accessToken
+    });
+
+    // 🆕 他の統合が維持されているかチェック
+    const afterIntegrations = await prisma.integration.findMany({
+      where: { userId: userData.id },
+      select: { 
+        id: true, 
+        service: true, 
+        isActive: true, 
+        accessToken: true,
+        updatedAt: true
+      }
+    });
+
+    console.log('📊 認証後の統合状況:', afterIntegrations.map(i => ({ 
+      service: i.service, 
+      isActive: i.isActive,
+      hasToken: !!i.accessToken,
+      updatedAt: i.updatedAt.toISOString()
+    })));
+
+    // 🆕 統合数の変化をチェック
+    const beforeActiveCount = beforeIntegrations.filter(i => i.isActive && i.accessToken).length;
+    const afterActiveCount = afterIntegrations.filter(i => i.isActive && i.accessToken).length;
     
-    if (result.beforeCount > result.afterCount) {
-      console.error('🚨 統合情報の損失が発生しました！');
+    console.log('📈 統合数の変化:', {
+      before: beforeActiveCount,
+      after: afterActiveCount,
+      change: afterActiveCount - beforeActiveCount
+    });
+
+    if (afterActiveCount < beforeActiveCount) {
+      console.error('🚨 統合数が減少しました！', {
+        lost: beforeIntegrations.filter(before => 
+          before.isActive && before.accessToken &&
+          !afterIntegrations.find(after => 
+            after.service === before.service && after.isActive && after.accessToken
+          )
+        ).map(i => i.service)
+      });
+      
+      // 🆕 失われた統合を復旧
+      for (const lostIntegration of beforeIntegrations) {
+        if (lostIntegration.isActive && lostIntegration.accessToken) {
+          const stillExists = afterIntegrations.find(after => 
+            after.service === lostIntegration.service && after.isActive && after.accessToken
+          );
+          
+          if (!stillExists && lostIntegration.service !== account.provider) {
+            console.log('🔄 統合復旧中:', lostIntegration.service);
+            await prisma.integration.update({
+              where: { id: lostIntegration.id },
+              data: {
+                isActive: true,
+                accessToken: lostIntegration.accessToken,
+                refreshToken: lostIntegration.refreshToken,
+                scope: lostIntegration.scope,
+                updatedAt: new Date(),
+              }
+            });
+            console.log('✅ 統合復旧完了:', lostIntegration.service);
+          }
+        }
+      }
     }
+
+    // 🆕 最終確認
+    const finalIntegrations = await prisma.integration.findMany({
+      where: { userId: userData.id },
+      select: { service: true, isActive: true, accessToken: true }
+    });
+
+    console.log('🎉 認証・保存完了:', {
+      currentProvider: account.provider,
+      userId: userData.id,
+      totalIntegrations: finalIntegrations.length,
+      activeIntegrations: finalIntegrations.filter(i => i.isActive && i.accessToken).length,
+      services: finalIntegrations.filter(i => i.isActive && i.accessToken).map(i => i.service)
+    });
     
     return true;
     
@@ -288,7 +292,6 @@ export const authOptions: AuthOptions = {
       timestamp: new Date().toISOString()
     });
     
-    // エラーでも認証は継続
     return true;
   }
 },
