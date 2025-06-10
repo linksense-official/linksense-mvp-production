@@ -364,5 +364,47 @@ function getTeamName(account: any, profile: any): string | null {
 
 const handler = NextAuth(authOptions)
 
+// ⭐ 安全な修正: エラー詳細ログのみ追加
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+  
+  console.log('🔍 NextAuth GET リクエスト詳細:', {
+    pathname,
+    searchParams: url.searchParams.toString(),
+    method: request.method,
+    timestamp: new Date().toISOString()
+  });
+  
+  // NextAuthがサポートしていないパスをチェック
+  if (pathname.includes('/api/auth/chatwork')) {
+    console.error('❌ 削除済みChatWorkエンドポイントへのアクセス:', pathname);
+    return new Response('Endpoint not found', { status: 404 });
+  }
+  
+  try {
+    return handler(request);
+  } catch (error) {
+    console.error('❌ NextAuth GET処理エラー:', {
+      pathname,
+      error: error instanceof Error ? error.message : error,
+      timestamp: new Date().toISOString()
+    });
+    throw error; // NextAuthに処理を委ねる
+  }
+}
 
-export { handler as GET, handler as POST }
+export async function POST(request: NextRequest) {
+  const url = new URL(request.url);
+  console.log('🔍 NextAuth POST リクエスト:', {
+    pathname: url.pathname,
+    timestamp: new Date().toISOString()
+  });
+  
+  try {
+    return handler(request);
+  } catch (error) {
+    console.error('❌ NextAuth POST処理エラー:', error);
+    throw error;
+  }
+}
