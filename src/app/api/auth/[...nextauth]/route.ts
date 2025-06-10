@@ -150,7 +150,58 @@ DiscordProvider({
       },
     },
   ],
+  // Cookie設定を追加
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true, // HTTPS必須
+        domain: '.vercel.app' // Vercelドメイン用
+      }
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+        domain: '.vercel.app'
+      }
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+        domain: '.vercel.app'
+      }
+    },
+    state: {
+      name: `next-auth.state`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+        maxAge: 900, // 15分
+        domain: '.vercel.app'
+      }
+    }
+  },
   
+  // セッション設定を強化
+  session: {
+    strategy: 'jwt' as const,
+    maxAge: 30 * 24 * 60 * 60, // 30日
+    updateAge: 24 * 60 * 60, // 24時間
+  },
+  
+  // その他の既存設定...
   debug: process.env.NODE_ENV === 'development',
   
   callbacks: {
@@ -371,11 +422,7 @@ DiscordProvider({
     signIn: '/login',
     error: '/login',
   },
-  
-  session: {
-    strategy: 'jwt' as const,
-    maxAge: 30 * 24 * 60 * 60, // 30日
-  },
+
   
   events: {
     async signIn({ user, account, profile, isNewUser }) {
