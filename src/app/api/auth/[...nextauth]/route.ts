@@ -77,51 +77,57 @@ export const authOptions: AuthOptions = {
       }
     }),
 
-    {
-      id: "chatwork",
-      name: "ChatWork",
-      type: "oauth" as const,
-      authorization: {
-        url: "https://www.chatwork.com/packages/oauth2/login.php",
-        params: {
-          scope: [
-            'users.profile.me:read',
-            'users.profile.others:read',
-            'rooms.all:read_only',
-            'contacts.all:read'
-          ].join(' '),
-          response_type: "code",
-        }
-      },
-      token: "https://oauth.chatwork.com/token",
-      userinfo: {
-        async request(context: { tokens: { access_token?: string; [key: string]: any } }) {
-          const { tokens } = context;
-          const response = await fetch("https://api.chatwork.com/v2/me", {
-            headers: {
-              'X-ChatWorkToken': tokens.access_token!,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (!response.ok) {
-            throw new Error(`ChatWork API Error: ${response.status}`);
-          }
-          
-          return await response.json();
-        }
-      },
-      clientId: process.env.CHATWORK_CLIENT_ID!,
-      clientSecret: process.env.CHATWORK_CLIENT_SECRET!,
-      profile(profile: any) {
-        return {
-          id: profile.account_id?.toString() || profile.id || 'unknown',
-          name: profile.name || 'ChatWork User',
-          email: `chatwork-${profile.account_id || 'unknown'}@linksense.local`,
-          image: profile.avatar_image_url || null,
-        }
-      },
-    },
+   // ⭐ ChatWorkプロバイダーを削除または無効化
+// ChatWorkは標準的なOAuth 2.0をサポートしていないため、別の実装が必要
+
+// 以下のChatWorkプロバイダー部分をコメントアウトまたは削除
+/*
+{
+  id: "chatwork",
+  name: "ChatWork",
+  type: "oauth" as const,
+  authorization: {
+    url: "https://www.chatwork.com/packages/oauth2/login.php",
+    params: {
+      scope: [
+        'users.profile.me:read',
+        'users.profile.others:read',
+        'rooms.all:read_only',
+        'contacts.all:read'
+      ].join(' '),
+      response_type: "code",
+    }
+  },
+  token: "https://oauth.chatwork.com/token",
+  userinfo: {
+    async request(context: { tokens: { access_token?: string; [key: string]: any } }) {
+      const { tokens } = context;
+      const response = await fetch("https://api.chatwork.com/v2/me", {
+        headers: {
+          'X-ChatWorkToken': tokens.access_token!,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`ChatWork API Error: ${response.status}`);
+      }
+      
+      return await response.json();
+    }
+  },
+  clientId: process.env.CHATWORK_CLIENT_ID!,
+  clientSecret: process.env.CHATWORK_CLIENT_SECRET!,
+  profile(profile: any) {
+    return {
+      id: profile.account_id?.toString() || profile.id || 'unknown',
+      name: profile.name || 'ChatWork User',
+      email: `chatwork-${profile.account_id || 'unknown'}@linksense.local`,
+      image: profile.avatar_image_url || null,
+    }
+  },
+},
+*/
   ],
   
   session: {
@@ -132,135 +138,151 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   
   callbacks: {
-    async signIn({ user, account, profile }) {
-      console.log('🔄 signIn コールバック開始:', {
-        provider: account?.provider,
-        email: user?.email,
-        hasAccessToken: !!account?.access_token,
-        accessTokenLength: account?.access_token?.length || 0,
-        scope: account?.scope,
-        timestamp: new Date().toISOString()
-      });
-      
-      if (!account) {
-        console.error('❌ account が null です');
-        return false;
-      }
-      
-      if (!user?.email) {
-        console.error('❌ user.email が null です');
-        return false;
-      }
-      
-      if (!account.access_token) {
-        console.error('❌ access_token が null です');
-        return false;
-      }
-      
-      try {
-        console.log('📝 データベース保存開始');
-        
-        let userEmail = user.email;
-        let userName = user.name || '';
-        
-        if (account.provider === 'chatwork' && user.email?.includes('linksense.local')) {
-          console.log('📧 ChatWork用メール処理');
-        }
+   async signIn({ user, account, profile }) {
+  console.log('🔄 signIn コールバック開始:', {
+    provider: account?.provider,
+    email: user?.email,
+    hasAccessToken: !!account?.access_token,
+    accessTokenLength: account?.access_token?.length || 0,
+    scope: account?.scope,
+    timestamp: new Date().toISOString()
+  });
+  
+  if (!account) {
+    console.error('❌ account が null です');
+    return false;
+  }
+  
+  if (!user?.email) {
+    console.error('❌ user.email が null です');
+    return false;
+  }
+  
+  if (!account.access_token) {
+    console.error('❌ access_token が null です');
+    return false;
+  }
+  
+  try {
+    console.log('📝 データベース保存開始');
+    
+    let userEmail = user.email;
+    let userName = user.name || '';
+    
+    if (account.provider === 'chatwork' && user.email?.includes('linksense.local')) {
+      console.log('📧 ChatWork用メール処理');
+    }
 
-        console.log('👤 ユーザー保存中...', { email: userEmail });
-        const userData = await prisma.user.upsert({
-          where: { email: userEmail },
-          update: {
-            name: userName,
-            image: user.image,
-            updatedAt: new Date(),
-          },
-          create: {
-            email: userEmail,
-            name: userName,
-            image: user.image,
-            emailVerified: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
+    console.log('👤 ユーザー保存中...', { email: userEmail });
+    
+    // ⭐ 修正: upsertを使用してエラーを回避
+    const userData = await prisma.user.upsert({
+      where: { email: userEmail },
+      update: {
+        name: userName,
+        image: user.image,
+        updatedAt: new Date(),
+      },
+      create: {
+        email: userEmail,
+        name: userName,
+        image: user.image,
+        emailVerified: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    }).catch(async (error) => {
+      // ⭐ 追加: 既存ユーザーが存在する場合の処理
+      if (error.code === 'P2002') {
+        console.log('👤 既存ユーザーを取得:', userEmail);
+        return await prisma.user.findUnique({
+          where: { email: userEmail }
         });
-        console.log('✅ ユーザー保存完了:', userData.id);
+      }
+      throw error;
+    });
+    
+    if (!userData) {
+      throw new Error('ユーザーデータの作成/取得に失敗しました');
+    }
+    
+    console.log('✅ ユーザー保存完了:', userData.id);
 
-        console.log('🔗 統合情報確認中...');
-        const existingIntegration = await prisma.integration.findUnique({
-          where: {
-            userId_service: {
-              userId: userData.id,
-              service: account.provider as any,
-            },
-          },
-        });
-        console.log('既存統合:', existingIntegration ? '更新' : '新規作成');
-
-        // チーム情報の取得
-        const teamId = getTeamId(account, profile);
-        const teamName = getTeamName(account, profile);
-
-        const integrationData = {
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token || '',
-          scope: account.scope || '',
-          tokenType: account.token_type || 'Bearer',
-          isActive: true,
-          updatedAt: new Date(),
-          teamId,
-          teamName,
-        };
-
-        console.log('💾 保存データ:', {
-          provider: account.provider,
-          accessTokenLength: integrationData.accessToken.length,
-          hasRefreshToken: !!integrationData.refreshToken,
-          scope: integrationData.scope,
-          teamId: integrationData.teamId,
-          teamName: integrationData.teamName
-        });
-
-        if (existingIntegration) {
-          console.log('🔄 既存統合更新中...');
-          const updated = await prisma.integration.update({
-            where: { id: existingIntegration.id },
-            data: integrationData,
-          });
-          console.log('✅ 更新完了:', { id: updated.id, hasToken: !!updated.accessToken });
-        } else {
-          console.log('🆕 新規統合作成中...');
-          const created = await prisma.integration.create({
-            data: {
-              userId: userData.id,
-              service: account.provider as any,
-              ...integrationData,
-              createdAt: new Date(),
-            },
-          });
-          console.log('✅ 作成完了:', { id: created.id, hasToken: !!created.accessToken });
-        }
-
-        console.log('🎉 認証・保存完了:', {
-          provider: account.provider,
+    console.log('🔗 統合情報確認中...');
+    const existingIntegration = await prisma.integration.findUnique({
+      where: {
+        userId_service: {
           userId: userData.id,
-          tokenSaved: true
-        });
-        
-        return true;
-        
-      } catch (error) {
-        console.error('❌ signIn エラー詳細:', {
-          error: error instanceof Error ? error.message : error,
-          stack: error instanceof Error ? error.stack : undefined,
-          provider: account?.provider,
-          timestamp: new Date().toISOString()
-        });
-        
-        // エラーでも認証は継続
-        return true;
-      }
-    },
+          service: account.provider as any,
+        },
+      },
+    });
+    console.log('既存統合:', existingIntegration ? '更新' : '新規作成');
+
+    // チーム情報の取得
+    const teamId = getTeamId(account, profile);
+    const teamName = getTeamName(account, profile);
+
+    const integrationData = {
+      accessToken: account.access_token,
+      refreshToken: account.refresh_token || '',
+      scope: account.scope || '',
+      tokenType: account.token_type || 'Bearer',
+      isActive: true,
+      updatedAt: new Date(),
+      teamId,
+      teamName,
+    };
+
+    console.log('💾 保存データ:', {
+      provider: account.provider,
+      accessTokenLength: integrationData.accessToken.length,
+      hasRefreshToken: !!integrationData.refreshToken,
+      scope: integrationData.scope,
+      teamId: integrationData.teamId,
+      teamName: integrationData.teamName
+    });
+
+    if (existingIntegration) {
+      console.log('🔄 既存統合更新中...');
+      const updated = await prisma.integration.update({
+        where: { id: existingIntegration.id },
+        data: integrationData,
+      });
+      console.log('✅ 更新完了:', { id: updated.id, hasToken: !!updated.accessToken });
+    } else {
+      console.log('🆕 新規統合作成中...');
+      const created = await prisma.integration.create({
+        data: {
+          userId: userData.id,
+          service: account.provider as any,
+          ...integrationData,
+          createdAt: new Date(),
+        },
+      });
+      console.log('✅ 作成完了:', { id: created.id, hasToken: !!created.accessToken });
+    }
+
+    console.log('🎉 認証・保存完了:', {
+      provider: account.provider,
+      userId: userData.id,
+      tokenSaved: true
+    });
+    
+    return true;
+    
+  } catch (error) {
+    console.error('❌ signIn エラー詳細:', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+      provider: account?.provider,
+      timestamp: new Date().toISOString()
+    });
+    
+    // エラーでも認証は継続
+    return true;
+  }
+},
     
     async redirect({ url, baseUrl }) {
       console.log('🔄 認証後リダイレクト:', { url, baseUrl });

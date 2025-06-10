@@ -1,80 +1,150 @@
-// src/app/api/integrations/chatwork/proxy/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-// import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { PrismaClient } from '@prisma/client';
 
-const CHATWORK_API_BASE = 'https://api.chatwork.com/v2';
+const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
-    // セッション確認
-    const session = await getServerSession();
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
+    console.log('🔄 ChatWork統合API開始');
+
+    // 認証確認
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { endpoint, method = 'GET', headers = {}, body: requestBody } = body;
-
-    // ChatWork APIトークンの取得（環境変数またはユーザー設定から）
-    const chatworkToken = process.env.CHATWORK_API_TOKEN || headers['X-ChatWorkToken'];
-    
-    if (!chatworkToken) {
-      return NextResponse.json(
-        { success: false, error: 'ChatWork APIトークンが設定されていません' },
-        { status: 400 }
-      );
-    }
-
-    // ChatWork API呼び出し
-    const apiUrl = `${CHATWORK_API_BASE}${endpoint}`;
-    
-    const apiHeaders = {
-      'Content-Type': 'application/json',
-      'X-ChatWorkToken': chatworkToken,
-      ...headers
-    };
-
-    console.log(`ChatWork API呼び出し: ${method} ${apiUrl}`);
-
-    const response = await fetch(apiUrl, {
-      method,
-      headers: apiHeaders,
-      body: requestBody ? JSON.stringify(requestBody) : undefined
+    // ユーザー取得
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true, email: true, name: true }
     });
 
-    // レート制限情報取得
-    const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
-    const rateLimitReset = response.headers.get('X-RateLimit-Reset');
-
-    let data;
-    try {
-      data = await response.json();
-    } catch (error) {
-      data = null;
+    if (!user) {
+      return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 });
     }
 
-    const result = {
-      success: response.ok,
-      data: response.ok ? data : undefined,
-      error: response.ok ? undefined : data?.message || `ChatWork API エラー: ${response.status}`,
-      code: response.status.toString(),
-      rateLimitRemaining: rateLimitRemaining ? parseInt(rateLimitRemaining, 10) : undefined,
-      rateLimitReset: rateLimitReset ? parseInt(rateLimitReset, 10) * 1000 : undefined
-    };
+    // リクエストボディからAPIトークンを取得
+    const { apiToken } = await request.json();
 
-    return NextResponse.json(result);
+    if (!apiToken) {
+      return NextResponse.json({ error: 'ChatWork APIトークンが必要です' }, { status: 400 });
+    }
+
+    // ChatWork APIでトークンの有効性確認
+    const meResponse = await fetch('https://api.chatwork.com/v2/me', {
+      headers: {
+        'X-ChatWorkToken': apiToken,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!meResponse.ok) {
+      return NextResponse.json({ 
+        error: 'ChatWork APIトークンが無効です',
+        details: `API Status: ${meResponse.status}`
+      }, { status: 400 });
+    }
+
+    const chatworkUser = await meResponse.json();
+
+    // 統合情報を保存
+    const integration = await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: user.id,
+          service: 'chatwork',
+        },
+      },
+      update: {
+        accessToken: apiToken,
+        refreshToken: '',
+        scope: 'api_access',
+        tokenType: 'APIToken',
+        isActive: true,
+        teamId: chatworkUser.organization_id?.toString() || null,
+        teamName: chatworkUser.organization_name || null,
+        updatedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
+        service: 'chatwork',
+        accessToken: apiToken,
+        refreshToken: '',
+        scope: 'api_access',
+        tokenType: 'APIToken',
+        isActive: true,
+        teamId: chatworkUser.organization_id?.toString() || null,
+        teamName: chatworkUser.organization_name || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log('✅ ChatWork統合完了:', {
+      userId: user.id,
+      integrationId: integration.id,
+      chatworkUser: chatworkUser.name
+    });
+
+    return NextResponse.json({
+      success: true,
+      integration: {
+        id: integration.id,
+        service: 'chatwork',
+        isActive: true,
+        teamName: integration.teamName,
+        user: {
+          name: chatworkUser.name,
+          account_id: chatworkUser.account_id
+        }
+      }
+    });
 
   } catch (error) {
-    console.error('ChatWork API Proxy エラー:', error);
+    console.error('❌ ChatWork統合エラー:', error);
     return NextResponse.json(
       { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'サーバーエラー' 
+        success: false,
+        error: 'ChatWork統合に失敗しました',
+        details: error instanceof Error ? error.message : '不明なエラー'
       },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 });
+    }
+
+    // ChatWork統合を削除
+    await prisma.integration.deleteMany({
+      where: {
+        userId: user.id,
+        service: 'chatwork'
+      }
+    });
+
+    return NextResponse.json({ success: true, message: 'ChatWork統合を削除しました' });
+
+  } catch (error) {
+    console.error('❌ ChatWork統合削除エラー:', error);
+    return NextResponse.json(
+      { error: 'ChatWork統合の削除に失敗しました' },
       { status: 500 }
     );
   }
