@@ -69,16 +69,7 @@ export const authOptions: AuthOptions = {
   clientSecret: process.env.DISCORD_CLIENT_SECRET!,
   authorization: {
     params: {
-      scope: [
-        'identify',
-        'email',
-        'guilds',
-        'guilds.members.read',  // サーバーメンバー取得 ⭐ 重要
-        'relationships.read',   // フレンドリスト取得 ⭐ 重要
-        'messages.read',        // メッセージ読み取り
-        'connections'           // 接続情報
-      ].join(' '),
-      prompt: 'consent'
+      scope: "identify email guilds guilds.members.read relationships.read connections"
     }
   }
 }),
