@@ -26,12 +26,18 @@ interface ServiceConfig {
   isNextAuth: boolean
 }
 
+// 🔧 修正: Integrationインターフェースを拡張
 interface Integration {
   id: string
   service: string
   isActive: boolean
   createdAt: string
   updatedAt: string
+  teamId?: string | null
+  teamName?: string | null
+  hasToken?: boolean        // 🆕 追加
+  hasRefreshToken?: boolean // 🆕 追加
+  scope?: string | null     // 🆕 追加
 }
 
 // 🎯 Phase 1対象の4サービスのみ
@@ -126,52 +132,28 @@ export default function IntegrationsPage() {
     }
   }, [])
 
-  // サービスが統合済みかチェック
-const isServiceConnected = (serviceId: string): boolean => {
-  console.log(`🔍 ${serviceId} の接続状況チェック中...`);
-  
-  const matchingIntegrations = integrations.filter(integration => {
-    const normalizedService = integration.service.toLowerCase().trim();
-    const normalizedServiceId = serviceId.toLowerCase().trim();
+  // 🔧 修正: サービスが統合済みかチェック（型安全版）
+  const isServiceConnected = (serviceId: string): boolean => {
+    const integration = integrations.find(integration => {
+      const normalizedService = integration.service.toLowerCase().trim()
+      const normalizedServiceId = serviceId.toLowerCase().trim()
+      
+      // 完全一致かつアクティブかつトークンありの場合のみ接続済みとする
+      return normalizedService === normalizedServiceId && 
+             integration.isActive && 
+             (integration.hasToken ?? false) // 🔧 修正: undefined対応
+    })
     
-    console.log(`  比較: "${normalizedService}" vs "${normalizedServiceId}"`);
+    const isConnected = !!integration
+    console.log(`🔍 ${serviceId} 接続チェック:`, {
+      found: !!integration,
+      isActive: integration?.isActive,
+      hasToken: integration?.hasToken ?? false, // 🔧 修正: undefined対応
+      result: isConnected
+    })
     
-    // 完全一致
-    if (normalizedService === normalizedServiceId) {
-      console.log(`  ✅ 完全一致: ${integration.isActive}`);
-      return integration.isActive;
-    }
-    
-    // Google関連の特別処理
-    if (serviceId === 'google') {
-      const isGoogleService = normalizedService === 'google' || 
-                             normalizedService === 'google-meet' || 
-                             normalizedService === 'google_meet';
-      if (isGoogleService) {
-        console.log(`  ✅ Google関連一致: ${integration.isActive}`);
-        return integration.isActive;
-      }
-    }
-    
-    // Teams関連の特別処理
-    if (serviceId === 'azure-ad') {
-      const isTeamsService = normalizedService === 'azure-ad' || 
-                             normalizedService === 'azure_ad' || 
-                             normalizedService === 'teams';
-      if (isTeamsService) {
-        console.log(`  ✅ Teams関連一致: ${integration.isActive}`);
-        return integration.isActive;
-      }
-    }
-    
-    return false;
-  });
-  
-  const isConnected = matchingIntegrations.length > 0;
-  console.log(`🔍 ${serviceId} 最終結果: ${isConnected ? '✅ 接続済み' : '❌ 未接続'}`);
-  
-  return isConnected;
-}
+    return isConnected
+  }
 
   // 統合解除
   const handleDisconnect = async (serviceId: string) => {
@@ -238,7 +220,7 @@ const isServiceConnected = (serviceId: string): boolean => {
     )
   }
 
-  const connectedCount = integrations.filter(i => i.isActive).length
+  const connectedCount = integrations.filter(i => i.isActive && (i.hasToken ?? false)).length
 
   return (
     <div className="min-h-screen bg-gray-50">

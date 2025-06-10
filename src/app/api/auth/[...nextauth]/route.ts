@@ -48,33 +48,9 @@ export const authOptions: AuthOptions = {
   clientSecret: process.env.SLACK_CLIENT_SECRET!,
   authorization: {
     params: {
-      // 🔧 修正: User Token Scopesに合わせる
-      scope: [
-        'identify',
-        'users:read',
-        'users:read.email',
-        'channels:read',
-        'channels:history',
-        'groups:read',
-        'im:read',
-        'im:history',
-        'mpim:read',
-        'team:read',
-        'usergroups:read'
-      ].join(' '),
-      user_scope: [
-        'identify',
-        'users:read',
-        'users:read.email',
-        'channels:read',
-        'channels:history',
-        'groups:read',
-        'im:read',
-        'im:history',
-        'mpim:read',
-        'team:read',
-        'usergroups:read'
-      ].join(' ')
+      // 🔧 修正: 最小限のスコープから開始
+      scope: 'identify users:read users:read.email',
+      // user_scopeを削除してシンプルに
     }
   }
 }),
