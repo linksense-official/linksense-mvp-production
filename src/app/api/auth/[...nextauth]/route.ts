@@ -66,12 +66,7 @@ export const authOptions: AuthOptions = {
     // Discord OAuth (拡張スコープ版)
 DiscordProvider({
   clientId: process.env.DISCORD_CLIENT_ID!,
-  clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-  authorization: {
-    params: {
-      scope: "identify email guilds connections"
-    }
-  }
+  clientSecret: process.env.DISCORD_CLIENT_SECRET!
 }),
     
     // Azure AD (Teams) OAuth (拡張スコープ版)
@@ -160,22 +155,17 @@ DiscordProvider({
   
   callbacks: {
     async signIn({ user, account, profile }) {
-  console.log('✅ OAuth認証成功 (拡張スコープ):', {
+  console.log('🔄 signIn コールバック開始:', {
     provider: account?.provider,
     email: user?.email,
-    name: user?.name,
-    scopes: account?.scope,
+    hasAccessToken: !!account?.access_token,
     timestamp: new Date().toISOString()
-  })
+  });
   
   try {
     if (account && user?.email) {
-      console.log('🔄 データベース保存開始:', {
-        provider: account.provider,
-        hasAccessToken: !!account.access_token,
-        scope: account.scope
-      });
-
+      console.log('📝 データベース保存処理開始');
+      
       // ChatWorkの場合、プレースホルダーメールを実際のIDベースに変換
       let userEmail = user.email;
       let userName = user.name || '';
@@ -184,8 +174,9 @@ DiscordProvider({
         console.log('📧 ChatWork用メール確認:', userEmail);
       }
 
+      console.log('👤 ユーザー情報保存開始:', { email: userEmail, name: userName });
+      
       // ユーザー情報をデータベースに保存/更新
-      console.log('👤 ユーザー情報保存開始');
       const userData = await prisma.user.upsert({
         where: { email: userEmail },
         update: {
@@ -202,10 +193,15 @@ DiscordProvider({
           updatedAt: new Date(),
         },
       });
-      console.log('✅ ユーザー情報保存完了:', userData.id);
+      
+      console.log('✅ ユーザー情報保存完了:', { 
+        userId: userData.id, 
+        email: userData.email 
+      });
 
       // 統合情報を保存（拡張データ含む）
       console.log('🔗 統合情報保存開始');
+      
       const existingIntegration = await prisma.integration.findUnique({
         where: {
           userId_service: {
@@ -226,23 +222,28 @@ DiscordProvider({
         teamName: getTeamName(account, profile),
       };
 
-      console.log('💾 保存データ確認:', {
+      console.log('💾 保存データ詳細:', {
+        provider: account.provider,
         hasAccessToken: !!integrationData.accessToken,
+        accessTokenLength: integrationData.accessToken.length,
         scope: integrationData.scope,
         teamId: integrationData.teamId,
         teamName: integrationData.teamName
       });
 
       if (existingIntegration) {
-        console.log('🔄 既存統合更新中');
-        await prisma.integration.update({
+        console.log('🔄 既存統合更新中:', existingIntegration.id);
+        const updatedIntegration = await prisma.integration.update({
           where: { id: existingIntegration.id },
           data: integrationData,
         });
-        console.log('✅ 既存統合更新完了');
+        console.log('✅ 既存統合更新完了:', {
+          id: updatedIntegration.id,
+          hasToken: !!updatedIntegration.accessToken
+        });
       } else {
         console.log('🆕 新規統合作成中');
-        await prisma.integration.create({
+        const newIntegration = await prisma.integration.create({
           data: {
             userId: userData.id,
             service: account.provider as any,
@@ -250,18 +251,21 @@ DiscordProvider({
             createdAt: new Date(),
           },
         });
-        console.log('✅ 新規統合作成完了');
+        console.log('✅ 新規統合作成完了:', {
+          id: newIntegration.id,
+          hasToken: !!newIntegration.accessToken
+        });
       }
 
-      console.log('💾 拡張統合情報保存完了:', {
+      console.log('🎉 統合情報保存完了:', {
         userId: userData.id,
         service: account.provider,
         hasToken: !!account.access_token,
         hasRefreshToken: !!account.refresh_token,
         scope: account.scope,
-        teamId: integrationData.teamId,
         action: existingIntegration ? 'updated' : 'created'
       });
+      
     } else {
       console.warn('⚠️ 必要な認証情報が不足:', {
         hasAccount: !!account,
@@ -270,24 +274,15 @@ DiscordProvider({
       });
     }
   } catch (error) {
-    console.error('❌ データベース保存エラー詳細:', {
+    console.error('❌ signIn コールバック エラー:', {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
       provider: account?.provider,
       timestamp: new Date().toISOString()
     });
     
-    // エラーの詳細をログに記録
-    if (error instanceof Error) {
-      console.error('エラー名:', error.name);
-      console.error('エラーメッセージ:', error.message);
-      if (error.stack) {
-        console.error('スタックトレース:', error.stack);
-      }
-    }
-    
-    // 認証は成功させるが、エラーをログに記録
-    // throw error; // この行をコメントアウトして認証を継続
+    // エラーでも認証は継続
+    // throw error; // この行はコメントアウト
   }
   
   return true;
