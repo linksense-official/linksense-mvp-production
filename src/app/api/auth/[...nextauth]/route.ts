@@ -76,58 +76,6 @@ export const authOptions: AuthOptions = {
         }
       }
     }),
-
-   // ⭐ ChatWorkプロバイダーを削除または無効化
-// ChatWorkは標準的なOAuth 2.0をサポートしていないため、別の実装が必要
-
-// 以下のChatWorkプロバイダー部分をコメントアウトまたは削除
-/*
-{
-  id: "chatwork",
-  name: "ChatWork",
-  type: "oauth" as const,
-  authorization: {
-    url: "https://www.chatwork.com/packages/oauth2/login.php",
-    params: {
-      scope: [
-        'users.profile.me:read',
-        'users.profile.others:read',
-        'rooms.all:read_only',
-        'contacts.all:read'
-      ].join(' '),
-      response_type: "code",
-    }
-  },
-  token: "https://oauth.chatwork.com/token",
-  userinfo: {
-    async request(context: { tokens: { access_token?: string; [key: string]: any } }) {
-      const { tokens } = context;
-      const response = await fetch("https://api.chatwork.com/v2/me", {
-        headers: {
-          'X-ChatWorkToken': tokens.access_token!,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`ChatWork API Error: ${response.status}`);
-      }
-      
-      return await response.json();
-    }
-  },
-  clientId: process.env.CHATWORK_CLIENT_ID!,
-  clientSecret: process.env.CHATWORK_CLIENT_SECRET!,
-  profile(profile: any) {
-    return {
-      id: profile.account_id?.toString() || profile.id || 'unknown',
-      name: profile.name || 'ChatWork User',
-      email: `chatwork-${profile.account_id || 'unknown'}@linksense.local`,
-      image: profile.avatar_image_url || null,
-    }
-  },
-},
-*/
   ],
   
   session: {
@@ -168,10 +116,7 @@ export const authOptions: AuthOptions = {
     
     let userEmail = user.email;
     let userName = user.name || '';
-    
-    if (account.provider === 'chatwork' && user.email?.includes('linksense.local')) {
-      console.log('📧 ChatWork用メール処理');
-    }
+  
 
     console.log('👤 ユーザー保存中...', { email: userEmail });
     
@@ -398,8 +343,6 @@ function getTeamId(account: any, profile: any): string | null {
       return profile?.team?.id || account.team?.id || null;
     case 'azure-ad':
       return profile?.tid || null;
-    case 'chatwork':
-      return profile?.organization_id?.toString() || null;
     default:
       return null;
   }
@@ -414,8 +357,6 @@ function getTeamName(account: any, profile: any): string | null {
       return profile?.team?.name || account.team?.name || null;
     case 'azure-ad':
       return profile?.companyName || null;
-    case 'chatwork':
-      return profile?.organization_name || null;
     default:
       return null;
   }
