@@ -1081,6 +1081,7 @@ async function getGoogleUsersExtended(integration: any): Promise<UnifiedUser[]> 
 // Discord ユーザーデータ取得（フレンド含む）
 async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]> {
   try {
+    console.log('🔍 Discord統合開始 - 活動状況分析版');
     const allUsers: UnifiedUser[] = [];
 
     // 1. 現在のユーザー情報取得
@@ -1098,8 +1099,10 @@ async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]>
     const currentUser = await currentUserResponse.json();
     console.log('✅ Discord基本情報取得成功:', currentUser.username);
 
-    // 2. 参加サーバー一覧取得
+    // 2. 参加サーバー一覧取得（詳細情報付き）
     let guilds = [];
+    let guildDetails: Record<string, any> = {};
+    
     try {
       const guildsResponse = await fetch(`https://discord.com/api/v10/users/@me/guilds`, {
         headers: {
@@ -1111,6 +1114,56 @@ async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]>
       if (guildsResponse.ok) {
         guilds = await guildsResponse.json();
         console.log(`✅ Discord サーバー取得成功: ${guilds.length}個`);
+
+        // 各サーバーの詳細情報を取得
+        for (const guild of guilds) {
+          try {
+            // サーバーの基本情報
+            const guildInfoResponse = await fetch(`https://discord.com/api/v10/guilds/${guild.id}`, {
+              headers: {
+                'Authorization': `Bearer ${integration.accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            });
+
+            if (guildInfoResponse.ok) {
+              const guildInfo = await guildInfoResponse.json();
+              guildDetails[guild.id] = {
+                ...guild,
+                memberCount: guildInfo.approximate_member_count || 0,
+                presenceCount: guildInfo.approximate_presence_count || 0,
+                features: guildInfo.features || [],
+                createdAt: guildInfo.created_at,
+                description: guildInfo.description
+              };
+            } else {
+              guildDetails[guild.id] = guild;
+            }
+
+            // 自分のサーバー内での情報取得
+            try {
+              const memberResponse = await fetch(`https://discord.com/api/v10/guilds/${guild.id}/members/@me`, {
+                headers: {
+                  'Authorization': `Bearer ${integration.accessToken}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              if (memberResponse.ok) {
+                const memberInfo = await memberResponse.json();
+                guildDetails[guild.id].joinedAt = memberInfo.joined_at;
+                guildDetails[guild.id].roles = memberInfo.roles || [];
+                guildDetails[guild.id].nick = memberInfo.nick;
+              }
+            } catch (error) {
+              console.warn(`⚠️ サーバー ${guild.name} のメンバー情報取得失敗:`, error);
+            }
+
+          } catch (error) {
+            console.warn(`⚠️ サーバー ${guild.name} の詳細取得失敗:`, error);
+            guildDetails[guild.id] = guild;
+          }
+        }
       } else {
         console.warn(`⚠️ Discord サーバー取得失敗: ${guildsResponse.status}`);
       }
@@ -1160,45 +1213,171 @@ async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]>
         note: '本人アカウント',
         guildsCount: guilds.length,
         connectionsCount: connections.length,
-        availableScopes: 'identify email guilds connections'
+        availableScopes: 'identify email guilds connections',
+        discordId: currentUser.id,
+        discriminator: currentUser.discriminator
       }
     });
 
-    // 5. サーバー情報から推定されるチームメンバー（基本情報のみ）
+    // 5. サーバー情報の詳細分析（活動状況・非表示機能付き）
     if (guilds.length > 0) {
-      console.log('📊 参加サーバー分析:');
-      guilds.forEach((guild: any, index: number) => {
-        console.log(`  ${index + 1}. ${guild.name} (${guild.id})`);
+      console.log('📊 参加サーバー詳細分析:');
+      
+      const analyzedGuilds = Object.values(guildDetails).map((guild: any) => {
+        // 参加期間の計算
+        const joinDate = guild.joinedAt ? new Date(guild.joinedAt) : new Date();
+        const daysSinceJoin = Math.floor((Date.now() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // 活動スコアの計算
+        let activityScore = 30; // ベーススコア
+        
+        // 参加期間による加点
+        if (daysSinceJoin > 365) activityScore += 20; // 1年以上
+        else if (daysSinceJoin > 90) activityScore += 15; // 3ヶ月以上
+        else if (daysSinceJoin > 30) activityScore += 10; // 1ヶ月以上
+        else if (daysSinceJoin < 7) activityScore -= 10; // 1週間未満は減点
+        
+        // サーバーサイズによる加点
+        if (guild.memberCount > 1000) activityScore += 15; // 大規模サーバー
+        else if (guild.memberCount > 100) activityScore += 10; // 中規模サーバー
+        else if (guild.memberCount > 10) activityScore += 5; // 小規模サーバー
+        
+        // 権限による加点
+        const hasSpecialRoles = guild.roles && guild.roles.length > 1;
+        if (guild.owner) activityScore += 25; // オーナー
+        else if (hasSpecialRoles) activityScore += 15; // 特別なロール
+        
+        // ニックネーム設定による加点
+        if (guild.nick) activityScore += 5;
+        
+        // アクティブユーザー比率による加点
+        if (guild.presenceCount && guild.memberCount) {
+          const activeRatio = guild.presenceCount / guild.memberCount;
+          if (activeRatio > 0.3) activityScore += 10;
+          else if (activeRatio > 0.1) activityScore += 5;
+        }
+        
+        // コミュニケーションスコアの計算
+        let communicationScore = 40;
+        
+        // 参加期間とサーバーサイズの組み合わせ
+        if (daysSinceJoin > 30 && guild.memberCount > 50) {
+          communicationScore += 20;
+        } else if (daysSinceJoin > 7) {
+          communicationScore += 10;
+        }
+        
+        // 権限レベル
+        if (guild.owner) communicationScore += 30;
+        else if (hasSpecialRoles) communicationScore += 15;
+        
+        // 関係性強度の計算
+        let relationshipStrength = 20;
+        
+        if (guild.owner) relationshipStrength = 90; // オーナー
+        else if (hasSpecialRoles) relationshipStrength = 60; // 管理者・モデレーター
+        else if (daysSinceJoin > 365) relationshipStrength = 50; // 長期メンバー
+        else if (daysSinceJoin > 90) relationshipStrength = 40; // 中期メンバー
+        else if (daysSinceJoin > 30) relationshipStrength = 30; // 短期メンバー
+        
+        // サーバーサイズによる調整
+        if (guild.memberCount < 20) relationshipStrength += 10; // 小規模は親密度高
+        
+        // 非表示判定（非アクティブサーバー）
+        const isInactive = activityScore < 40 || 
+                          (daysSinceJoin < 7 && !guild.owner) || 
+                          (guild.memberCount < 5 && daysSinceJoin < 30);
+        
+        // 孤立リスク判定
+        const isolationRisk = determineIsolationRisk(activityScore, communicationScore);
+        
+        // 関係性タイプの決定
+        let relationshipType: 'teammate' | 'frequent_contact' = 'teammate';
+        if (guild.owner || (hasSpecialRoles && daysSinceJoin > 90)) {
+          relationshipType = 'frequent_contact';
+        }
+
+        return {
+          guild,
+          activityScore,
+          communicationScore,
+          relationshipStrength,
+          isolationRisk,
+          relationshipType,
+          daysSinceJoin,
+          isInactive,
+          analysis: {
+            participationLevel: guild.owner ? 'owner' : hasSpecialRoles ? 'moderator' : 'member',
+            serverSize: guild.memberCount > 1000 ? 'large' : guild.memberCount > 100 ? 'medium' : 'small',
+            engagementLevel: relationshipStrength > 60 ? 'high' : relationshipStrength > 40 ? 'medium' : 'low'
+          }
+        };
+      });
+
+      // アクティブなサーバーのみを表示（非表示機能）
+      const activeGuilds = analyzedGuilds.filter(g => !g.isInactive);
+      const inactiveGuilds = analyzedGuilds.filter(g => g.isInactive);
+      
+      console.log(`📊 アクティブサーバー: ${activeGuilds.length}個`);
+      console.log(`📊 非アクティブサーバー: ${inactiveGuilds.length}個（非表示）`);
+
+      // アクティブなサーバーをユーザーリストに追加
+      activeGuilds.forEach((analyzed, index) => {
+        const guild = analyzed.guild;
+        
+        console.log(`  ${index + 1}. ${guild.name} - 活動度: ${analyzed.activityScore}/100, 関係性: ${analyzed.relationshipStrength}/100`);
         
         allUsers.push({
           id: `guild-${guild.id}`,
-          name: `${guild.name} サーバー`,
+          name: `${guild.name}`,
           email: undefined,
           avatar: guild.icon ? 
             `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png` : 
             undefined,
           service: 'discord',
-          role: 'server',
-          department: 'Discord サーバー',
-          lastActivity: new Date().toISOString(),
+          role: analyzed.analysis.participationLevel,
+          department: `Discord ${analyzed.analysis.serverSize} サーバー`,
+          lastActivity: guild.joinedAt || new Date().toISOString(),
           isActive: true,
-          activityScore: 60,
-          communicationScore: 50,
-          isolationRisk: 'medium',
-          relationshipType: 'teammate',
-          relationshipStrength: 40,
+          activityScore: analyzed.activityScore,
+          communicationScore: analyzed.communicationScore,
+          isolationRisk: analyzed.isolationRisk,
+          relationshipType: analyzed.relationshipType,
+          relationshipStrength: analyzed.relationshipStrength,
           metadata: {
-            note: 'サーバー情報（メンバー詳細は権限不足のため取得不可）',
             guildId: guild.id,
             guildName: guild.name,
+            memberCount: guild.memberCount || 0,
+            presenceCount: guild.presenceCount || 0,
+            joinedAt: guild.joinedAt,
+            daysSinceJoin: analyzed.daysSinceJoin,
             isOwner: guild.owner || false,
-            permissions: guild.permissions
+            hasSpecialRoles: guild.roles && guild.roles.length > 1,
+            nickname: guild.nick,
+            permissions: guild.permissions,
+            features: guild.features,
+            description: guild.description,
+            participationLevel: analyzed.analysis.participationLevel,
+            serverSize: analyzed.analysis.serverSize,
+            engagementLevel: analyzed.analysis.engagementLevel,
+            activeRatio: guild.presenceCount && guild.memberCount ? 
+              (guild.presenceCount / guild.memberCount * 100).toFixed(1) + '%' : 'N/A'
           }
         });
       });
+
+      // 非アクティブサーバーの情報をログに出力（デバッグ用）
+      if (inactiveGuilds.length > 0) {
+        console.log('📋 非表示されたサーバー:');
+        inactiveGuilds.forEach((analyzed, index) => {
+          console.log(`  ${index + 1}. ${analyzed.guild.name} - 理由: 活動度低 (${analyzed.activityScore}/100)`);
+        });
+      }
     }
 
-    console.log(`✅ Discord 総取得数: ${allUsers.length}人 (本人: 1人, サーバー情報: ${guilds.length}個)`);
+    console.log(`✅ Discord 総取得数: ${allUsers.length}人 (本人: 1人, アクティブサーバー: ${allUsers.length - 1}個)`);
+    console.log(`📊 フィルタリング結果: ${guilds.length}個中${allUsers.length - 1}個を表示`);
+    
     return allUsers;
 
   } catch (error) {
@@ -1227,7 +1406,6 @@ async function getDiscordUsersExtended(integration: any): Promise<UnifiedUser[]>
     }];
   }
 }
-
 // ChatWork ユーザーデータ取得（ルーム参加者・頻繁な連絡先含む）
 async function getChatWorkUsersExtended(integration: any): Promise<UnifiedUser[]> {
   try {
