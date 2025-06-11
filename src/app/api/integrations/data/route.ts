@@ -608,9 +608,22 @@ async function getSlackUsersExtended(integration: any): Promise<UnifiedUser[]> {
 // Microsoft Teams/Azure ADユーザーデータ取得（チャット相手・会議参加者含む）
 async function getTeamsUsersExtended(integration: any): Promise<UnifiedUser[]> {
   try {
+    console.log('🔍 Teams統合開始 - トークン長:', integration.accessToken?.length || 0);
+    
     const allUsers: UnifiedUser[] = [];
 
-    // 1. 現在のユーザー情報で権限確認
+    // 1. アクセストークンの詳細確認
+    if (!integration.accessToken) {
+      throw new Error('Teams アクセストークンが存在しません');
+    }
+
+    if (integration.accessToken.length < 50) {
+      throw new Error(`Teams アクセストークンが短すぎます（長さ: ${integration.accessToken.length}）`);
+    }
+
+    console.log('✅ Teams アクセストークン確認完了 - 長さ:', integration.accessToken.length);
+
+    // 2. 現在のユーザー情報で権限確認
     const meResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
       headers: {
         'Authorization': `Bearer ${integration.accessToken}`,
@@ -618,97 +631,20 @@ async function getTeamsUsersExtended(integration: any): Promise<UnifiedUser[]> {
       }
     });
 
+    console.log('🔍 Teams /me API レスポンス:', meResponse.status);
+
     if (!meResponse.ok) {
-      throw new Error(`Teams認証エラー: ${meResponse.status} - アクセストークンが無効です`);
+      const errorText = await meResponse.text();
+      console.error('❌ Teams /me API エラー:', errorText);
+      throw new Error(`Teams認証エラー: ${meResponse.status} - ${errorText}`);
     }
 
     const currentUser = await meResponse.json();
+    console.log('✅ Teams 現在ユーザー取得成功:', currentUser.displayName);
 
-    // 2. チャット履歴取得（個人チャット相手）
-    const chatsResponse = await fetch('https://graph.microsoft.com/v1.0/me/chats', {
-      headers: {
-        'Authorization': `Bearer ${integration.accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const chatFrequency: Record<string, number> = {};
-    const chatUsers = new Set<string>();
-    const lastChatInteraction: Record<string, string> = {};
-
-    if (chatsResponse.ok) {
-      const chatsData = await chatsResponse.json();
-      
-      for (const chat of chatsData.value || []) {
-        if (chat.chatType === 'oneOnOne') {
-          // チャットメンバー取得
-          try {
-            const membersResponse = await fetch(`https://graph.microsoft.com/v1.0/me/chats/${chat.id}/members`, {
-              headers: {
-                'Authorization': `Bearer ${integration.accessToken}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            if (membersResponse.ok) {
-              const members = await membersResponse.json();
-              const otherMember = members.value?.find((m: any) => m.userId !== currentUser.id);
-              
-              if (otherMember) {
-                chatUsers.add(otherMember.userId);
-                
-                // チャットメッセージ数取得
-                const messagesResponse = await fetch(`https://graph.microsoft.com/v1.0/me/chats/${chat.id}/messages?$top=50`, {
-                  headers: {
-                    'Authorization': `Bearer ${integration.accessToken}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                
-                if (messagesResponse.ok) {
-                  const messages = await messagesResponse.json();
-                  chatFrequency[otherMember.userId] = messages.value?.length || 0;
-                  
-                  if (messages.value && messages.value.length > 0) {
-                    lastChatInteraction[otherMember.userId] = messages.value[0].createdDateTime;
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            // チャット詳細取得エラーは無視
-          }
-        }
-      }
-    }
-
-    // 3. 最近の会議参加者取得
-    const eventsResponse = await fetch('https://graph.microsoft.com/v1.0/me/events?$top=20&$select=id,subject,attendees,start,end', {
-      headers: {
-        'Authorization': `Bearer ${integration.accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const meetingFrequency: Record<string, number> = {};
-    const meetingUsers = new Set<string>();
-
-    if (eventsResponse.ok) {
-      const events = await eventsResponse.json();
-      
-      for (const event of events.value || []) {
-        if (event.attendees) {
-          for (const attendee of event.attendees) {
-            if (attendee.emailAddress && attendee.emailAddress.address !== currentUser.userPrincipalName) {
-              meetingUsers.add(attendee.emailAddress.address);
-              meetingFrequency[attendee.emailAddress.address] = (meetingFrequency[attendee.emailAddress.address] || 0) + 1;
-            }
-          }
-        }
-      }
-    }
-
-    // 4. 組織ユーザー一覧取得
+    // 3. 組織ユーザー一覧取得（詳細ログ付き）
+    console.log('🔍 Teams 組織ユーザー取得開始...');
+    
     const usersResponse = await fetch('https://graph.microsoft.com/v1.0/users?$top=999&$select=id,displayName,userPrincipalName,mail,department,jobTitle,officeLocation,accountEnabled,createdDateTime,lastSignInDateTime,userType', {
       headers: {
         'Authorization': `Bearer ${integration.accessToken}`,
@@ -716,7 +652,12 @@ async function getTeamsUsersExtended(integration: any): Promise<UnifiedUser[]> {
       }
     });
 
+    console.log('🔍 Teams /users API レスポンス:', usersResponse.status);
+
     if (!usersResponse.ok) {
+      const errorText = await usersResponse.text();
+      console.error('❌ Teams /users API エラー:', errorText);
+      
       // 管理者権限がない場合、現在のユーザーのみ取得
       console.warn(`Teams ユーザー一覧取得失敗: ${usersResponse.status}. 現在のユーザーのみ取得します`);
       
@@ -737,32 +678,99 @@ async function getTeamsUsersExtended(integration: any): Promise<UnifiedUser[]> {
         relationshipStrength: 100,
         metadata: {
           workingHours: currentUser.officeLocation,
-          note: '管理者権限がないため、個人情報のみ取得'
+          note: '管理者権限がないため、個人情報のみ取得',
+          tokenLength: integration.accessToken.length,
+          permissions: 'User.Read のみ'
         }
       }];
     }
 
     const usersData = await usersResponse.json();
+    console.log('✅ Teams 組織ユーザー取得成功 - 人数:', usersData.value?.length || 0);
 
-    // 5. ユーザーデータ統合
-    const organizationUsers = await Promise.allSettled(
-      usersData.value.map(async (user: any) => {
-        // プロフィール写真取得
-        let photoUrl;
-        try {
-          const photoResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${user.id}/photo/$value`, {
-            headers: {
-              'Authorization': `Bearer ${integration.accessToken}`
+    // 4. チャット履歴取得（個人チャット相手）
+    console.log('🔍 Teams チャット履歴取得開始...');
+    
+    const chatsResponse = await fetch('https://graph.microsoft.com/v1.0/me/chats', {
+      headers: {
+        'Authorization': `Bearer ${integration.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const chatFrequency: Record<string, number> = {};
+    const chatUsers = new Set<string>();
+    const lastChatInteraction: Record<string, string> = {};
+
+    if (chatsResponse.ok) {
+      const chatsData = await chatsResponse.json();
+      console.log('✅ Teams チャット取得成功 - 件数:', chatsData.value?.length || 0);
+      
+      for (const chat of (chatsData.value || []).slice(0, 20)) { // 最初の20件のみ
+        if (chat.chatType === 'oneOnOne') {
+          try {
+            const membersResponse = await fetch(`https://graph.microsoft.com/v1.0/me/chats/${chat.id}/members`, {
+              headers: {
+                'Authorization': `Bearer ${integration.accessToken}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (membersResponse.ok) {
+              const members = await membersResponse.json();
+              const otherMember = members.value?.find((m: any) => m.userId !== currentUser.id);
+              
+              if (otherMember) {
+                chatUsers.add(otherMember.userId);
+                chatFrequency[otherMember.userId] = (chatFrequency[otherMember.userId] || 0) + 1;
+              }
             }
-          });
-          if (photoResponse.ok) {
-            const photoBlob = await photoResponse.blob();
-            photoUrl = URL.createObjectURL(photoBlob);
+          } catch (error) {
+            console.warn('チャット詳細取得エラー:', error);
           }
-        } catch (photoError) {
-          // 写真取得エラーは無視
         }
+      }
+    } else {
+      console.warn('Teams チャット取得失敗:', chatsResponse.status);
+    }
 
+    // 5. 最近の会議参加者取得
+    console.log('🔍 Teams 会議情報取得開始...');
+    
+    const eventsResponse = await fetch('https://graph.microsoft.com/v1.0/me/events?$top=20&$select=id,subject,attendees,start,end', {
+      headers: {
+        'Authorization': `Bearer ${integration.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const meetingFrequency: Record<string, number> = {};
+    const meetingUsers = new Set<string>();
+
+    if (eventsResponse.ok) {
+      const events = await eventsResponse.json();
+      console.log('✅ Teams 会議取得成功 - 件数:', events.value?.length || 0);
+      
+      for (const event of events.value || []) {
+        if (event.attendees) {
+          for (const attendee of event.attendees) {
+            if (attendee.emailAddress && attendee.emailAddress.address !== currentUser.userPrincipalName) {
+              meetingUsers.add(attendee.emailAddress.address);
+              meetingFrequency[attendee.emailAddress.address] = (meetingFrequency[attendee.emailAddress.address] || 0) + 1;
+            }
+          }
+        }
+      }
+    } else {
+      console.warn('Teams 会議取得失敗:', eventsResponse.status);
+    }
+
+    // 6. ユーザーデータ統合
+    console.log('🔍 Teams ユーザーデータ統合開始...');
+    
+    const organizationUsers = (usersData.value || [])
+      .filter((user: any) => user.accountEnabled)
+      .map((user: any) => {
         const activityScore = calculateTeamsActivityScore(user);
         const hasChat = chatUsers.has(user.id);
         const hasMeeting = meetingUsers.has(user.userPrincipalName || user.mail);
@@ -797,7 +805,7 @@ async function getTeamsUsersExtended(integration: any): Promise<UnifiedUser[]> {
           id: user.id,
           name: user.displayName || '名前未設定',
           email: user.userPrincipalName || user.mail,
-          avatar: photoUrl,
+          avatar: undefined, // プロフィール写真は後で取得
           service: 'teams',
           role: user.userType === 'Guest' ? 'guest' : 'member',
           department: user.department || user.jobTitle || '未設定',
@@ -815,23 +823,27 @@ async function getTeamsUsersExtended(integration: any): Promise<UnifiedUser[]> {
             chatFrequency: chatCount,
             meetingFrequency: meetingCount,
             interactionScore: communicationScore,
-            lastInteraction: lastChatInteraction[user.id]
+            lastInteraction: lastChatInteraction[user.id],
+            tokenLength: integration.accessToken.length,
+            permissions: 'User.Read.All, Directory.Read.All'
           }
         };
-      })
-    );
+      });
 
-    const validUsers = organizationUsers
-      .filter(result => result.status === 'fulfilled')
-      .map(result => (result as PromiseFulfilledResult<UnifiedUser>).value);
-
-    allUsers.push(...validUsers);
+    allUsers.push(...organizationUsers);
 
     console.log(`✅ Teams 総取得数: ${allUsers.length}人 (頻繁な連絡先: ${allUsers.filter(u => u.relationshipType === 'frequent_contact').length}人)`);
+    console.log('🔍 Teams 統合完了 - アクセストークン長:', integration.accessToken.length);
+    
     return allUsers;
 
   } catch (error) {
     console.error('❌ Teams データ取得エラー:', error);
+    console.error('🔍 Teams エラー詳細:', {
+      hasToken: !!integration.accessToken,
+      tokenLength: integration.accessToken?.length || 0,
+      service: integration.service
+    });
     throw error;
   }
 }

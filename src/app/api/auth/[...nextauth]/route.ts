@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server'
 import NextAuth, { AuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
-import SlackProvider from 'next-auth/providers/slack'
 import DiscordProvider from 'next-auth/providers/discord'
 import AzureADProvider from 'next-auth/providers/azure-ad'
 import { PrismaClient } from '@prisma/client'
 
-console.log('🚀 LinkSense MVP - 完全再構築版')
+console.log('🚀 LinkSense MVP - Slack統合完全修正版')
 
 const prisma = new PrismaClient()
 
@@ -20,24 +19,114 @@ interface ExtendedProfile {
   hd?: string;
   guild?: { id: string; name: string };
   team?: { id: string; name: string };
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    image_192?: string;
+  };
 }
 
 export const authOptions: AuthOptions = {
   providers: [
-    // 🔧 Slack設定の完全修正
-    SlackProvider({
-  clientId: process.env.SLACK_CLIENT_ID!,
-  clientSecret: process.env.SLACK_CLIENT_SECRET!,
-  authorization: {
-    url: 'https://slack.com/oauth/v2/authorize',
-    params: {
-      scope: 'identify users:read users:read.email',
-      user_scope: 'identify users:read users:read.email'
-    }
-  },
-  token: 'https://slack.com/api/oauth.v2.access',
-  userinfo: 'https://slack.com/api/users.identity'
-}),
+    // 🔧 Slack カスタムプロバイダー（型修正版）
+    {
+      id: 'slack',
+      name: 'Slack',
+      type: 'oauth',
+      authorization: {
+        url: 'https://slack.com/oauth/v2/authorize',
+        params: {
+          scope: '', // Bot Token用は空
+          user_scope: 'identity.basic,identity.email,identity.avatar', // User Token用のみ
+          response_type: 'code'
+        }
+      },
+      token: {
+        url: 'https://slack.com/api/oauth.v2.access',
+        async request({ params, provider }) {
+          console.log('🔍 Slack Token Request:', { code: params.code });
+          
+          const response = await fetch('https://slack.com/api/oauth.v2.access', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              client_id: process.env.SLACK_CLIENT_ID!,
+              client_secret: process.env.SLACK_CLIENT_SECRET!,
+              code: params.code!,
+              redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/slack`
+            })
+          });
+          
+          const tokens = await response.json();
+          console.log('🔍 Slack Token Response:', {
+            ok: tokens.ok,
+            hasUserToken: !!tokens.authed_user?.access_token,
+            error: tokens.error
+          });
+          
+          if (!tokens.ok) {
+            throw new Error(`Slack OAuth error: ${tokens.error}`);
+          }
+          
+          return {
+            tokens: {
+              access_token: tokens.authed_user?.access_token,
+              token_type: 'bearer',
+              scope: tokens.authed_user?.scope,
+              team_id: tokens.team?.id,
+              team_name: tokens.team?.name
+            }
+          };
+        }
+      },
+      userinfo: {
+        url: 'https://slack.com/api/users.identity',
+        async request({ tokens }) {
+          console.log('🔍 Slack User Info Request:', { hasToken: !!tokens.access_token });
+          
+          const response = await fetch('https://slack.com/api/users.identity', {
+            headers: {
+              'Authorization': `Bearer ${tokens.access_token}`,
+            }
+          });
+          
+          const user = await response.json();
+          console.log('🔍 Slack User Info Response:', {
+            ok: user.ok,
+            hasUser: !!user.user,
+            error: user.error
+          });
+          
+          if (!user.ok) {
+            throw new Error(`Slack user info error: ${user.error}`);
+          }
+          
+          return {
+            id: user.user?.id,
+            name: user.user?.name,
+            email: user.user?.email,
+            image: user.user?.image_192,
+            team: {
+              id: user.team?.id,
+              name: user.team?.name
+            }
+          };
+        }
+      },
+      profile(profile) {
+        return {
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          image: profile.image
+        };
+      },
+      clientId: process.env.SLACK_CLIENT_ID!,
+      clientSecret: process.env.SLACK_CLIENT_SECRET!
+    },
 
     // 🔧 Discord設定の分離
     DiscordProvider({
@@ -63,14 +152,14 @@ export const authOptions: AuthOptions = {
       },
     }),
     
-    // 🔧 Azure AD設定の分離
+    // 🔧 Azure AD設定の修正（スコープ拡張）
     AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
       tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
       authorization: {
         params: {
-          scope: 'openid profile email User.Read User.Read.All',
+          scope: 'openid profile email User.Read User.Read.All Directory.Read.All People.Read.All TeamMember.Read.All',
           prompt: 'consent'
         }
       }
@@ -84,13 +173,40 @@ export const authOptions: AuthOptions = {
   
   debug: process.env.NODE_ENV === 'development',
   
-  callbacks: {
-    // 🆕 完全に分離されたsignInコールバック
+  // 🆕 ログ機能強化
+  logger: {
+    error(code, metadata) {
+      console.error('🚨 NextAuth Error:', code, metadata);
+    },
+    warn(code) {
+      console.warn('⚠️ NextAuth Warning:', code);
+    },
+    debug(code, metadata) {
+      console.log('🔍 NextAuth Debug:', code, metadata);
+    }
+  },
+  
+  // 🆕 イベントログ追加
+  events: {
     async signIn({ user, account, profile }) {
-      console.log('🔄 分離版signIn開始:', {
+      console.log('🔍 SignIn Event:', { 
+        provider: account?.provider,
+        userId: user.id,
+        hasAccessToken: !!account?.access_token,
+        tokenLength: account?.access_token?.length || 0,
+        scope: account?.scope
+      });
+    }
+  },
+  
+  callbacks: {
+    // 🆕 完全に修正されたsignInコールバック
+    async signIn({ user, account, profile }) {
+      console.log('🔄 修正版signIn開始:', {
         provider: account?.provider,
         email: user?.email,
         hasAccessToken: !!account?.access_token,
+        tokenLength: account?.access_token?.length || 0,
         timestamp: new Date().toISOString()
       });
       
@@ -106,7 +222,10 @@ export const authOptions: AuthOptions = {
       }
       
       if (!account.access_token) {
-        console.error('❌ アクセストークンが取得できません');
+        console.error('❌ アクセストークンが取得できません:', {
+          provider: account.provider,
+          accountKeys: Object.keys(account)
+        });
         return false;
       }
       
@@ -145,10 +264,30 @@ export const authOptions: AuthOptions = {
         const teamId = getTeamId(account, extendedProfile);
         const teamName = getTeamName(account, extendedProfile);
 
+        // 🔧 Teams専用のトークン保存強化
+        let finalAccessToken = account.access_token;
+        let finalRefreshToken = account.refresh_token || '';
+        let finalScope = account.scope || '';
+
+        if (account.provider === 'azure-ad') {
+          console.log('🔍 Teams Token Details:', {
+            access_token_length: account.access_token?.length || 0,
+            refresh_token_present: !!account.refresh_token,
+            expires_at: account.expires_at,
+            scope_length: account.scope?.length || 0
+          });
+
+          // トークンの詳細検証
+          if (!account.access_token || account.access_token.length < 50) {
+            console.error('❌ Teams アクセストークンが無効です');
+            return false;
+          }
+        }
+
         const integrationData = {
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token || '',
-          scope: account.scope || '',
+          accessToken: finalAccessToken,
+          refreshToken: finalRefreshToken,
+          scope: finalScope,
           tokenType: account.token_type || 'Bearer',
           isActive: true,
           updatedAt: new Date(),
@@ -159,10 +298,11 @@ export const authOptions: AuthOptions = {
         console.log(`💾 ${account.provider} 統合データ保存:`, {
           hasToken: !!integrationData.accessToken,
           tokenLength: integrationData.accessToken.length,
-          scope: integrationData.scope
+          scope: integrationData.scope,
+          hasRefreshToken: !!integrationData.refreshToken
         });
 
-        // 🆕 プロバイダー専用の統合処理
+        // 🆕 プロバイダー専用の統合処理（エラーハンドリング強化）
         const integration = await prisma.integration.upsert({
           where: {
             userId_service: {
@@ -182,14 +322,31 @@ export const authOptions: AuthOptions = {
         console.log(`✅ ${account.provider} 統合完了:`, {
           id: integration.id,
           service: integration.service,
-          hasToken: !!integration.accessToken
+          hasToken: !!integration.accessToken,
+          tokenLength: integration.accessToken.length
+        });
+
+        // 🆕 保存後の検証
+        const savedIntegration = await prisma.integration.findUnique({
+          where: {
+            userId_service: {
+              userId: userData.id,
+              service: account.provider,
+            },
+          },
+        });
+
+        console.log(`🔍 ${account.provider} 保存確認:`, {
+          found: !!savedIntegration,
+          hasToken: !!savedIntegration?.accessToken,
+          tokenLength: savedIntegration?.accessToken?.length || 0
         });
         
         return true;
         
       } catch (error) {
         console.error(`❌ ${account.provider} 統合エラー:`, error);
-        return false; // 🆕 エラー時は認証を拒否
+        return false;
       }
     },
     
@@ -208,7 +365,8 @@ export const authOptions: AuthOptions = {
       if (account && user) {
         console.log('🔑 JWT生成:', {
           provider: account.provider,
-          user: user.email
+          user: user.email,
+          hasAccessToken: !!account.access_token
         });
         
         if (user.email) {
@@ -226,6 +384,7 @@ export const authOptions: AuthOptions = {
         
         token.provider = account.provider;
         token.scope = account.scope;
+        token.accessToken = account.access_token; // JWTにもトークンを保存
       }
       return token;
     },
@@ -249,13 +408,13 @@ export const authOptions: AuthOptions = {
   },
 }
 
-// ヘルパー関数
+// ヘルパー関数（修正版）
 function getTeamId(account: any, profile: ExtendedProfile): string | null {
   switch (account.provider) {
     case 'discord':
       return profile?.guild?.id || null;
     case 'slack':
-      return profile?.team?.id || null;
+      return (account as any)?.team_id || profile?.team?.id || null;
     case 'azure-ad':
       return profile?.tid || null;
     default:
@@ -268,7 +427,7 @@ function getTeamName(account: any, profile: ExtendedProfile): string | null {
     case 'discord':
       return profile?.guild?.name || null;
     case 'slack':
-      return profile?.team?.name || null;
+      return (account as any)?.team_name || profile?.team?.name || null;
     case 'azure-ad':
       return profile?.companyName || profile?.organizationName || null;
     case 'google':

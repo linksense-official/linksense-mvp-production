@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 統合データ取得API開始');
+    console.log('🔍 統合データ取得API開始 - 詳細デバッグ版');
 
     // 認証確認（authOptionsを正しく渡す）
     const session = await getServerSession(authOptions);
@@ -58,13 +58,93 @@ export async function GET(request: NextRequest) {
         isActive: true,
         createdAt: true,
         updatedAt: true,
-        scope: true,        // 🆕 スコープ情報を追加
-        tokenType: true,    // 🆕 トークンタイプを追加
+        scope: true,        
+        tokenType: true,    
       },
       orderBy: {
         updatedAt: 'desc',
       },
     });
+
+    // 🆕 Teams統合の詳細分析
+    const teamsIntegrations = userIntegrations.filter(i => i.service === 'azure-ad' || i.service === 'teams');
+    
+    console.log('🔍 Teams統合詳細分析:', {
+      count: teamsIntegrations.length,
+      details: teamsIntegrations.map(integration => ({
+        id: integration.id,
+        service: integration.service,
+        isActive: integration.isActive,
+        hasAccessToken: !!integration.accessToken,
+        accessTokenLength: integration.accessToken?.length || 0,
+        accessTokenPreview: integration.accessToken ? 
+          `${integration.accessToken.substring(0, 20)}...${integration.accessToken.substring(integration.accessToken.length - 10)}` : 
+          'なし',
+        hasRefreshToken: !!integration.refreshToken,
+        refreshTokenLength: integration.refreshToken?.length || 0,
+        scope: integration.scope,
+        scopeLength: integration.scope?.length || 0,
+        tokenType: integration.tokenType,
+        teamId: integration.teamId,
+        teamName: integration.teamName,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
+        timeSinceUpdate: Date.now() - integration.updatedAt.getTime()
+      }))
+    });
+
+    // 🆕 アクセストークンの健全性チェック
+    const tokenHealthCheck = userIntegrations.map(integration => {
+      const health = {
+        service: integration.service,
+        isHealthy: true,
+        issues: [] as string[],
+        recommendations: [] as string[]
+      };
+
+      // トークンの存在チェック
+      if (!integration.accessToken) {
+        health.isHealthy = false;
+        health.issues.push('アクセストークンが存在しません');
+        health.recommendations.push('再認証が必要です');
+      } else if (integration.accessToken.length < 50) {
+        health.isHealthy = false;
+        health.issues.push(`アクセストークンが短すぎます（${integration.accessToken.length}文字）`);
+        health.recommendations.push('トークンが破損している可能性があります');
+      }
+
+      // Teamsの特別チェック
+      if ((integration.service === 'azure-ad' || integration.service === 'teams')) {
+        if (!integration.scope) {
+          health.isHealthy = false;
+          health.issues.push('スコープ情報が存在しません');
+          health.recommendations.push('権限設定を確認してください');
+        } else {
+          const requiredScopes = ['User.Read', 'User.Read.All'];
+          const hasRequiredScopes = requiredScopes.some(scope => 
+            integration.scope!.includes(scope)
+          );
+          
+          if (!hasRequiredScopes) {
+            health.isHealthy = false;
+            health.issues.push('必要な権限が不足しています');
+            health.recommendations.push('管理者権限の再取得が必要です');
+          }
+        }
+
+        // トークンの有効期限推定
+        const tokenAge = Date.now() - integration.updatedAt.getTime();
+        const oneHour = 60 * 60 * 1000;
+        if (tokenAge > oneHour) {
+          health.issues.push(`トークンが古い可能性があります（${Math.round(tokenAge / oneHour)}時間前）`);
+          health.recommendations.push('トークンの更新を確認してください');
+        }
+      }
+
+      return health;
+    });
+
+    console.log('🔍 トークン健全性チェック結果:', tokenHealthCheck);
 
     console.log('📊 データベースから取得した統合情報（詳細）:', {
       count: userIntegrations.length,
@@ -96,7 +176,7 @@ export async function GET(request: NextRequest) {
     // フロントエンド用にデータ形式を変換（ダッシュボードの期待形式に合わせる）
     const formattedIntegrations = userIntegrations.map(integration => ({
       id: integration.id,
-      service: integration.service, // 統合ページで期待されるフィールド名
+      service: integration.service, 
       isActive: integration.isActive,
       createdAt: integration.createdAt.toISOString(),
       updatedAt: integration.updatedAt.toISOString(),
@@ -104,25 +184,37 @@ export async function GET(request: NextRequest) {
       teamId: integration.teamId,
       teamName: integration.teamName,
       hasToken: !!integration.accessToken,
+      tokenLength: integration.accessToken?.length || 0, // 🆕 トークン長を追加
       hasRefreshToken: !!integration.refreshToken,
       scope: integration.scope,
       tokenType: integration.tokenType,
       // 🆕 権限情報の推定
       hasAdminPermission: integration.scope?.includes('User.Read.All') || 
                          integration.scope?.includes('admin.directory.user.readonly') || 
-                         false
+                         false,
+      // 🆕 健全性情報
+      isHealthy: tokenHealthCheck.find(h => h.service === integration.service)?.isHealthy || false,
+      healthIssues: tokenHealthCheck.find(h => h.service === integration.service)?.issues || [],
+      recommendations: tokenHealthCheck.find(h => h.service === integration.service)?.recommendations || []
     }));
 
     // 統計情報計算
     const activeIntegrations = formattedIntegrations.filter(i => i.isActive);
+    const healthyIntegrations = formattedIntegrations.filter(i => i.isHealthy);
+    
     const stats = {
       total: formattedIntegrations.length,
       active: activeIntegrations.length,
       inactive: formattedIntegrations.length - activeIntegrations.length,
+      healthy: healthyIntegrations.length,
+      unhealthy: formattedIntegrations.length - healthyIntegrations.length,
       services: formattedIntegrations.map(i => i.service),
       lastUpdated: formattedIntegrations.length > 0 
         ? Math.max(...formattedIntegrations.map(i => new Date(i.updatedAt).getTime()))
-        : Date.now()
+        : Date.now(),
+      // 🆕 Teams統合の特別統計
+      teamsIntegrationCount: teamsIntegrations.length,
+      teamsWithValidTokens: teamsIntegrations.filter(t => t.accessToken && t.accessToken.length > 50).length
     };
 
     console.log('✅ 最終レスポンス準備完了:', {
@@ -133,8 +225,11 @@ export async function GET(request: NextRequest) {
         service: i.service, 
         isActive: i.isActive,
         hasToken: i.hasToken,
+        tokenLength: i.tokenLength,
         teamName: i.teamName,
-        hasAdminPermission: i.hasAdminPermission
+        hasAdminPermission: i.hasAdminPermission,
+        isHealthy: i.isHealthy,
+        healthIssues: i.healthIssues
       }))
     });
 
@@ -153,7 +248,24 @@ export async function GET(request: NextRequest) {
         rawCount: userIntegrations.length,
         formattedCount: formattedIntegrations.length,
         servicesWithTokens: formattedIntegrations.filter(i => i.hasToken).map(i => i.service),
-        servicesWithAdminPermission: formattedIntegrations.filter(i => i.hasAdminPermission).map(i => i.service)
+        servicesWithAdminPermission: formattedIntegrations.filter(i => i.hasAdminPermission).map(i => i.service),
+        // 🆕 Teams統合の詳細デバッグ情報
+        teamsDebug: {
+          count: teamsIntegrations.length,
+          services: teamsIntegrations.map(t => t.service),
+          tokenLengths: teamsIntegrations.map(t => t.accessToken?.length || 0),
+          scopes: teamsIntegrations.map(t => t.scope),
+          lastUpdated: teamsIntegrations.map(t => t.updatedAt)
+        },
+        tokenHealthSummary: {
+          total: tokenHealthCheck.length,
+          healthy: tokenHealthCheck.filter(h => h.isHealthy).length,
+          issues: tokenHealthCheck.filter(h => !h.isHealthy).map(h => ({
+            service: h.service,
+            issues: h.issues,
+            recommendations: h.recommendations
+          }))
+        }
       },
       timestamp: new Date().toISOString()
     };
@@ -191,7 +303,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
 export async function POST(request: NextRequest) {
   try {
     console.log('🔄 統合情報更新API開始');
