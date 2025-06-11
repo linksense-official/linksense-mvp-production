@@ -26,15 +26,18 @@ export const authOptions: AuthOptions = {
   providers: [
     // 🔧 Slack設定の完全修正
     SlackProvider({
-      clientId: process.env.SLACK_CLIENT_ID!,
-      clientSecret: process.env.SLACK_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          // 最小限のスコープから開始
-          scope: 'identify users:read users:read.email',
-        }
-      }
-    }),
+  clientId: process.env.SLACK_CLIENT_ID!,
+  clientSecret: process.env.SLACK_CLIENT_SECRET!,
+  authorization: {
+    url: 'https://slack.com/oauth/v2/authorize',
+    params: {
+      scope: 'identify users:read users:read.email',
+      user_scope: 'identify users:read users:read.email'
+    }
+  },
+  token: 'https://slack.com/api/oauth.v2.access',
+  userinfo: 'https://slack.com/api/users.identity'
+}),
 
     // 🔧 Discord設定の分離
     DiscordProvider({
