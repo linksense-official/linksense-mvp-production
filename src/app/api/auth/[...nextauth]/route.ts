@@ -302,69 +302,81 @@ export const authOptions: AuthOptions = {
     }
 
     const integrationData = {
-      accessToken: finalAccessToken,
-      refreshToken: finalRefreshToken,
-      scope: finalScope,
-      tokenType: account.token_type || 'Bearer',
-      isActive: true,
-      updatedAt: new Date(),
-      teamId,
-      teamName,
-    };
+  accessToken: finalAccessToken,
+  refreshToken: finalRefreshToken || null,  // 🔧 空文字列ではなくnull
+  scope: finalScope || null,                // 🔧 空文字列ではなくnull
+  tokenType: account.token_type || 'Bearer',
+  isActive: true,
+  updatedAt: new Date(),
+  teamId: teamId || null,                   // 🔧 undefinedではなくnull
+  teamName: teamName || null,               // 🔧 undefinedではなくnull
+};
 
-    console.log(`💾 ${account.provider} → ${normalizedServiceName} 統合データ保存:`, {
-      hasToken: !!integrationData.accessToken,
-      tokenLength: integrationData.accessToken.length,
-      scope: integrationData.scope,
-      hasRefreshToken: !!integrationData.refreshToken
-    });
+console.log(`💾 ${account.provider} → ${normalizedServiceName} 統合データ保存確認:`, {
+  hasAccessToken: !!integrationData.accessToken,
+  accessTokenLength: integrationData.accessToken?.length || 0,
+  hasRefreshToken: !!integrationData.refreshToken,
+  scope: integrationData.scope,
+  tokenType: integrationData.tokenType,
+  isActive: integrationData.isActive
+});
 
-    // 🆕 プロバイダー専用の統合処理（サービス名正規化版）
-    const integration = await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: userData.id,
-          service: normalizedServiceName,  // 正規化されたサービス名を使用
-        },
-      },
-      update: integrationData,
-      create: {
-        userId: userData.id,
-        service: normalizedServiceName,  // 正規化されたサービス名を使用
-        ...integrationData,
-        createdAt: new Date(),
-      },
-    });
+// 🆕 トークン検証を強化
+if (!integrationData.accessToken || integrationData.accessToken.length < 10) {
+  console.error(`❌ ${normalizedServiceName} アクセストークンが無効:`, {
+    token: integrationData.accessToken,
+    length: integrationData.accessToken?.length || 0,
+    provider: account.provider
+  });
+  return false;
+}
 
-    console.log(`✅ ${account.provider} → ${normalizedServiceName} 統合完了:`, {
-      id: integration.id,
-      service: integration.service,
-      hasToken: !!integration.accessToken,
-      tokenLength: integration.accessToken.length
-    });
+// 🆕 プロバイダー専用の統合処理（サービス名正規化版）
+const integration = await prisma.integration.upsert({
+  where: {
+    userId_service: {
+      userId: userData.id,
+      service: normalizedServiceName,  // 正規化されたサービス名を使用
+    },
+  },
+  update: integrationData,
+  create: {
+    userId: userData.id,
+    service: normalizedServiceName,  // 正規化されたサービス名を使用
+    ...integrationData,
+    createdAt: new Date(),
+  },
+});
 
-    // 🆕 保存後の検証
-    const savedIntegration = await prisma.integration.findUnique({
-      where: {
-        userId_service: {
-          userId: userData.id,
-          service: normalizedServiceName,  // 正規化されたサービス名を使用
-        },
-      },
-    });
+console.log(`✅ ${account.provider} → ${normalizedServiceName} 統合完了:`, {
+  id: integration.id,
+  service: integration.service,
+  hasToken: !!integration.accessToken,
+  tokenLength: integration.accessToken?.length || 0
+});
 
-    console.log(`🔍 ${normalizedServiceName} 保存確認:`, {
-      found: !!savedIntegration,
-      hasToken: !!savedIntegration?.accessToken,
-      tokenLength: savedIntegration?.accessToken?.length || 0
-    });
-    
-    return true;
-    
-  } catch (error) {
-    console.error(`❌ ${account.provider} 統合エラー:`, error);
-    return false;
-  }
+// 🆕 保存後の検証
+const savedIntegration = await prisma.integration.findUnique({
+  where: {
+    userId_service: {
+      userId: userData.id,
+      service: normalizedServiceName,  // 正規化されたサービス名を使用
+    },
+  },
+});
+
+console.log(`🔍 ${normalizedServiceName} 保存確認:`, {
+  found: !!savedIntegration,
+  hasToken: !!savedIntegration?.accessToken,
+  tokenLength: savedIntegration?.accessToken?.length || 0
+});
+
+return true;
+
+} catch (error) {
+console.error(`❌ ${account.provider} 統合エラー:`, error);
+return false;
+}
 },
     
     async redirect({ url, baseUrl }) {
