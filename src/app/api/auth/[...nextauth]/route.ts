@@ -202,153 +202,170 @@ export const authOptions: AuthOptions = {
   callbacks: {
     // 🆕 完全に修正されたsignInコールバック
     async signIn({ user, account, profile }) {
-      console.log('🔄 修正版signIn開始:', {
-        provider: account?.provider,
-        email: user?.email,
-        hasAccessToken: !!account?.access_token,
-        tokenLength: account?.access_token?.length || 0,
-        timestamp: new Date().toISOString()
+  console.log('🔄 修正版signIn開始:', {
+    provider: account?.provider,
+    email: user?.email,
+    hasAccessToken: !!account?.access_token,
+    tokenLength: account?.access_token?.length || 0,
+    timestamp: new Date().toISOString()
+  });
+  
+  // 🆕 厳密な検証
+  if (!account?.provider) {
+    console.error('❌ プロバイダーが特定できません');
+    return false;
+  }
+  
+  if (!user?.email) {
+    console.error('❌ ユーザーメールが取得できません');
+    return false;
+  }
+  
+  if (!account.access_token) {
+    console.error('❌ アクセストークンが取得できません:', {
+      provider: account.provider,
+      accountKeys: Object.keys(account)
+    });
+    return false;
+  }
+  
+  // 🆕 有効なプロバイダーのみ許可
+  const validProviders = ['slack', 'discord', 'google', 'azure-ad'];
+  if (!validProviders.includes(account.provider)) {
+    console.error('❌ 無効なプロバイダー:', account.provider);
+    return false;
+  }
+
+  // 🆕 プロバイダー名を正規化してサービス名に変換
+  function normalizeServiceName(provider: string): string {
+    switch (provider) {
+      case 'azure-ad':
+        return 'teams';  // azure-ad プロバイダーは teams サービス
+      case 'google':
+        return 'google'; // google プロバイダーは google サービス
+      case 'slack':
+        return 'slack';
+      case 'discord':
+        return 'discord';
+      default:
+        return provider;
+    }
+  }
+  
+  try {
+    const normalizedServiceName = normalizeServiceName(account.provider);
+    console.log(`📝 ${account.provider} → ${normalizedServiceName} 統合処理開始`);
+    
+    // ユーザー確保
+    const userData = await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        name: user.name || '',
+        image: user.image,
+        updatedAt: new Date(),
+      },
+      create: {
+        email: user.email,
+        name: user.name || '',
+        image: user.image,
+        emailVerified: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log('✅ ユーザー確保:', userData.id);
+
+    // 🆕 現在のプロバイダーのみの統合を処理
+    const extendedProfile = profile as ExtendedProfile;
+    const teamId = getTeamId(account, extendedProfile);
+    const teamName = getTeamName(account, extendedProfile);
+
+    // 🔧 Teams専用のトークン保存強化
+    let finalAccessToken = account.access_token;
+    let finalRefreshToken = account.refresh_token || '';
+    let finalScope = account.scope || '';
+
+    if (account.provider === 'azure-ad') {
+      console.log('🔍 Teams Token Details:', {
+        access_token_length: account.access_token?.length || 0,
+        refresh_token_present: !!account.refresh_token,
+        expires_at: account.expires_at,
+        scope_length: account.scope?.length || 0
       });
-      
-      // 🆕 厳密な検証
-      if (!account?.provider) {
-        console.error('❌ プロバイダーが特定できません');
+
+      // トークンの詳細検証
+      if (!account.access_token || account.access_token.length < 50) {
+        console.error('❌ Teams アクセストークンが無効です');
         return false;
       }
-      
-      if (!user?.email) {
-        console.error('❌ ユーザーメールが取得できません');
-        return false;
-      }
-      
-      if (!account.access_token) {
-        console.error('❌ アクセストークンが取得できません:', {
-          provider: account.provider,
-          accountKeys: Object.keys(account)
-        });
-        return false;
-      }
-      
-      // 🆕 有効なプロバイダーのみ許可
-      const validProviders = ['slack', 'discord', 'google', 'azure-ad'];
-      if (!validProviders.includes(account.provider)) {
-        console.error('❌ 無効なプロバイダー:', account.provider);
-        return false;
-      }
-      
-      try {
-        console.log(`📝 ${account.provider} 専用処理開始`);
-        
-        // ユーザー確保
-        const userData = await prisma.user.upsert({
-          where: { email: user.email },
-          update: {
-            name: user.name || '',
-            image: user.image,
-            updatedAt: new Date(),
-          },
-          create: {
-            email: user.email,
-            name: user.name || '',
-            image: user.image,
-            emailVerified: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        });
+    }
 
-        console.log('✅ ユーザー確保:', userData.id);
+    const integrationData = {
+      accessToken: finalAccessToken,
+      refreshToken: finalRefreshToken,
+      scope: finalScope,
+      tokenType: account.token_type || 'Bearer',
+      isActive: true,
+      updatedAt: new Date(),
+      teamId,
+      teamName,
+    };
 
-        // 🆕 現在のプロバイダーのみの統合を処理
-        const extendedProfile = profile as ExtendedProfile;
-        const teamId = getTeamId(account, extendedProfile);
-        const teamName = getTeamName(account, extendedProfile);
+    console.log(`💾 ${account.provider} → ${normalizedServiceName} 統合データ保存:`, {
+      hasToken: !!integrationData.accessToken,
+      tokenLength: integrationData.accessToken.length,
+      scope: integrationData.scope,
+      hasRefreshToken: !!integrationData.refreshToken
+    });
 
-        // 🔧 Teams専用のトークン保存強化
-        let finalAccessToken = account.access_token;
-        let finalRefreshToken = account.refresh_token || '';
-        let finalScope = account.scope || '';
+    // 🆕 プロバイダー専用の統合処理（サービス名正規化版）
+    const integration = await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: userData.id,
+          service: normalizedServiceName,  // 正規化されたサービス名を使用
+        },
+      },
+      update: integrationData,
+      create: {
+        userId: userData.id,
+        service: normalizedServiceName,  // 正規化されたサービス名を使用
+        ...integrationData,
+        createdAt: new Date(),
+      },
+    });
 
-        if (account.provider === 'azure-ad') {
-          console.log('🔍 Teams Token Details:', {
-            access_token_length: account.access_token?.length || 0,
-            refresh_token_present: !!account.refresh_token,
-            expires_at: account.expires_at,
-            scope_length: account.scope?.length || 0
-          });
+    console.log(`✅ ${account.provider} → ${normalizedServiceName} 統合完了:`, {
+      id: integration.id,
+      service: integration.service,
+      hasToken: !!integration.accessToken,
+      tokenLength: integration.accessToken.length
+    });
 
-          // トークンの詳細検証
-          if (!account.access_token || account.access_token.length < 50) {
-            console.error('❌ Teams アクセストークンが無効です');
-            return false;
-          }
-        }
+    // 🆕 保存後の検証
+    const savedIntegration = await prisma.integration.findUnique({
+      where: {
+        userId_service: {
+          userId: userData.id,
+          service: normalizedServiceName,  // 正規化されたサービス名を使用
+        },
+      },
+    });
 
-        const integrationData = {
-          accessToken: finalAccessToken,
-          refreshToken: finalRefreshToken,
-          scope: finalScope,
-          tokenType: account.token_type || 'Bearer',
-          isActive: true,
-          updatedAt: new Date(),
-          teamId,
-          teamName,
-        };
-
-        console.log(`💾 ${account.provider} 統合データ保存:`, {
-          hasToken: !!integrationData.accessToken,
-          tokenLength: integrationData.accessToken.length,
-          scope: integrationData.scope,
-          hasRefreshToken: !!integrationData.refreshToken
-        });
-
-        // 🆕 プロバイダー専用の統合処理（エラーハンドリング強化）
-        const integration = await prisma.integration.upsert({
-          where: {
-            userId_service: {
-              userId: userData.id,
-              service: account.provider,
-            },
-          },
-          update: integrationData,
-          create: {
-            userId: userData.id,
-            service: account.provider,
-            ...integrationData,
-            createdAt: new Date(),
-          },
-        });
-
-        console.log(`✅ ${account.provider} 統合完了:`, {
-          id: integration.id,
-          service: integration.service,
-          hasToken: !!integration.accessToken,
-          tokenLength: integration.accessToken.length
-        });
-
-        // 🆕 保存後の検証
-        const savedIntegration = await prisma.integration.findUnique({
-          where: {
-            userId_service: {
-              userId: userData.id,
-              service: account.provider,
-            },
-          },
-        });
-
-        console.log(`🔍 ${account.provider} 保存確認:`, {
-          found: !!savedIntegration,
-          hasToken: !!savedIntegration?.accessToken,
-          tokenLength: savedIntegration?.accessToken?.length || 0
-        });
-        
-        return true;
-        
-      } catch (error) {
-        console.error(`❌ ${account.provider} 統合エラー:`, error);
-        return false;
-      }
-    },
+    console.log(`🔍 ${normalizedServiceName} 保存確認:`, {
+      found: !!savedIntegration,
+      hasToken: !!savedIntegration?.accessToken,
+      tokenLength: savedIntegration?.accessToken?.length || 0
+    });
+    
+    return true;
+    
+  } catch (error) {
+    console.error(`❌ ${account.provider} 統合エラー:`, error);
+    return false;
+  }
+},
     
     async redirect({ url, baseUrl }) {
       console.log('🔄 リダイレクト:', { url, baseUrl });
