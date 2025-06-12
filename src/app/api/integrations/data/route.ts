@@ -202,65 +202,53 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`🔍 ${integration.service} データ取得開始 - 独立処理`);
         
-        // 🆕 サービス別の厳密な分岐処理
-        switch (integration.service) {
-          case 'slack':
-            console.log('📱 Slack処理開始 - 独立モード');
-            serviceUsers = await getSlackUsersExtended(integration);
-            processSuccess = true;
-            break;
-            
-          case 'azure-ad':
-            console.log('🏢 Azure AD (Teams) 処理開始 - 独立モード');
-            serviceUsers = await getTeamsUsersExtended(integration);
-            processSuccess = true;
-            break;
-            
-          case 'teams':
-            console.log('🏢 Teams処理開始 - 独立モード');
-            serviceUsers = await getTeamsUsersExtended(integration);
-            processSuccess = true;
-            break;
-            
-          case 'google':
-            console.log('🔍 Google処理開始 - 独立モード');
-            serviceUsers = await getGoogleUsersExtended(integration);
-            processSuccess = true;
-            break;
-            
-          case 'google-meet':
-            console.log('🔍 Google Meet処理開始 - 独立モード');
-            serviceUsers = await getGoogleUsersExtended(integration);
-            processSuccess = true;
-            break;
-            
-          case 'discord':
-            console.log('🎮 Discord処理開始 - 独立モード');
-            serviceUsers = await getDiscordUsersExtended(integration);
-            processSuccess = true;
-            break;
-            
-          case 'chatwork':
-            console.log('💬 ChatWork処理開始 - 独立モード');
-            serviceUsers = await getChatWorkUsersExtended(integration);
-            processSuccess = true;
-            break;
-            
-          default:
-            console.warn(`⚠️ 未対応サービス: ${integration.service}`);
-            errors.push({
-              service: integration.service,
-              error: '未対応のサービスです',
-              severity: 'warning'
-            });
-            serviceResults[integration.service] = {
-              success: false,
-              userCount: 0,
-              error: '未対応のサービス',
-              processingTime: Date.now() - startTime
-            };
-            continue;
-        }
+        // 🆕 サービス別の厳密な分岐処理（修正版）
+switch (integration.service) {
+  case 'slack':
+    console.log('📱 Slack処理開始 - 独立モード');
+    serviceUsers = await getSlackUsersExtended(integration);
+    processSuccess = true;
+    break;
+    
+  case 'teams':  // azure-ad は teams として正規化済み
+    console.log('🏢 Teams処理開始 - 独立モード');
+    serviceUsers = await getTeamsUsersExtended(integration);
+    processSuccess = true;
+    break;
+    
+  case 'google':  // google のみ、google-meet は削除
+    console.log('🔍 Google処理開始 - 独立モード');
+    serviceUsers = await getGoogleUsersExtended(integration);
+    processSuccess = true;
+    break;
+    
+  case 'discord':
+    console.log('🎮 Discord処理開始 - 独立モード');
+    serviceUsers = await getDiscordUsersExtended(integration);
+    processSuccess = true;
+    break;
+    
+  case 'chatwork':
+    console.log('💬 ChatWork処理開始 - 独立モード');
+    serviceUsers = await getChatWorkUsersExtended(integration);
+    processSuccess = true;
+    break;
+    
+  default:
+    console.warn(`⚠️ 未対応サービス: ${integration.service}`);
+    errors.push({
+      service: integration.service,
+      error: '未対応のサービスです',
+      severity: 'warning'
+    });
+    serviceResults[integration.service] = {
+      success: false,
+      userCount: 0,
+      error: '未対応のサービス',
+      processingTime: Date.now() - startTime
+    };
+    continue;
+}
 
         // 🆕 成功時の処理
         if (processSuccess && serviceUsers.length > 0) {
@@ -423,51 +411,50 @@ async function getFallbackUserData(integration: any): Promise<UnifiedUser | null
     
     // 各サービスの最も基本的なエンドポイントを使用
     switch (integration.service) {
-      case 'slack':
-        fallbackEndpoint = 'https://slack.com/api/auth.test';
-        headers = {
-          'Authorization': `Bearer ${integration.accessToken}`,
-          'Content-Type': 'application/json'
-        };
-        break;
-        
-      case 'azure-ad':
-      case 'teams':
-        fallbackEndpoint = 'https://graph.microsoft.com/v1.0/me';
-        headers = {
-          'Authorization': `Bearer ${integration.accessToken}`,
-          'Content-Type': 'application/json'
-        };
-        break;
-        
-      case 'google':
-        fallbackEndpoint = 'https://www.googleapis.com/oauth2/v2/userinfo';
-        headers = {
-          'Authorization': `Bearer ${integration.accessToken}`,
-          'Content-Type': 'application/json'
-        };
-        break;
-        
-      case 'discord':
-        fallbackEndpoint = 'https://discord.com/api/v10/users/@me';
-        headers = {
-          'Authorization': `Bearer ${integration.accessToken}`,
-          'Content-Type': 'application/json'
-        };
-        break;
-        
-      case 'chatwork':
-        fallbackEndpoint = 'https://api.chatwork.com/v2/me';
-        headers = {
-          'X-ChatWorkToken': integration.accessToken,
-          'Content-Type': 'application/json'
-        };
-        break;
-        
-      default:
-        console.warn(`⚠️ ${integration.service}: フォールバック未対応`);
-        return null;
-    }
+  case 'slack':
+    fallbackEndpoint = 'https://slack.com/api/auth.test';
+    headers = {
+      'Authorization': `Bearer ${integration.accessToken}`,
+      'Content-Type': 'application/json'
+    };
+    break;
+    
+  case 'teams':  // azure-ad ケースを削除
+    fallbackEndpoint = 'https://graph.microsoft.com/v1.0/me';
+    headers = {
+      'Authorization': `Bearer ${integration.accessToken}`,
+      'Content-Type': 'application/json'
+    };
+    break;
+    
+  case 'google':  // google-meet ケースを削除
+    fallbackEndpoint = 'https://www.googleapis.com/oauth2/v2/userinfo';
+    headers = {
+      'Authorization': `Bearer ${integration.accessToken}`,
+      'Content-Type': 'application/json'
+    };
+    break;
+    
+  case 'discord':
+    fallbackEndpoint = 'https://discord.com/api/v10/users/@me';
+    headers = {
+      'Authorization': `Bearer ${integration.accessToken}`,
+      'Content-Type': 'application/json'
+    };
+    break;
+    
+  case 'chatwork':
+    fallbackEndpoint = 'https://api.chatwork.com/v2/me';
+    headers = {
+      'X-ChatWorkToken': integration.accessToken,
+      'Content-Type': 'application/json'
+    };
+    break;
+    
+  default:
+    console.warn(`⚠️ ${integration.service}: フォールバック未対応`);
+    return null;
+}
 
     console.log(`🌐 ${integration.service}: ${fallbackEndpoint} にアクセス中...`);
     
