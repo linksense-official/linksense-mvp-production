@@ -199,9 +199,11 @@ export const authOptions: AuthOptions = {
     }
   },
   
+  
   callbacks: {
     // 🆕 完全に修正されたsignInコールバック
     async signIn({ user, account, profile }) {
+  console.log('🎮 認証開始:', account?.provider, 'トークン長さ:', account?.access_token?.length);
   console.log('🔄 修正版signIn開始:', {
     provider: account?.provider,
     email: user?.email,
@@ -311,6 +313,7 @@ export const authOptions: AuthOptions = {
   teamId: teamId || null,                   // 🔧 undefinedではなくnull
   teamName: teamName || null,               // 🔧 undefinedではなくnull
 };
+console.log('💾 保存するデータ:', normalizedServiceName, 'トークン長さ:', integrationData.accessToken?.length);
 
 console.log(`💾 ${account.provider} → ${normalizedServiceName} 統合データ保存確認:`, {
   hasAccessToken: !!integrationData.accessToken,
@@ -347,6 +350,7 @@ const integration = await prisma.integration.upsert({
     createdAt: new Date(),
   },
 });
+console.log('✅ 保存完了:', integration.service, 'トークン長さ:', integration.accessToken?.length);
 
 console.log(`✅ ${account.provider} → ${normalizedServiceName} 統合完了:`, {
   id: integration.id,
