@@ -138,7 +138,7 @@ interface RiskAnalysis {
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔄 統合データ取得API開始（フレンド・コンタクト含む）');
+    console.log('🔄 統合データ取得API開始（独立性強化版）');
 
     // 認証確認
     const session = await getServerSession(authOptions);
@@ -156,52 +156,96 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 });
     }
 
-    // アクティブな統合を取得
+    // 🆕 アクティブな統合を厳密に取得（独立性確保）
     const integrations = await prisma.integration.findMany({
-      where: {
-        userId: user.id,
-        isActive: true
-      },
-      select: {
-        id: true,
-        service: true,
-        accessToken: true,
-        refreshToken: true,
-        teamId: true,
-        teamName: true
-      }
-    });
+  where: {
+    userId: user.id,
+    isActive: true,
+    accessToken: {
+      not: ""  // 空文字列ではない
+    }
+  },
+  select: {
+    id: true,
+    service: true,
+    accessToken: true,
+    refreshToken: true,
+    teamId: true,
+    teamName: true,
+    updatedAt: true
+  }
+});
 
-    console.log('📊 アクティブ統合:', integrations.map(i => i.service));
+    console.log('📊 厳密なアクティブ統合:', integrations.map(i => ({
+      service: i.service,
+      hasToken: !!i.accessToken,
+      tokenLength: i.accessToken?.length || 0,
+      updatedAt: i.updatedAt
+    })));
 
-    // 全サービスからデータ取得
+    // 🆕 各サービスを完全に独立して処理
     const allUsers: UnifiedUser[] = [];
     const errors: Array<{service: string, error: string, severity: 'warning' | 'error'}> = [];
+    const serviceResults: Record<string, {
+      success: boolean;
+      userCount: number;
+      error?: string;
+      processingTime: number;
+    }> = {};
 
+    // 🆕 サービス別独立処理
     for (const integration of integrations) {
+      const startTime = Date.now();
+      let serviceUsers: UnifiedUser[] = [];
+      let processSuccess = false;
+      
       try {
-        console.log(`🔍 ${integration.service} データ取得開始`);
+        console.log(`🔍 ${integration.service} データ取得開始 - 独立処理`);
         
-        let serviceUsers: UnifiedUser[] = [];
-        
+        // 🆕 サービス別の厳密な分岐処理
         switch (integration.service) {
           case 'slack':
+            console.log('📱 Slack処理開始 - 独立モード');
             serviceUsers = await getSlackUsersExtended(integration);
+            processSuccess = true;
             break;
+            
           case 'azure-ad':
-          case 'teams':
+            console.log('🏢 Azure AD (Teams) 処理開始 - 独立モード');
             serviceUsers = await getTeamsUsersExtended(integration);
+            processSuccess = true;
             break;
+            
+          case 'teams':
+            console.log('🏢 Teams処理開始 - 独立モード');
+            serviceUsers = await getTeamsUsersExtended(integration);
+            processSuccess = true;
+            break;
+            
           case 'google':
-          case 'google-meet':
+            console.log('🔍 Google処理開始 - 独立モード');
             serviceUsers = await getGoogleUsersExtended(integration);
+            processSuccess = true;
             break;
+            
+          case 'google-meet':
+            console.log('🔍 Google Meet処理開始 - 独立モード');
+            serviceUsers = await getGoogleUsersExtended(integration);
+            processSuccess = true;
+            break;
+            
           case 'discord':
+            console.log('🎮 Discord処理開始 - 独立モード');
             serviceUsers = await getDiscordUsersExtended(integration);
+            processSuccess = true;
             break;
+            
           case 'chatwork':
+            console.log('💬 ChatWork処理開始 - 独立モード');
             serviceUsers = await getChatWorkUsersExtended(integration);
+            processSuccess = true;
             break;
+            
           default:
             console.warn(`⚠️ 未対応サービス: ${integration.service}`);
             errors.push({
@@ -209,17 +253,42 @@ export async function GET(request: NextRequest) {
               error: '未対応のサービスです',
               severity: 'warning'
             });
+            serviceResults[integration.service] = {
+              success: false,
+              userCount: 0,
+              error: '未対応のサービス',
+              processingTime: Date.now() - startTime
+            };
             continue;
         }
 
-        allUsers.push(...serviceUsers);
-        console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了`);
+        // 🆕 成功時の処理
+        if (processSuccess && serviceUsers.length > 0) {
+          allUsers.push(...serviceUsers);
+          serviceResults[integration.service] = {
+            success: true,
+            userCount: serviceUsers.length,
+            processingTime: Date.now() - startTime
+          };
+          console.log(`✅ ${integration.service}: ${serviceUsers.length}人のデータ取得完了 (${Date.now() - startTime}ms)`);
+        } else if (processSuccess && serviceUsers.length === 0) {
+          console.warn(`⚠️ ${integration.service}: データ取得成功だがユーザー0人`);
+          serviceResults[integration.service] = {
+            success: true,
+            userCount: 0,
+            processingTime: Date.now() - startTime
+          };
+        }
         
       } catch (error) {
+        const processingTime = Date.now() - startTime;
         const errorMsg = error instanceof Error ? error.message : 'データ取得エラー';
         
-        // 権限エラーの詳細判定を強化
+        console.error(`❌ ${integration.service} データ取得エラー:`, errorMsg);
+        
+        // 🆕 エラーの詳細分類
         let severity: 'warning' | 'error' = 'error';
+        let shouldTryFallback = false;
         
         // より広範囲な権限エラーパターンをキャッチ
         if (errorMsg.includes('401') || 
@@ -233,6 +302,7 @@ export async function GET(request: NextRequest) {
             errorMsg.includes('管理者権限') ||
             errorMsg.includes('Forbidden')) {
           severity = 'warning';
+          shouldTryFallback = true;
         }
         
         errors.push({
@@ -241,26 +311,45 @@ export async function GET(request: NextRequest) {
           severity
         });
         
-        console.error(`❌ ${integration.service}: ${errorMsg}`);
+        serviceResults[integration.service] = {
+          success: false,
+          userCount: 0,
+          error: errorMsg,
+          processingTime
+        };
         
-        // 権限エラーの場合は必ずフォールバック処理を実行
-        if (severity === 'warning') {
+        // 🆕 フォールバック処理（他のサービスに影響しない）
+        if (shouldTryFallback) {
           try {
-            console.log(`🔄 ${integration.service}: フォールバック処理開始`);
+            console.log(`🔄 ${integration.service}: フォールバック処理開始 - 独立実行`);
             const fallbackUser = await getFallbackUserData(integration);
             if (fallbackUser) {
               allUsers.push(fallbackUser);
+              serviceResults[integration.service] = {
+                success: true,
+                userCount: 1,
+                error: `フォールバック成功: ${errorMsg}`,
+                processingTime: Date.now() - startTime
+              };
               console.log(`✅ ${integration.service}: フォールバック成功 - ${fallbackUser.name}`);
-            } else {
-              console.warn(`⚠️ ${integration.service}: フォールバック失敗 - ユーザーデータなし`);
             }
           } catch (fallbackError) {
             const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : 'フォールバック不明エラー';
-            console.warn(`⚠️ ${integration.service}: フォールバック取得エラー - ${fallbackMsg}`);
+            console.warn(`⚠️ ${integration.service}: フォールバック失敗 - ${fallbackMsg}`);
+            serviceResults[integration.service].error += ` | フォールバック失敗: ${fallbackMsg}`;
           }
         }
       }
     }
+
+    // 🆕 統合結果の詳細ログ
+    console.log('📊 サービス別処理結果:');
+    Object.entries(serviceResults).forEach(([service, result]) => {
+      console.log(`  ${service}: ${result.success ? '✅' : '❌'} ${result.userCount}人 (${result.processingTime}ms)`);
+      if (result.error) {
+        console.log(`    エラー: ${result.error}`);
+      }
+    });
 
     // データ統合・重複排除
     const unifiedUsers = mergeUserDataExtended(allUsers);
@@ -271,12 +360,35 @@ export async function GET(request: NextRequest) {
     // 離職リスク分析
     const riskAnalysis = analyzeIsolationRisksExtended(unifiedUsers);
 
-    console.log('✅ 統合データ取得完了:', {
+    // 🆕 成功統計
+    const successfulServices = Object.entries(serviceResults).filter(([_, result]) => result.success).length;
+    const totalServices = integrations.length;
+
+    console.log('✅ 統合データ取得完了 - 独立性強化版:', {
       totalUsers: unifiedUsers.length,
-      services: integrations.map(i => i.service),
+      successfulServices: `${successfulServices}/${totalServices}`,
+      services: Object.keys(serviceResults),
       healthScore: teamHealth.healthScore,
-      relationshipTypes: teamHealth.relationshipDistribution
+      processingTime: Object.values(serviceResults).reduce((sum, r) => sum + r.processingTime, 0)
     });
+
+    // 🆕 詳細メタデータ
+    const metadata = {
+      totalServices: integrations.length,
+      successfulServices,
+      failedServices: totalServices - successfulServices,
+      dataFreshness: new Date().toISOString(),
+      serviceResults,
+      errors: errors.length > 0 ? errors : undefined,
+      processingStats: {
+        totalProcessingTime: Object.values(serviceResults).reduce((sum, r) => sum + r.processingTime, 0),
+        averageProcessingTime: Object.values(serviceResults).reduce((sum, r) => sum + r.processingTime, 0) / totalServices,
+        fastestService: Object.entries(serviceResults).reduce((fastest, [service, result]) => 
+          result.processingTime < fastest.time ? { service, time: result.processingTime } : fastest,
+          { service: '', time: Infinity }
+        )
+      }
+    };
 
     return NextResponse.json({
       success: true,
@@ -284,11 +396,7 @@ export async function GET(request: NextRequest) {
         users: unifiedUsers,
         teamHealth,
         riskAnalysis,
-        metadata: {
-          totalServices: integrations.length,
-          dataFreshness: new Date().toISOString(),
-          errors: errors.length > 0 ? errors : undefined
-        }
+        metadata
       }
     });
 
