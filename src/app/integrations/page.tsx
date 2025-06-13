@@ -181,8 +181,15 @@ const handleConnect = async (service: ServiceConfig) => {
   setConnecting(service.id)
   
   try {
-    // 🔧 全サービス共通処理（直接URL指定）
-    const authUrl = service.id === 'teams' ? '/api/auth/signin/azure-ad' : service.authUrl;
+    // 🔧 すべて直接URL方式に変更
+    const authUrls = {
+      'teams': '/api/auth/signin/azure-ad',
+      'slack': '/api/auth/signin/slack',
+      'discord': '/api/auth/signin/discord', 
+      'google': '/api/auth/signin/google'
+    };
+    
+    const authUrl = authUrls[service.id as keyof typeof authUrls] || service.authUrl;
     const callbackUrl = encodeURIComponent('/integrations?success=true');
     
     window.location.href = `${authUrl}?callbackUrl=${callbackUrl}`;
