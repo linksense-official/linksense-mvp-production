@@ -5,7 +5,7 @@ import DiscordProvider from 'next-auth/providers/discord'
 import AzureADProvider from 'next-auth/providers/azure-ad'
 import { PrismaClient } from '@prisma/client'
 
-console.log('🚀 LinkSense MVP - Teams統合修正版')
+console.log('🚀 LinkSense MVP - 完全修正版')
 
 const prisma = new PrismaClient()
 
@@ -138,32 +138,12 @@ export const authOptions: AuthOptions = {
       },
     }),
     
-    // Azure AD カスタムプロバイダー（型エラー修正版）
-{
-  id: 'azure-ad',
-  name: 'Azure Active Directory',
-  type: 'oauth',
-  authorization: {
-    url: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/oauth2/v2.0/authorize`,
-    params: {
-      scope: 'openid profile email User.Read',
-      response_type: 'code',
-      prompt: 'consent'
-    }
-  },
-  token: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/oauth2/v2.0/token`,
-  userinfo: 'https://graph.microsoft.com/v1.0/me',
-  profile(profile) {
-    return {
-      id: profile.id,
-      name: profile.displayName,
-      email: profile.mail || profile.userPrincipalName,
-      image: undefined, // 🔧 修正: null → undefined
-    }
-  },
-  clientId: process.env.AZURE_AD_CLIENT_ID!,
-  clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-},
+    // Azure AD設定（最もシンプル版）
+    AzureADProvider({
+      clientId: process.env.AZURE_AD_CLIENT_ID!,
+      clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+      tenantId: process.env.AZURE_AD_TENANT_ID!,
+    }),
   ],
   
   session: {
@@ -171,155 +151,151 @@ export const authOptions: AuthOptions = {
     maxAge: 30 * 24 * 60 * 60,
   },
   
-  debug: false, // 🔧 本番デバッグ無効化
+  debug: false,
   
   callbacks: {
-  // 🚨 最優先デバッグログ
-  async signIn({ user, account, profile }) {
-  console.log('🔧 認証開始:', {
-    provider: account?.provider,
-    email: user?.email,
-    hasToken: !!account?.access_token
-  });
-  
-  // 基本検証
-  if (!account?.provider || !user?.email) {
-    console.log('❌ 認証情報不足');
-    return false;
-  }
-
-  // トークンなしでもセッション作成
-  if (!account?.access_token) {
-    console.log('⚠️ トークンなし - セッションのみ作成');
-    return true;
-  }
-
-  try {
-    // ユーザー確保
-    const userData = await prisma.user.upsert({
-      where: { email: user.email },
-      update: { 
-        name: user.name || '',
-        image: user.image,
-        updatedAt: new Date() 
-      },
-      create: {
-        email: user.email,
-        name: user.name || '',
-        image: user.image,
-        emailVerified: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    // サービス名正規化
-    const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
-
-console.log('🔍 サービス名確認:', {
-  originalProvider: account.provider,
-  normalizedService: serviceName,
-  email: user.email
-});
-
-// 🚨 重要: 意図しないサービスの統合を防ぐ
-if (!['teams', 'slack', 'discord', 'google'].includes(serviceName)) {
-  console.log('❌ 未対応サービス:', serviceName);
-  return true; // セッションのみ作成
-}
-    
-    // 統合保存（シンプル版）
-    await prisma.integration.upsert({
-      where: {
-        userId_service: {
-          userId: userData.id,
-          service: serviceName,
-        },
-      },
-      update: {
-        accessToken: account.access_token,
-        refreshToken: account.refresh_token || null,
-        scope: account.scope || null,
-        tokenType: account.token_type || 'Bearer',
-        isActive: true,
-        updatedAt: new Date(),
-      },
-      create: {
-        userId: userData.id,
-        service: serviceName,
-        accessToken: account.access_token,
-        refreshToken: account.refresh_token || null,
-        scope: account.scope || null,
-        tokenType: account.token_type || 'Bearer',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    console.log('✅ 統合保存完了:', serviceName);
-    return true;
-
-  } catch (error: unknown) {
-    console.error('❌ 統合保存エラー:', error);
-    return true; // エラーでもセッション作成
-  }
-},
-  
-  async redirect({ url, baseUrl }) {
-    console.log('🔄 リダイレクト:', { url, baseUrl });
-    if (url.includes('error=')) {
-      console.error('🚨 OAuth認証エラー:', url);
-      return `${baseUrl}/integrations?error=oauth_failed`;
-    }
-    return `${baseUrl}/integrations?success=true`;
-  },
-  
-  async jwt({ token, user, account }) {
-    if (account && user) {
-      console.log('🔑 JWT生成:', {
-        provider: account.provider,
-        user: user.email,
-        hasAccessToken: !!account.access_token
+    async signIn({ user, account, profile }) {
+      console.log('🔧 認証開始:', {
+        provider: account?.provider,
+        email: user?.email,
+        hasToken: !!account?.access_token
       });
       
-      if (user.email) {
-        try {
-          const userData = await prisma.user.findUnique({
-            where: { email: user.email }
-          });
-          if (userData) {
-            token.userId = userData.id;
-          }
-        } catch (error) {
-          console.error('JWT生成エラー:', error);
-        }
+      // 基本検証
+      if (!account?.provider || !user?.email) {
+        console.log('❌ 認証情報不足');
+        return false;
       }
-      
-      token.provider = account.provider;
-      token.scope = account.scope;
-      token.accessToken = account.access_token;
-    }
-    return token;
+
+      // トークンなしでもセッション作成
+      if (!account?.access_token) {
+        console.log('⚠️ トークンなし - セッションのみ作成');
+        return true;
+      }
+
+      try {
+        // ユーザー確保
+        const userData = await prisma.user.upsert({
+          where: { email: user.email },
+          update: { 
+            name: user.name || '',
+            image: user.image,
+            updatedAt: new Date() 
+          },
+          create: {
+            email: user.email,
+            name: user.name || '',
+            image: user.image,
+            emailVerified: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+
+        // サービス名正規化
+        const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
+
+        console.log('🔍 サービス名確認:', {
+          originalProvider: account.provider,
+          normalizedService: serviceName,
+          email: user.email
+        });
+
+        // 対応サービスチェック
+        if (!['teams', 'slack', 'discord', 'google'].includes(serviceName)) {
+          console.log('❌ 未対応サービス:', serviceName);
+          return true;
+        }
+        
+        // 統合保存
+        await prisma.integration.upsert({
+          where: {
+            userId_service: {
+              userId: userData.id,
+              service: serviceName,
+            },
+          },
+          update: {
+            accessToken: account.access_token,
+            refreshToken: account.refresh_token || null,
+            scope: account.scope || null,
+            tokenType: account.token_type || 'Bearer',
+            isActive: true,
+            updatedAt: new Date(),
+          },
+          create: {
+            userId: userData.id,
+            service: serviceName,
+            accessToken: account.access_token,
+            refreshToken: account.refresh_token || null,
+            scope: account.scope || null,
+            tokenType: account.token_type || 'Bearer',
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+
+        console.log('✅ 統合保存完了:', serviceName);
+        return true;
+
+      } catch (error: unknown) {
+        console.error('❌ 統合保存エラー:', error);
+        return true;
+      }
+    },
+    
+    async redirect({ url, baseUrl }) {
+      console.log('🔄 リダイレクト:', { url, baseUrl });
+      if (url.includes('error=')) {
+        console.error('🚨 OAuth認証エラー:', url);
+        return `${baseUrl}/integrations?error=oauth_failed`;
+      }
+      return `${baseUrl}/integrations?success=true`;
+    },
+    
+    async jwt({ token, user, account }) {
+      if (account && user) {
+        console.log('🔑 JWT生成:', {
+          provider: account.provider,
+          user: user.email,
+          hasAccessToken: !!account.access_token
+        });
+        
+        if (user.email) {
+          try {
+            const userData = await prisma.user.findUnique({
+              where: { email: user.email }
+            });
+            if (userData) {
+              token.userId = userData.id;
+            }
+          } catch (error) {
+            console.error('JWT生成エラー:', error);
+          }
+        }
+        
+        token.provider = account.provider;
+        token.scope = account.scope;
+        token.accessToken = account.access_token;
+      }
+      return token;
+    },
+    
+    async session({ session, token }) {
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: token.userId as string,
+        },
+        provider: token.provider as string,
+        scope: token.scope as string,
+      };
+    },
   },
   
-  async session({ session, token }) {
-    return {
-      ...session,
-      user: {
-        ...session.user,
-        id: token.userId as string,
-      },
-      provider: token.provider as string,
-      scope: token.scope as string,
-    };
-  },
-},
-  
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
+  // 🔧 重要: pages設定を完全に削除
 }
 
 const handler = NextAuth(authOptions)
