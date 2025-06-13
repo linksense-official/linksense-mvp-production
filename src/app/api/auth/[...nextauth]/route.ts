@@ -5,7 +5,7 @@ import DiscordProvider from 'next-auth/providers/discord'
 import AzureADProvider from 'next-auth/providers/azure-ad'
 import { PrismaClient } from '@prisma/client'
 
-console.log('🚀 LinkSense MVP - 最終修正版')
+console.log('🚀 LinkSense MVP - Teams統合修正版')
 
 const prisma = new PrismaClient()
 
@@ -160,18 +160,19 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   
   callbacks: {
-    // 🔧 完全修正版 signIn コールバック
+    // 🔧 Teams統合修正版 signIn コールバック（TypeScript修正版）
     async signIn({ user, account, profile }) {
-      console.log('🔄 認証開始:', {
+      console.log('🚨 Teams統合修正版 - 認証開始:', {
         provider: account?.provider,
         email: user?.email,
         hasToken: !!account?.access_token,
-        tokenLength: account?.access_token?.length || 0
+        tokenLength: account?.access_token?.length || 0,
+        timestamp: new Date().toISOString()
       });
-      
-      // 基本検証
-      if (!account?.provider || !user?.email || !account.access_token) {
-        console.error('❌ 認証情報不足:', {
+
+      // 🔧 TypeScript対応の厳密な検証
+      if (!account?.provider || !user?.email || !account?.access_token) {
+        console.log('❌ 認証情報不足:', {
           provider: !!account?.provider,
           email: !!user?.email,
           token: !!account?.access_token
@@ -179,91 +180,141 @@ export const authOptions: AuthOptions = {
         return false;
       }
 
+      // 🔧 型安全性を確保
+      const accessToken = account.access_token;
+      const refreshToken = account.refresh_token;
+      const scope = account.scope;
+      const tokenType = account.token_type;
+
+      if (!accessToken) {
+        console.log('❌ アクセストークンが無効');
+        return false;
+      }
+
       try {
-        // ユーザー確保
-        const userData = await prisma.user.upsert({
-          where: { email: user.email },
-          update: {
-            name: user.name || '',
-            image: user.image,
-            updatedAt: new Date(),
-          },
-          create: {
-            email: user.email,
-            name: user.name || '',
-            image: user.image,
-            emailVerified: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        });
+        // 🔧 トランザクション内で安全に処理
+        const result = await prisma.$transaction(async (tx) => {
+          console.log('🔄 トランザクション開始');
 
-        console.log('✅ ユーザー確保:', userData.id);
+          // ユーザー確保
+          const userData = await tx.user.upsert({
+            where: { email: user.email! },
+            update: {
+              name: user.name || '',
+              image: user.image,
+              updatedAt: new Date(),
+            },
+            create: {
+              email: user.email!,
+              name: user.name || '',
+              image: user.image,
+              emailVerified: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
 
-        // サービス名正規化
-        const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
-        
-        console.log('💾 統合保存開始:', {
-          service: serviceName,
-          tokenLength: account.access_token.length,
-          hasRefreshToken: !!account.refresh_token
-        });
+          console.log('✅ ユーザー確保完了:', userData.id);
 
-        // 統合データ保存
-        const integration = await prisma.integration.upsert({
-          where: {
-            userId_service: {
+          // サービス名正規化
+          const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
+          
+          console.log('🔄 統合保存開始:', {
+            service: serviceName,
+            userId: userData.id,
+            tokenLength: accessToken.length
+          });
+
+          // 🔧 既存の統合を削除してから新規作成（競合回避）
+          const deletedCount = await tx.integration.deleteMany({
+            where: {
               userId: userData.id,
               service: serviceName,
             },
-          },
-          update: {
-            accessToken: account.access_token,
-            refreshToken: account.refresh_token || null,
-            scope: account.scope || null,
-            tokenType: account.token_type || 'Bearer',
-            isActive: true,
-            updatedAt: new Date(),
-          },
-          create: {
-            userId: userData.id,
-            service: serviceName,
-            accessToken: account.access_token,
-            refreshToken: account.refresh_token || null,
-            scope: account.scope || null,
-            tokenType: account.token_type || 'Bearer',
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+          });
+
+          console.log('🗑️ 既存統合削除:', deletedCount.count, '件');
+
+          // 🔧 TypeScript対応の新規統合作成
+          const integration = await tx.integration.create({
+            data: {
+              userId: userData.id,
+              service: serviceName,
+              accessToken: accessToken,
+              refreshToken: refreshToken || null,
+              scope: scope || null,
+              tokenType: tokenType || 'Bearer',
+              isActive: true,
+              teamId: null,
+              teamName: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+
+          console.log('✅ 統合作成完了:', {
+            id: integration.id,
+            service: integration.service,
+            hasToken: !!integration.accessToken,
+            tokenLength: integration.accessToken.length
+          });
+
+          return integration;
+        }, {
+          timeout: 10000, // 10秒タイムアウト
+        });
+
+        console.log('✅ トランザクション完了:', result.service);
+
+        // 🔧 保存後の検証
+        const verification = await prisma.integration.findUnique({
+          where: {
+            userId_service: {
+              userId: result.userId,
+              service: result.service,
+            },
           },
         });
 
-        console.log('✅ 統合保存完了:', {
-          id: integration.id,
-          service: integration.service,
-          hasToken: !!integration.accessToken,
-          tokenLength: integration.accessToken?.length || 0
+        console.log('🔍 保存検証結果:', {
+          found: !!verification,
+          hasToken: !!verification?.accessToken,
+          tokenLength: verification?.accessToken?.length || 0,
+          isActive: verification?.isActive
         });
 
+        if (!verification || !verification.accessToken) {
+          console.log('❌ 保存検証失敗');
+          return false;
+        }
+
+        console.log('✅ 認証完了:', verification.service);
         return true;
 
       } catch (error) {
-        console.error('❌ 認証エラー:', error);
+        console.log('❌ トランザクションエラー:', error);
+        console.log('❌ エラー詳細:', error instanceof Error ? error.message : '不明なエラー');
         return false;
       }
     },
     
     async redirect({ url, baseUrl }) {
+      console.log('🔄 リダイレクト:', { url, baseUrl });
       if (url.includes('error=')) {
         console.error('🚨 OAuth認証エラー:', url);
         return `${baseUrl}/integrations?error=oauth_failed`;
       }
-      
       return `${baseUrl}/integrations?success=true`;
     },
     
     async jwt({ token, user, account }) {
       if (account && user) {
+        console.log('🔑 JWT生成:', {
+          provider: account.provider,
+          user: user.email,
+          hasAccessToken: !!account.access_token
+        });
+        
         if (user.email) {
           try {
             const userData = await prisma.user.findUnique({
