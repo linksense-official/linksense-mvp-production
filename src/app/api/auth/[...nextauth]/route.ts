@@ -142,10 +142,10 @@ export const authOptions: AuthOptions = {
 AzureADProvider({
   clientId: process.env.AZURE_AD_CLIENT_ID!,
   clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-  tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
+  tenantId: process.env.AZURE_AD_TENANT_ID,
   authorization: {
     params: {
-      scope: 'openid profile email offline_access User.Read',
+      scope: 'openid profile email User.Read',
       prompt: 'consent',
       response_type: 'code'
     }
