@@ -178,19 +178,20 @@ export default function IntegrationsPage() {
   }
 
   const handleConnect = async (service: ServiceConfig) => {
-    setConnecting(service.id)
-    
-    try {
-      if (service.isNextAuth) {
-        await signIn(service.id, { callbackUrl: '/integrations?success=true' })
-      } else {
-        window.location.href = service.authUrl
-      }
-    } catch (error) {
-      console.error(`${service.name}認証エラー:`, error)
-      setConnecting(null)
+  setConnecting(service.id)
+  
+  try {
+    if (service.isNextAuth) {
+      // 🔧 修正: 直接認証URLに飛ぶ
+      window.location.href = service.authUrl
+    } else {
+      window.location.href = service.authUrl
     }
+  } catch (error) {
+    console.error(`${service.name}認証エラー:`, error)
+    setConnecting(null)
   }
+}
 
   if (status === 'loading') {
     return (
