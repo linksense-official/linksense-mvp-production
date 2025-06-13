@@ -161,100 +161,73 @@ export const authOptions: AuthOptions = {
   
   callbacks: {
     // 🔧 Teams統合修正版 signIn コールバック（TypeScript修正版）
-    async signIn({ user, account, profile }) {
-  console.log('🔧 確実修正版 - 認証開始:', {
-    provider: account?.provider,
-    email: user?.email,
-    timestamp: new Date().toISOString()
-  });
-
-  // 基本検証
+   async signIn({ user, account, profile }) {
+  // 🔧 最小限の処理のみ
+  console.log('🔧 最小限認証処理:', account?.provider);
+  
   if (!account?.provider || !user?.email || !account?.access_token) {
-    console.log('❌ 認証情報不足');
     return false;
   }
 
   try {
-    // 🔧 他のサービスに影響しない安全な処理
-    console.log('🔄 安全な統合処理開始');
-
-    // ユーザー取得（更新しない）
-    let userData = await prisma.user.findUnique({
-      where: { email: user.email }
+    // 🔧 Step 1: ユーザーIDのみ取得
+    const existingUser = await prisma.user.findUnique({
+      where: { email: user.email },
+      select: { id: true }
     });
 
-    // ユーザーが存在しない場合のみ作成
-    if (!userData) {
-      userData = await prisma.user.create({
-        data: {
-          email: user.email,
-          name: user.name || '',
-          image: user.image,
-          emailVerified: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-      });
-      console.log('✅ 新規ユーザー作成:', userData.id);
-    } else {
-      console.log('✅ 既存ユーザー使用:', userData.id);
+    if (!existingUser) {
+      console.log('❌ ユーザーが存在しません');
+      return false;
     }
 
-    // サービス名正規化
+    console.log('✅ ユーザーID:', existingUser.id);
+
+    // 🔧 Step 2: サービス名決定
     const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
     
-    console.log('🔄 統合処理:', serviceName);
-
-    // 🔧 現在のサービスのみを対象とした安全な更新
-    const integration = await prisma.integration.upsert({
+    // 🔧 Step 3: 直接SQL的なアプローチ（競合回避）
+    // 既存レコードを探す
+    const existingIntegration = await prisma.integration.findFirst({
       where: {
-        userId_service: {
-          userId: userData.id,
+        userId: existingUser.id,
+        service: serviceName
+      }
+    });
+
+    if (existingIntegration) {
+      // 既存レコードを更新
+      await prisma.integration.update({
+        where: { id: existingIntegration.id },
+        data: {
+          accessToken: account.access_token,
+          isActive: true,
+          updatedAt: new Date()
+        }
+      });
+      console.log('✅ 既存統合更新:', serviceName);
+    } else {
+      // 新規レコード作成
+      await prisma.integration.create({
+        data: {
+          userId: existingUser.id,
           service: serviceName,
-        },
-      },
-      update: {
-        accessToken: account.access_token,
-        refreshToken: account.refresh_token || null,
-        scope: account.scope || null,
-        tokenType: account.token_type || 'Bearer',
-        isActive: true,
-        updatedAt: new Date(),
-      },
-      create: {
-        userId: userData.id,
-        service: serviceName,
-        accessToken: account.access_token,
-        refreshToken: account.refresh_token || null,
-        scope: account.scope || null,
-        tokenType: account.token_type || 'Bearer',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    console.log('✅ 統合完了:', {
-      service: integration.service,
-      hasToken: !!integration.accessToken,
-      tokenLength: integration.accessToken?.length || 0
-    });
-
-    // 🔧 他のサービスの状態を確認（影響していないことを確認）
-    const allIntegrations = await prisma.integration.findMany({
-      where: { userId: userData.id },
-      select: { service: true, isActive: true, accessToken: true }
-    });
-
-    console.log('🔍 全統合状態確認:');
-    allIntegrations.forEach(int => {
-      console.log(`  ${int.service}: アクティブ=${int.isActive}, トークン=${!!int.accessToken}`);
-    });
+          accessToken: account.access_token,
+          refreshToken: account.refresh_token,
+          scope: account.scope,
+          tokenType: account.token_type || 'Bearer',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+      console.log('✅ 新規統合作成:', serviceName);
+    }
 
     return true;
 
   } catch (error) {
-    console.log('❌ 統合エラー:', error);
+    console.log('❌ エラー:', error);
     return false;
   }
 },
