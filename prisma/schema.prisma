@@ -58,7 +58,7 @@ model User {
   updatedAt               DateTime                 @updatedAt
   accounts                Account[]
   emailVerificationTokens EmailVerificationToken[]
-  integrations            Integration[]  // 大文字のIntegration
+  integrations            Integration[]
   loginHistory            LoginHistory[]
   passwordResetTokens     PasswordResetToken[]
   sessions                Session[]
@@ -131,7 +131,7 @@ model Integration {
   id           String   @id @default(cuid())
   userId       String
   service      String
-  accessToken  String   // String? から String に変更（non-nullable）
+  accessToken  String?  // 🔧 NULL許可に変更（String → String?）
   refreshToken String?
   scope        String?
   tokenType    String?
