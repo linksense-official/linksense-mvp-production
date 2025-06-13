@@ -162,9 +162,88 @@ export const authOptions: AuthOptions = {
   callbacks: {
     // 🔧 Teams統合修正版 signIn コールバック（TypeScript修正版）
    async signIn({ user, account, profile }) {
-  console.log('🔧 テスト用認証:', account?.provider);
-  // 🚨 何もしない - 認証のみ通す
-  return true;
+  console.log('🔧 マイグレーション後認証テスト:', {
+    provider: account?.provider,
+    email: user?.email,
+    hasToken: !!account?.access_token,
+    tokenLength: account?.access_token?.length || 0
+  });
+  
+  if (!account?.provider || !user?.email || !account?.access_token) {
+    console.log('❌ 認証情報不足');
+    return false;
+  }
+
+  try {
+    // ユーザー確保
+    const userData = await prisma.user.upsert({
+      where: { email: user.email },
+      update: { 
+        name: user.name || '',
+        image: user.image,
+        updatedAt: new Date() 
+      },
+      create: {
+        email: user.email,
+        name: user.name || '',
+        image: user.image,
+        emailVerified: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log('✅ ユーザー確保:', userData.id);
+
+    // サービス名正規化
+    const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
+    
+    console.log('🔄 統合保存:', {
+      service: serviceName,
+      tokenLength: account.access_token.length
+    });
+
+    // 統合保存
+    const integration = await prisma.integration.upsert({
+      where: {
+        userId_service: {
+          userId: userData.id,
+          service: serviceName,
+        },
+      },
+      update: {
+        accessToken: account.access_token,
+        refreshToken: account.refresh_token || null,
+        scope: account.scope || null,
+        tokenType: account.token_type || 'Bearer',
+        isActive: true,
+        updatedAt: new Date(),
+      },
+      create: {
+        userId: userData.id,
+        service: serviceName,
+        accessToken: account.access_token,
+        refreshToken: account.refresh_token || null,
+        scope: account.scope || null,
+        tokenType: account.token_type || 'Bearer',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    console.log('✅ 統合保存完了:', {
+      service: integration.service,
+      hasToken: !!integration.accessToken,
+      tokenLength: integration.accessToken?.length || 0
+    });
+
+    return true;
+
+  } catch (error) {
+    console.log('❌ 認証エラー:', error);
+    return false;
+  }
 },
     
     async redirect({ url, baseUrl }) {
