@@ -162,74 +162,9 @@ export const authOptions: AuthOptions = {
   callbacks: {
     // 🔧 Teams統合修正版 signIn コールバック（TypeScript修正版）
    async signIn({ user, account, profile }) {
-  // 🔧 最小限の処理のみ
-  console.log('🔧 最小限認証処理:', account?.provider);
-  
-  if (!account?.provider || !user?.email || !account?.access_token) {
-    return false;
-  }
-
-  try {
-    // 🔧 Step 1: ユーザーIDのみ取得
-    const existingUser = await prisma.user.findUnique({
-      where: { email: user.email },
-      select: { id: true }
-    });
-
-    if (!existingUser) {
-      console.log('❌ ユーザーが存在しません');
-      return false;
-    }
-
-    console.log('✅ ユーザーID:', existingUser.id);
-
-    // 🔧 Step 2: サービス名決定
-    const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
-    
-    // 🔧 Step 3: 直接SQL的なアプローチ（競合回避）
-    // 既存レコードを探す
-    const existingIntegration = await prisma.integration.findFirst({
-      where: {
-        userId: existingUser.id,
-        service: serviceName
-      }
-    });
-
-    if (existingIntegration) {
-      // 既存レコードを更新
-      await prisma.integration.update({
-        where: { id: existingIntegration.id },
-        data: {
-          accessToken: account.access_token,
-          isActive: true,
-          updatedAt: new Date()
-        }
-      });
-      console.log('✅ 既存統合更新:', serviceName);
-    } else {
-      // 新規レコード作成
-      await prisma.integration.create({
-        data: {
-          userId: existingUser.id,
-          service: serviceName,
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token,
-          scope: account.scope,
-          tokenType: account.token_type || 'Bearer',
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      });
-      console.log('✅ 新規統合作成:', serviceName);
-    }
-
-    return true;
-
-  } catch (error) {
-    console.log('❌ エラー:', error);
-    return false;
-  }
+  console.log('🔧 テスト用認証:', account?.provider);
+  // 🚨 何もしない - 認証のみ通す
+  return true;
 },
     
     async redirect({ url, baseUrl }) {
