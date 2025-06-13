@@ -181,9 +181,14 @@ const handleConnect = async (service: ServiceConfig) => {
   setConnecting(service.id)
   
   try {
-    // 🔧 Teams専用の直接認証
+    // 🔧 Teams・Slack専用の直接認証
     if (service.id === 'teams') {
       window.location.href = `/api/teams-auth?callbackUrl=${encodeURIComponent('/integrations?success=true')}`;
+      return;
+    }
+    
+    if (service.id === 'slack') {
+      window.location.href = `/api/slack-auth?callbackUrl=${encodeURIComponent('/integrations?success=true')}`;
       return;
     }
     
