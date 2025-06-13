@@ -177,13 +177,16 @@ export default function IntegrationsPage() {
     }
   }
 
-  const handleConnect = async (service: ServiceConfig) => {
+const handleConnect = async (service: ServiceConfig) => {
   setConnecting(service.id)
   
   try {
-    if (service.isNextAuth) {
-      // 🔧 修正: 直接認証URLに飛ぶ
-      window.location.href = service.authUrl
+    // 🔧 Teams専用処理
+    if (service.id === 'teams') {
+      window.location.href = '/api/auth/signin/azure-ad?callbackUrl=' + 
+        encodeURIComponent('/integrations?success=true')
+    } else if (service.isNextAuth) {
+      await signIn(service.id, { callbackUrl: '/integrations?success=true' })
     } else {
       window.location.href = service.authUrl
     }
