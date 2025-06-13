@@ -139,18 +139,31 @@ export const authOptions: AuthOptions = {
     }),
     
     // Azure AD設定
-AzureADProvider({
-  clientId: process.env.AZURE_AD_CLIENT_ID!,
-  clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-  tenantId: process.env.AZURE_AD_TENANT_ID,
+{
+  id: 'azure-ad',
+  name: 'Azure Active Directory',
+  type: 'oauth',
+  wellKnown: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0/.well-known/openid-configuration`,
   authorization: {
     params: {
       scope: 'openid profile email User.Read',
       prompt: 'consent',
       response_type: 'code'
     }
-  }
-}),
+  },
+  idToken: true,
+  checks: ['state'],
+  profile(profile) {
+    return {
+      id: profile.sub,
+      name: profile.name,
+      email: profile.email,
+      image: profile.picture,
+    }
+  },
+  clientId: process.env.AZURE_AD_CLIENT_ID!,
+  clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+},
   ],
   
   session: {
