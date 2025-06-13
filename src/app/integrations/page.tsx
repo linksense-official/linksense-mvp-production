@@ -61,14 +61,14 @@ const services: ServiceConfig[] = [
     isNextAuth: true,
   },
   {
-    id: 'teams', // 🔧 修正: 'azure-ad' → 'teams'
-    name: 'Microsoft Teams',
-    description: 'ビジネスコラボレーション分析',
-    icon: Building2,
-    color: 'bg-blue-600',
-    authUrl: '/api/auth/signin/azure-ad', // 認証URLはそのまま
-    isNextAuth: true,
-  },
+  id: 'teams',
+  name: 'Microsoft Teams',
+  description: 'ビジネスコラボレーション分析',
+  icon: Building2,
+  color: 'bg-blue-600',
+  authUrl: '/api/auth/signin/azure-ad', // ← この部分が正しいか確認
+  isNextAuth: true,
+},
   {
     id: 'google',
     name: 'Google Meet',

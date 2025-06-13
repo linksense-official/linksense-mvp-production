@@ -142,10 +142,10 @@ export const authOptions: AuthOptions = {
 AzureADProvider({
   clientId: process.env.AZURE_AD_CLIENT_ID!,
   clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-  tenantId: process.env.AZURE_AD_TENANT_ID,
+  tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
   authorization: {
     params: {
-      scope: 'openid profile email',
+      scope: 'openid profile email offline_access User.Read',
       prompt: 'consent',
       response_type: 'code'
     }
@@ -202,6 +202,18 @@ AzureADProvider({
 
     // サービス名正規化
     const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
+
+console.log('🔍 サービス名確認:', {
+  originalProvider: account.provider,
+  normalizedService: serviceName,
+  email: user.email
+});
+
+// 🚨 重要: 意図しないサービスの統合を防ぐ
+if (!['teams', 'slack', 'discord', 'google'].includes(serviceName)) {
+  console.log('❌ 未対応サービス:', serviceName);
+  return true; // セッションのみ作成
+}
     
     // 統合保存（シンプル版）
     await prisma.integration.upsert({
