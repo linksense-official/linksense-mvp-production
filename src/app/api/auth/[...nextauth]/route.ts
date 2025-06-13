@@ -163,29 +163,25 @@ AzureADProvider({
   callbacks: {
   // 🚨 最優先デバッグログ
   async signIn({ user, account, profile }) {
-  console.error('🚨🚨🚨 統合認証 signInコールバック実行！🚨🚨🚨');
-  console.error('🚨 Provider:', account?.provider);
-  console.error('🚨 Email:', user?.email);
-  console.error('🚨 Has Token:', !!account?.access_token);
+  console.log('🔧 認証開始:', {
+    provider: account?.provider,
+    email: user?.email,
+    hasToken: !!account?.access_token
+  });
   
-  // 🔧 基本検証
+  // 基本検証
   if (!account?.provider || !user?.email) {
-    console.log('❌ プロバイダーまたはメール不足');
+    console.log('❌ 認証情報不足');
     return false;
   }
 
-  // 🔧 トークンが取得できない場合の処理
+  // トークンなしでもセッション作成
   if (!account?.access_token) {
-    console.log('❌ アクセストークン取得失敗:', {
-      provider: account.provider,
-      account_object: JSON.stringify(account, null, 2)
-    });
-    return true; // セッションは作成
+    console.log('⚠️ トークンなし - セッションのみ作成');
+    return true;
   }
 
   try {
-    console.log('✅ トークン取得成功 - 保存処理開始');
-    
     // ユーザー確保
     const userData = await prisma.user.upsert({
       where: { email: user.email },
@@ -204,31 +200,11 @@ AzureADProvider({
       },
     });
 
-    console.log('✅ ユーザー確保:', userData.id);
-
     // サービス名正規化
     const serviceName = account.provider === 'azure-ad' ? 'teams' : account.provider;
     
-    console.log('🔄 統合保存開始:', {
-      service: serviceName,
-      userId: userData.id,
-      tokenExists: !!account.access_token,
-      tokenLength: account.access_token?.length || 0
-    });
-
-    // 🔧 競合防止: 既存の統合状態を確認
-    const existingIntegrations = await prisma.integration.findMany({
-      where: { userId: userData.id },
-      select: { id: true, service: true, isActive: true }
-    });
-    
-    console.log('🔍 既存統合確認:', {
-      count: existingIntegrations.length,
-      services: existingIntegrations.map(i => ({ service: i.service, active: i.isActive }))
-    });
-
-    // 🔧 統合保存（競合防止版）
-    const integration = await prisma.integration.upsert({
+    // 統合保存（シンプル版）
+    await prisma.integration.upsert({
       where: {
         userId_service: {
           userId: userData.id,
@@ -256,41 +232,13 @@ AzureADProvider({
       },
     });
 
-    console.log('✅ 統合保存完了:', {
-      id: integration.id,
-      service: integration.service,
-      hasToken: !!integration.accessToken,
-      tokenLength: integration.accessToken?.length || 0
-    });
-
-    // 🔧 競合防止: 保存後の全統合状態を確認
-    const finalIntegrations = await prisma.integration.findMany({
-      where: { userId: userData.id },
-      select: { service: true, isActive: true, accessToken: true }
-    });
-    
-    console.log('🔍 保存後統合確認:', {
-      count: finalIntegrations.length,
-      active: finalIntegrations.filter(i => i.isActive && i.accessToken).length,
-      services: finalIntegrations.map(i => ({ 
-        service: i.service, 
-        active: i.isActive,
-        hasToken: !!i.accessToken 
-      }))
-    });
-
+    console.log('✅ 統合保存完了:', serviceName);
     return true;
 
-  } catch (error) {
-  console.error('❌❌❌ 統合保存エラー詳細:', {
-    error: error,
-    errorMessage: error instanceof Error ? error.message : String(error),
-    errorStack: error instanceof Error ? error.stack : undefined,
-    provider: account?.provider,
-    email: user?.email
-  });
-  return true;
-}
+  } catch (error: unknown) {
+    console.error('❌ 統合保存エラー:', error);
+    return true; // エラーでもセッション作成
+  }
 },
   
   async redirect({ url, baseUrl }) {
