@@ -294,11 +294,6 @@ export const authOptions: AuthOptions = {
       };
     },
   },
-  
-  // 🔧 修正: pages設定を復活（エラーページのみ変更）
-  pages: {
-    signIn: '/api/auth/signin',
-  },
 }
 
 const handler = NextAuth(authOptions)

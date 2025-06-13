@@ -181,15 +181,12 @@ const handleConnect = async (service: ServiceConfig) => {
   setConnecting(service.id)
   
   try {
-    // 🔧 Teams専用処理
-    if (service.id === 'teams') {
-      window.location.href = '/api/auth/signin/azure-ad?callbackUrl=' + 
-        encodeURIComponent('/integrations?success=true')
-    } else if (service.isNextAuth) {
-      await signIn(service.id, { callbackUrl: '/integrations?success=true' })
-    } else {
-      window.location.href = service.authUrl
-    }
+    // 🔧 全サービス共通処理（直接URL指定）
+    const authUrl = service.id === 'teams' ? '/api/auth/signin/azure-ad' : service.authUrl;
+    const callbackUrl = encodeURIComponent('/integrations?success=true');
+    
+    window.location.href = `${authUrl}?callbackUrl=${callbackUrl}`;
+    
   } catch (error) {
     console.error(`${service.name}認証エラー:`, error)
     setConnecting(null)
