@@ -181,19 +181,18 @@ const handleConnect = async (service: ServiceConfig) => {
   setConnecting(service.id)
   
   try {
-    // 🔧 すべて直接URL方式に変更
-    const authUrls = {
-      'teams': '/api/auth/signin/azure-ad',
-      'slack': '/api/auth/signin/slack',
-      'discord': '/api/auth/signin/discord', 
-      'google': '/api/auth/signin/google'
-    };
+    // 🔧 Teams専用の直接認証
+    if (service.id === 'teams') {
+      window.location.href = `/api/teams-auth?callbackUrl=${encodeURIComponent('/integrations?success=true')}`;
+      return;
+    }
     
-    const authUrl = authUrls[service.id as keyof typeof authUrls] || service.authUrl;
-    const callbackUrl = encodeURIComponent('/integrations?success=true');
-    
-    window.location.href = `${authUrl}?callbackUrl=${callbackUrl}`;
-    
+    // 他のサービス（NextAuth使用）
+    if (service.isNextAuth) {
+      await signIn(service.id, { callbackUrl: '/integrations?success=true' })
+    } else {
+      window.location.href = service.authUrl
+    }
   } catch (error) {
     console.error(`${service.name}認証エラー:`, error)
     setConnecting(null)
