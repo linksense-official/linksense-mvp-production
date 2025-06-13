@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '../auth/[...nextauth]/route'
 
 const prisma = new PrismaClient()
 
@@ -22,6 +24,10 @@ export async function GET(request: NextRequest) {
   }
   
   try {
+    // 🔧 現在のセッション取得
+    const session = await getServerSession(authOptions)
+    console.log('🔍 現在のセッション:', session?.user?.email)
+    
     // トークン取得
     const tokenResponse = await fetch(`https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/oauth2/v2.0/token`, {
       method: 'POST',
@@ -52,34 +58,39 @@ export async function GET(request: NextRequest) {
     })
     
     const userData = await userResponse.json()
-    
-    if (!userData.mail && !userData.userPrincipalName) {
-      console.error('❌ ユーザー情報取得失敗:', userData)
-      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/integrations?error=user_failed`)
-    }
-    
     const email = userData.mail || userData.userPrincipalName
     
-    // データベース保存
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: { 
-        name: userData.displayName || '',
-        updatedAt: new Date() 
-      },
-      create: {
-        email,
-        name: userData.displayName || '',
-        emailVerified: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    })
+    console.log('🔍 Teams認証ユーザー:', email)
     
+    // 🔧 セッションユーザーを優先使用
+    let targetUserId = session?.user?.id
+    
+    if (!targetUserId) {
+      // セッションがない場合のみ新規作成
+      const user = await prisma.user.upsert({
+        where: { email },
+        update: { 
+          name: userData.displayName || '',
+          updatedAt: new Date() 
+        },
+        create: {
+          email,
+          name: userData.displayName || '',
+          emailVerified: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+      targetUserId = user.id
+    }
+    
+    console.log('🔍 対象ユーザーID:', targetUserId)
+    
+    // 統合保存
     await prisma.integration.upsert({
       where: {
         userId_service: {
-          userId: user.id,
+          userId: targetUserId,
           service: 'teams',
         },
       },
@@ -92,7 +103,7 @@ export async function GET(request: NextRequest) {
         updatedAt: new Date(),
       },
       create: {
-        userId: user.id,
+        userId: targetUserId,
         service: 'teams',
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token || null,
@@ -104,7 +115,7 @@ export async function GET(request: NextRequest) {
       },
     })
     
-    console.log('✅ Teams統合保存完了')
+    console.log('✅ Teams統合保存完了 - ユーザーID:', targetUserId)
     
     const callbackUrl = state ? decodeURIComponent(state) : '/integrations?success=true'
     return NextResponse.redirect(`${process.env.NEXTAUTH_URL}${callbackUrl}`)
