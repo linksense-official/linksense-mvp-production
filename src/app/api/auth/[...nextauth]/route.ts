@@ -158,7 +158,7 @@ AzureADProvider({
     maxAge: 30 * 24 * 60 * 60,
   },
   
-  debug: true, // 🔧 本番でも一時的にデバッグ有効
+  debug: false, // 🔧 本番デバッグ無効化
   
   callbacks: {
   // 🚨 最優先デバッグログ
