@@ -140,16 +140,17 @@ export const authOptions: AuthOptions = {
     
     // Azure AD設定
     AzureADProvider({
-      clientId: process.env.AZURE_AD_CLIENT_ID!,
-      clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-      tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
-      authorization: {
-        params: {
-          scope: 'openid profile email User.Read User.Read.All Directory.Read.All People.Read.All TeamMember.Read.All',
-          prompt: 'consent'
-        }
-      }
-    }),
+  clientId: process.env.AZURE_AD_CLIENT_ID!,
+  clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+  tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
+  authorization: {
+    params: {
+      scope: 'openid profile email offline_access User.Read',
+      prompt: 'consent',
+      response_type: 'code'
+    }
+  }
+}),
   ],
   
   session: {
