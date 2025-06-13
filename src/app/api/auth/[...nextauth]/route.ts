@@ -139,7 +139,7 @@ export const authOptions: AuthOptions = {
     }),
     
     // Azure AD設定
-    AzureADProvider({
+AzureADProvider({
   clientId: process.env.AZURE_AD_CLIENT_ID!,
   clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
   tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
