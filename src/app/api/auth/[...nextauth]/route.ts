@@ -138,27 +138,27 @@ export const authOptions: AuthOptions = {
       },
     }),
     
-    // Azure AD設定
+    // Azure AD カスタムプロバイダー（型エラー修正版）
 {
   id: 'azure-ad',
   name: 'Azure Active Directory',
   type: 'oauth',
-  wellKnown: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0/.well-known/openid-configuration`,
   authorization: {
+    url: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/oauth2/v2.0/authorize`,
     params: {
       scope: 'openid profile email User.Read',
-      prompt: 'consent',
-      response_type: 'code'
+      response_type: 'code',
+      prompt: 'consent'
     }
   },
-  idToken: true,
-  checks: ['state'],
+  token: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/oauth2/v2.0/token`,
+  userinfo: 'https://graph.microsoft.com/v1.0/me',
   profile(profile) {
     return {
-      id: profile.sub,
-      name: profile.name,
-      email: profile.email,
-      image: profile.picture,
+      id: profile.id,
+      name: profile.displayName,
+      email: profile.mail || profile.userPrincipalName,
+      image: undefined, // 🔧 修正: null → undefined
     }
   },
   clientId: process.env.AZURE_AD_CLIENT_ID!,
