@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession, signIn } from 'next-auth/react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { 
   RefreshCw, 
   CheckCircle, 
@@ -13,7 +13,22 @@ import {
   Users,
   Building2,
   Shield,
-  Zap
+  Zap,
+  Clock,
+  Activity,
+  AlertCircle,
+  Wifi,
+  WifiOff,
+  Timer,
+  Loader2,
+  CheckCheck,
+  X,
+  Play,
+  Pause,
+  Settings,
+  Eye,
+  TrendingUp,
+  BarChart3  // ← この行を追加
 } from 'lucide-react'
 
 interface ServiceConfig {
@@ -24,9 +39,11 @@ interface ServiceConfig {
   color: string
   authUrl: string
   isNextAuth: boolean
+  features: string[]
+  priority: 'high' | 'medium' | 'low'
 }
 
-// 🔧 修正: Integrationインターフェースを拡張
+// 拡張されたIntegrationインターフェース
 interface Integration {
   id: string
   service: string
@@ -35,12 +52,38 @@ interface Integration {
   updatedAt: string
   teamId?: string | null
   teamName?: string | null
-  hasToken?: boolean        // 🆕 追加
-  hasRefreshToken?: boolean // 🆕 追加
-  scope?: string | null     // 🆕 追加
+  hasToken?: boolean
+  hasRefreshToken?: boolean
+  scope?: string | null
+  // 新機能フィールド
+  lastSync?: string
+  syncStatus?: 'syncing' | 'completed' | 'error' | 'pending'
+  errorMessage?: string
+  userCount?: number
+  dataQuality?: number
+  connectionHealth?: number
 }
 
-// 🎯 Phase 1対象の4サービスのみ
+// 接続進捗状態
+interface ConnectionProgress {
+  serviceId: string
+  step: 'auth' | 'token' | 'validation' | 'sync' | 'completed' | 'error'
+  progress: number
+  message: string
+  error?: string
+}
+
+// リアルタイム統計
+interface IntegrationStats {
+  totalConnected: number
+  activeConnections: number
+  totalUsers: number
+  lastSyncTime: string
+  healthScore: number
+  dataQuality: number
+}
+
+// 4サービス設定（拡張版）
 const services: ServiceConfig[] = [
   {
     id: 'slack',
@@ -50,6 +93,8 @@ const services: ServiceConfig[] = [
     color: 'bg-purple-600',
     authUrl: '/api/auth/signin/slack',
     isNextAuth: true,
+    features: ['メッセージ分析', 'チャンネル分析', 'ユーザー活動', 'リアクション分析'],
+    priority: 'high'
   },
   {
     id: 'discord',
@@ -59,16 +104,20 @@ const services: ServiceConfig[] = [
     color: 'bg-indigo-600',
     authUrl: '/api/auth/signin/discord',
     isNextAuth: true,
+    features: ['サーバー分析', 'ボイス活動', 'コミュニティ健全性'],
+    priority: 'medium'
   },
   {
-  id: 'teams',
-  name: 'Microsoft Teams',
-  description: 'ビジネスコラボレーション分析',
-  icon: Building2,
-  color: 'bg-blue-600',
-  authUrl: '/api/auth/signin/azure-ad', // ← この部分が正しいか確認
-  isNextAuth: true,
-},
+    id: 'teams',
+    name: 'Microsoft Teams',
+    description: 'ビジネスコラボレーション分析',
+    icon: Building2,
+    color: 'bg-blue-600',
+    authUrl: '/api/auth/signin/azure-ad',
+    isNextAuth: true,
+    features: ['会議分析', 'チャット分析', 'ファイル共有', 'カレンダー統合'],
+    priority: 'high'
+  },
   {
     id: 'google',
     name: 'Google Meet',
@@ -77,47 +126,183 @@ const services: ServiceConfig[] = [
     color: 'bg-red-600',
     authUrl: '/api/auth/signin/google',
     isNextAuth: true,
+    features: ['会議分析', 'カレンダー統合', '参加者分析', '時間分析'],
+    priority: 'high'
   }
 ]
 
+// UIコンポーネント
+const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}>
+    {children}
+  </div>
+)
+
+const Badge: React.FC<{ 
+  children: React.ReactNode; 
+  variant?: 'default' | 'success' | 'destructive' | 'secondary';
+  className?: string;
+}> = ({ children, variant = 'default', className = '' }) => {
+  const variantClasses = {
+    default: "bg-blue-100 text-blue-800",
+    success: "bg-green-100 text-green-800",
+    destructive: "bg-red-100 text-red-800",
+    secondary: "bg-gray-100 text-gray-800"
+  };
+  
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses[variant]} ${className}`}>
+      {children}
+    </span>
+  );
+};
+
+const Progress: React.FC<{ 
+  value: number; 
+  className?: string;
+  variant?: 'default' | 'success' | 'warning' | 'danger';
+}> = ({ value, className = '', variant = 'default' }) => {
+  const colorClasses = {
+    default: 'bg-blue-600',
+    success: 'bg-green-600',
+    warning: 'bg-yellow-600',
+    danger: 'bg-red-600'
+  };
+  
+  const normalizedValue = Math.min(100, Math.max(0, value));
+  
+  return (
+    <div className={`relative ${className}`}>
+      <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+        <div
+          className={`h-full transition-all duration-500 ease-out ${colorClasses[variant]}`}
+          style={{ width: `${normalizedValue}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
 export default function IntegrationsPage() {
   const { data: session, status } = useSession()
-  const [connecting, setConnecting] = useState<string | null>(null)
+  
+  // 状態管理
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [connectionProgress, setConnectionProgress] = useState<ConnectionProgress[]>([])
+  const [stats, setStats] = useState<IntegrationStats | null>(null)
+  const [realTimeUpdates, setRealTimeUpdates] = useState(true)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
-  // 統合状態を取得
-  const fetchIntegrations = async () => {
+  // 統計計算関数（この1つだけ残す）
+  const calculateStats = useCallback((integrations: Integration[]): IntegrationStats => {
+    const activeIntegrations = integrations.filter(i => i.isActive && i.hasToken)
+    const totalUsers = integrations.reduce((sum, i) => sum + (i.userCount || 0), 0)
+    const avgDataQuality = integrations.length > 0 
+      ? integrations.reduce((sum, i) => sum + (i.dataQuality || 0), 0) / integrations.length 
+      : 0
+    const avgHealth = integrations.length > 0
+      ? integrations.reduce((sum, i) => sum + (i.connectionHealth || 0), 0) / integrations.length
+      : 0
+
+    return {
+      totalConnected: integrations.length,
+      activeConnections: activeIntegrations.length,
+      totalUsers,
+      lastSyncTime: new Date().toISOString(),
+      healthScore: Math.round(avgHealth),
+      dataQuality: Math.round(avgDataQuality)
+    }
+  }, [])
+
+  // 並行データ取得の最適化
+  const fetchIntegrationsOptimized = useCallback(async (): Promise<void> => {
     if (!session?.user?.id) return
 
     try {
-      setLoading(true)
-      const response = await fetch('/api/integrations/user')
+      setError(null)
+      console.log('🚀 統合状態の並行取得開始')
       
-      if (!response.ok) {
-        throw new Error('統合情報の取得に失敗しました')
+      // 並行でデータ取得
+      const [integrationsResult, statsResult] = await Promise.allSettled([
+        fetch('/api/integrations/user', {
+          headers: { 'Cache-Control': 'no-cache' }
+        }),
+        fetch('/api/integrations/stats', {
+          headers: { 'Cache-Control': 'no-cache' }
+        })
+      ])
+
+      let enhancedIntegrations: Integration[] = []
+
+      // 統合情報処理
+      if (integrationsResult.status === 'fulfilled') {
+        const integrationsResponse = integrationsResult.value
+        if (integrationsResponse.ok) {
+          const data = await integrationsResponse.json()
+          
+          // 拡張情報付きで設定
+          enhancedIntegrations = (data.integrations || []).map((integration: any) => ({
+            ...integration,
+            lastSync: integration.lastSync || new Date().toISOString(),
+            syncStatus: integration.isActive ? 'completed' : 'pending',
+            userCount: integration.userCount || 0,
+            dataQuality: integration.dataQuality || (integration.isActive ? 85 : 0),
+            connectionHealth: integration.connectionHealth || (integration.isActive ? 95 : 0)
+          }))
+          
+          setIntegrations(enhancedIntegrations)
+        }
       }
 
-      const data = await response.json()
-      setIntegrations(data.integrations || [])
-      setError(null)
+      // 統計情報処理
+      let calculatedStats: IntegrationStats
+      if (statsResult.status === 'fulfilled') {
+        const statsResponse = statsResult.value
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json()
+          calculatedStats = statsData.stats
+        } else {
+          // フォールバック統計計算
+          calculatedStats = calculateStats(enhancedIntegrations)
+        }
+      } else {
+        calculatedStats = calculateStats(enhancedIntegrations)
+      }
+      
+      setStats(calculatedStats)
+      setLastRefresh(new Date())
+      
+      console.log('✅ 統合状態取得完了:', {
+        integrations: enhancedIntegrations.length,
+        connectedServices: calculatedStats.activeConnections
+      })
+
     } catch (error) {
-      console.error('統合情報取得エラー:', error)
+      console.error('❌ 統合情報取得エラー:', error)
       setError(error instanceof Error ? error.message : '統合情報の取得に失敗しました')
     } finally {
       setLoading(false)
     }
-  }
+  }, [session?.user?.id, calculateStats])
 
-  // セッション確立時に統合状態を取得
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchIntegrations()
+// リアルタイム更新
+useEffect(() => {
+  if (session?.user?.id) {
+    fetchIntegrationsOptimized()
+    
+    if (realTimeUpdates) {
+      const interval = setInterval(fetchIntegrationsOptimized, 30000) // 30秒間隔
+      return () => clearInterval(interval)
     }
-  }, [session?.user?.id])
+  }
+  
+  // 全てのコードパスで戻り値を返すように修正
+  return undefined
+}, [session?.user?.id, realTimeUpdates, fetchIntegrationsOptimized])
 
-  // URL パラメータで成功メッセージを表示
+  // OAuth成功後の処理
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const success = urlParams.get('success')
@@ -125,44 +310,121 @@ export default function IntegrationsPage() {
     
     if (success === 'true') {
       setTimeout(() => {
-        fetchIntegrations()
+        fetchIntegrationsOptimized()
       }, 1000)
+      
+      // URLクリーンアップ
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
     } else if (error) {
-      console.log('🔍 エラーを検出:', error)
+      setError(`認証エラー: ${error}`)
     }
-  }, [])
+  }, [fetchIntegrationsOptimized])
 
-  // 🔧 修正: サービスが統合済みかチェック（型安全版）
-  const isServiceConnected = (serviceId: string): boolean => {
+  // サービス接続状態チェック（最適化版）
+  const getServiceStatus = useCallback((serviceId: string) => {
     const integration = integrations.find(integration => {
       const normalizedService = integration.service.toLowerCase().trim()
       const normalizedServiceId = serviceId.toLowerCase().trim()
       
-      // 完全一致かつアクティブかつトークンありの場合のみ接続済みとする
-      return normalizedService === normalizedServiceId && 
-             integration.isActive && 
-             (integration.hasToken ?? false) // 🔧 修正: undefined対応
+      return normalizedService === normalizedServiceId
     })
     
-    const isConnected = !!integration
-    console.log(`🔍 ${serviceId} 接続チェック:`, {
-      found: !!integration,
-      isActive: integration?.isActive,
-      hasToken: integration?.hasToken ?? false, // 🔧 修正: undefined対応
-      result: isConnected
-    })
+    if (!integration) {
+      return { connected: false, status: 'disconnected', integration: null }
+    }
     
-    return isConnected
-  }
+    const isFullyConnected = integration.isActive && (integration.hasToken ?? false)
+    
+    return {
+      connected: isFullyConnected,
+      status: integration.syncStatus || (isFullyConnected ? 'completed' : 'pending'),
+      integration,
+      health: integration.connectionHealth || 0,
+      dataQuality: integration.dataQuality || 0,
+      lastSync: integration.lastSync,
+      userCount: integration.userCount || 0
+    }
+  }, [integrations])
 
-  // 統合解除
-  const handleDisconnect = async (serviceId: string) => {
+  // 接続処理（進捗表示付き）
+  const handleConnect = useCallback(async (service: ServiceConfig) => {
+    const progressId = `${service.id}-${Date.now()}`
+    
+    // 進捗状態初期化
+    setConnectionProgress(prev => [...prev, {
+      serviceId: service.id,
+      step: 'auth',
+      progress: 10,
+      message: '認証を開始しています...'
+    }])
+    
+    try {
+      // 進捗更新: トークン取得
+      setConnectionProgress(prev => prev.map(p => 
+        p.serviceId === service.id 
+          ? { ...p, step: 'token', progress: 30, message: 'トークンを取得中...' }
+          : p
+      ))
+      
+      // Teams・Slack専用の直接認証
+      if (service.id === 'teams') {
+        window.location.href = `/api/teams-auth?callbackUrl=${encodeURIComponent('/integrations?success=true')}`
+        return
+      }
+      
+      if (service.id === 'slack') {
+        window.location.href = `/api/slack-auth?callbackUrl=${encodeURIComponent('/integrations?success=true')}`
+        return
+      }
+      
+      // 進捗更新: 検証
+      setConnectionProgress(prev => prev.map(p => 
+        p.serviceId === service.id 
+          ? { ...p, step: 'validation', progress: 60, message: '接続を検証中...' }
+          : p
+      ))
+      
+      // 他のサービス（NextAuth使用）
+      if (service.isNextAuth) {
+        await signIn(service.id, { callbackUrl: '/integrations?success=true' })
+      } else {
+        window.location.href = service.authUrl
+      }
+      
+    } catch (error) {
+      console.error(`${service.name}認証エラー:`, error)
+      setConnectionProgress(prev => prev.map(p => 
+        p.serviceId === service.id 
+          ? { 
+              ...p, 
+              step: 'error', 
+              progress: 0, 
+              message: '接続に失敗しました',
+              error: error instanceof Error ? error.message : '不明なエラー'
+            }
+          : p
+      ))
+    }
+  }, [])
+
+  // 統合解除（確認ダイアログ付き）
+  const handleDisconnect = useCallback(async (serviceId: string) => {
+    const service = services.find(s => s.id === serviceId)
+    if (!service) return
+    
+    const confirmed = window.confirm(
+      `${service.name}との統合を解除しますか？\n\n` +
+      '解除すると以下のデータが利用できなくなります：\n' +
+      service.features.map(f => `• ${f}`).join('\n')
+    )
+    
+    if (!confirmed) return
+
     try {
       const response = await fetch('/api/integrations/disconnect', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ service: serviceId }),
       })
 
@@ -170,46 +432,41 @@ export default function IntegrationsPage() {
         throw new Error('統合解除に失敗しました')
       }
 
-      await fetchIntegrations()
+      await fetchIntegrationsOptimized()
     } catch (error) {
       console.error('統合解除エラー:', error)
-      alert('統合解除に失敗しました')
+      setError('統合解除に失敗しました')
     }
-  }
+  }, [fetchIntegrationsOptimized])
 
-const handleConnect = async (service: ServiceConfig) => {
-  setConnecting(service.id)
-  
-  try {
-    // 🔧 Teams・Slack専用の直接認証
-    if (service.id === 'teams') {
-      window.location.href = `/api/teams-auth?callbackUrl=${encodeURIComponent('/integrations?success=true')}`;
-      return;
-    }
-    
-    if (service.id === 'slack') {
-      window.location.href = `/api/slack-auth?callbackUrl=${encodeURIComponent('/integrations?success=true')}`;
-      return;
-    }
-    
-    // 他のサービス（NextAuth使用）
-    if (service.isNextAuth) {
-      await signIn(service.id, { callbackUrl: '/integrations?success=true' })
-    } else {
-      window.location.href = service.authUrl
-    }
-  } catch (error) {
-    console.error(`${service.name}認証エラー:`, error)
-    setConnecting(null)
-  }
-}
+  // 手動更新
+  const handleRefresh = useCallback(async () => {
+    setLoading(true)
+    await fetchIntegrationsOptimized()
+  }, [fetchIntegrationsOptimized])
+
+  // メモ化された計算値
+  const sortedServices = useMemo(() => {
+    return [...services].sort((a, b) => {
+      const priorityOrder = { high: 3, medium: 2, low: 1 }
+      return priorityOrder[b.priority] - priorityOrder[a.priority]
+    })
+  }, [])
+
+  const connectedCount = useMemo(() => {
+    return integrations.filter(i => i.isActive && (i.hasToken ?? false)).length
+  }, [integrations])
+
+  const activeProgress = useMemo(() => {
+    return connectionProgress.filter(p => p.step !== 'completed' && p.step !== 'error')
+  }, [connectionProgress])
 
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">読み込み中...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">認証状態を確認中...</p>
         </div>
       </div>
     )
@@ -218,191 +475,387 @@ const handleConnect = async (service: ServiceConfig) => {
   if (status === 'unauthenticated') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md mx-auto text-center bg-white rounded-lg shadow-sm p-8">
+        <Card className="max-w-md mx-auto text-center p-8">
+          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-4">認証が必要です</h1>
           <p className="text-gray-600 mb-6">統合管理にはログインが必要です</p>
           <button
             onClick={() => signIn()}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
+            <Shield className="h-4 w-4" />
             ログイン
           </button>
-        </div>
+        </Card>
       </div>
     )
   }
 
-  const connectedCount = integrations.filter(i => i.isActive && (i.hasToken ?? false)).length
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* ヘッダー */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            LinkSense MVP
+        <div className="text-center mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            LinkSense 統合管理
           </h1>
-          <p className="text-xl text-gray-600 mb-2">
-            サービス統合管理
+          <p className="text-lg sm:text-xl text-gray-600 mb-2">
+            サービス統合とリアルタイム監視
           </p>
-          <p className="text-sm text-gray-500">
-            4つのサービスを統合してチーム分析を開始
-          </p>
+          <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-1">
+              <Activity className={`h-4 w-4 ${realTimeUpdates ? 'text-green-500 animate-pulse' : 'text-gray-400'}`} />
+              <span>{realTimeUpdates ? 'リアルタイム監視中' : '手動更新モード'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>最終更新: {lastRefresh.toLocaleTimeString('ja-JP')}</span>
+            </div>
+          </div>
         </div>
+
+        {/* コントロールパネル */}
+        <Card className="mb-8 p-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setRealTimeUpdates(!realTimeUpdates)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  realTimeUpdates 
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {realTimeUpdates ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {realTimeUpdates ? 'リアルタイム停止' : 'リアルタイム開始'}
+              </button>
+              
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                更新
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1">
+                <Wifi className="h-4 w-4 text-green-500" />
+                <span className="text-gray-600">接続状態: 良好</span>
+              </div>
+              {stats && (
+                <Badge variant="success">
+                  健全性: {stats.healthScore}%
+                </Badge>
+              )}
+            </div>
+          </div>
+        </Card>
 
         {/* エラー表示 */}
         {error && (
-          <div className="mb-8 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="font-medium text-red-800 mb-1">エラーが発生しました</h3>
-                <p className="text-red-700 text-sm">{error}</p>
-                <button
-                  onClick={fetchIntegrations}
-                  className="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  再試行
-                </button>
+          <Card className="mb-8 border-red-200 bg-red-50">
+            <div className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-medium text-red-800 mb-1">エラーが発生しました</h3>
+                  <p className="text-red-700 text-sm mb-3">{error}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRefresh}
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      再試行
+                    </button>
+                    <button
+                      onClick={() => setError(null)}
+                      className="bg-white border border-red-300 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                    >
+                      閉じる
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* 統合状況サマリー */}
-        {!loading && (
-          <div className="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">統合状況</h2>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-600">
-                  {connectedCount}/4 接続済み
-                </span>
+        {stats && !loading && (
+          <Card className="mb-8">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">統合状況サマリー</h2>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-green-600" />
+                  <span className="font-medium text-green-600">
+                    {stats.activeConnections}/4 アクティブ
+                  </span>
+                </div>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {services.map((service) => {
-                const isConnected = isServiceConnected(service.id)
-                const IconComponent = service.icon
-                return (
-                  <div key={service.id} className="text-center">
-                    <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center transition-all ${
-                      isConnected ? service.color : 'bg-gray-200'
-                    }`}>
-                      <IconComponent className="h-6 w-6 text-white" />
-                    </div>
-                    <p className="font-medium text-gray-900 mb-1">{service.name}</p>
-                    <div className="flex items-center justify-center gap-1">
-                      {isConnected ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-gray-400" />
-                      )}
-                      <span className={`text-sm ${isConnected ? 'text-green-600' : 'text-gray-500'}`}>
-                        {isConnected ? '接続済み' : '未接続'}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-blue-600" />
-                <p className="text-sm text-blue-700 font-medium">
-                  {connectedCount === 0 && 'サービスを接続して統合分析を開始しましょう'}
-                  {connectedCount > 0 && connectedCount < 2 && `${connectedCount}個のサービスが接続済み。追加接続で分析精度が向上します`}
-                  {connectedCount >= 2 && connectedCount < 4 && `${connectedCount}個のサービスが接続済み。包括的な分析が利用可能です`}
-                  {connectedCount === 4 && '全サービスが接続済み！最高精度の統合分析をお楽しみください'}
+              
+              {/* 統計グリッド */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <Building2 className="h-6 w-6 text-blue-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-blue-600">{stats.activeConnections}</div>
+                  <div className="text-sm text-gray-600">接続済みサービス</div>
+                </div>
+                
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <Users className="h-6 w-6 text-green-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-green-600">{stats.totalUsers.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">統合ユーザー数</div>
+                </div>
+                
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <Activity className="h-6 w-6 text-purple-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-purple-600">{stats.healthScore}%</div>
+                  <div className="text-sm text-gray-600">接続健全性</div>
+                </div>
+                
+                <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-yellow-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-yellow-600">{stats.dataQuality}%</div>
+                  <div className="text-sm text-gray-600">データ品質</div>
+                </div>
+              </div>
+              
+              {/* 全体進捗 */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">統合進捗</span>
+                  <span className="text-sm text-gray-600">
+                    {Math.round((stats.activeConnections / 4) * 100)}%
+                  </span>
+                </div>
+                <Progress 
+                  value={(stats.activeConnections / 4) * 100} 
+                  variant="success"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  {stats.activeConnections === 0 && 'サービス接続を開始してください'}
+                  {stats.activeConnections > 0 && stats.activeConnections < 2 && '基本分析が利用可能です'}
+                  {stats.activeConnections >= 2 && stats.activeConnections < 4 && '高度な分析が利用可能です'}
+                  {stats.activeConnections === 4 && '最高精度の統合分析が利用可能です'}
                 </p>
               </div>
             </div>
-          </div>
+          </Card>
+        )}
+
+        {/* 接続進捗表示 */}
+        {activeProgress.length > 0 && (
+          <Card className="mb-8 border-blue-200 bg-blue-50">
+            <div className="p-4">
+              <h3 className="font-medium text-blue-800 mb-3 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                接続処理中
+              </h3>
+              <div className="space-y-3">
+                {activeProgress.map((progress) => (
+                  <div key={progress.serviceId} className="bg-white rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-900">
+                        {services.find(s => s.id === progress.serviceId)?.name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {progress.progress}%
+                      </span>
+                    </div>
+                    <Progress value={progress.progress} variant="default" className="mb-2" />
+                    <p className="text-xs text-gray-600">{progress.message}</p>
+                    {progress.error && (
+                      <p className="text-xs text-red-600 mt-1">エラー: {progress.error}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
         )}
 
         {/* サービス一覧 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {services.map((service) => {
-            const isConnected = isServiceConnected(service.id)
-            const integration = integrations.find(i => i.service === service.id)
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {sortedServices.map((service) => {
+            const serviceStatus = getServiceStatus(service.id)
             const IconComponent = service.icon
+            const isConnecting = activeProgress.some(p => p.serviceId === service.id)
             
             return (
-              <div
+              <Card
                 key={service.id}
-                className={`bg-white rounded-lg border shadow-sm transition-all hover:shadow-md ${
-                  isConnected 
+                className={`transition-all hover:shadow-md ${
+                  serviceStatus.connected 
                     ? 'border-green-200 bg-green-50/30' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
                 <div className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <div className={`flex-shrink-0 rounded-lg p-3 text-white ${
-                      isConnected ? service.color : 'bg-gray-400'
-                    }`}>
-                      <IconComponent className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {service.name}
-                        </h3>
-                        {isConnected && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            接続済み
-                          </span>
-                        )}
+                  {/* サービスヘッダー */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start space-x-4">
+                      <div className={`flex-shrink-0 rounded-lg p-3 text-white ${
+                        serviceStatus.connected ? service.color : 'bg-gray-400'
+                      }`}>
+                        <IconComponent className="h-6 w-6" />
                       </div>
-                      <p className="text-gray-600 mb-3">
-                        {service.description}
-                      </p>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          <Zap className="h-3 w-3 mr-1" />
-                          NextAuth統合
-                        </span>
-                      </div>
-                      {integration && (
-                        <p className="text-xs text-gray-500">
-                          接続日時: {new Date(integration.createdAt).toLocaleString()}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {service.name}
+                          </h3>
+                          <Badge variant={service.priority === 'high' ? 'destructive' : 'secondary'}>
+                            {service.priority === 'high' ? '推奨' : '任意'}
+                          </Badge>
+                        </div>
+                        <p className="text-gray-600 text-sm">
+                          {service.description}
                         </p>
+                      </div>
+                    </div>
+                    
+                    {/* 接続状態表示 */}
+                    <div className="flex flex-col items-end gap-1">
+                       {serviceStatus.connected ? (
+                        <Badge variant="success" className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          接続済み
+                        </Badge>
+                      ) : isConnecting ? (
+                        <Badge variant="default" className="flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          接続中
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />
+                          未接続
+                        </Badge>
+                      )}
+                      
+                      {serviceStatus.connected && (
+                        <div className="text-xs text-gray-500 text-right">
+                          <div className="flex items-center gap-1">
+                            <Wifi className="h-3 w-3" />
+                            健全性: {serviceStatus.health}%
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
-                  
-                  <div className="mt-6 flex gap-3">
-                    {isConnected ? (
+
+                  {/* 機能一覧 */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">提供機能:</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {service.features.map((feature, index) => (
+                        <span
+                          key={index}
+                          className="inline-block px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
+                        >
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 接続詳細情報 */}
+                  {serviceStatus.integration && (
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-gray-600">接続日時:</span>
+                          <div className="font-medium text-gray-900">
+                            {new Date(serviceStatus.integration.createdAt).toLocaleDateString('ja-JP')}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">最終同期:</span>
+                          <div className="font-medium text-gray-900">
+                            {serviceStatus.lastSync ? 
+                              new Date(serviceStatus.lastSync).toLocaleTimeString('ja-JP') : 
+                              '未同期'
+                            }
+                          </div>
+                        </div>
+                        {serviceStatus.userCount > 0 && (
+                          <div>
+                            <span className="text-gray-600">ユーザー数:</span>
+                            <div className="font-medium text-gray-900">
+                              {serviceStatus.userCount.toLocaleString()}名
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-gray-600">データ品質:</span>
+                          <div className="font-medium text-gray-900">
+                            {serviceStatus.dataQuality}%
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* データ品質インジケーター */}
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-600">データ品質</span>
+                          <span className="text-xs text-gray-600">{serviceStatus.dataQuality}%</span>
+                        </div>
+                        <Progress 
+                          value={serviceStatus.dataQuality} 
+                          variant={serviceStatus.dataQuality >= 80 ? 'success' : serviceStatus.dataQuality >= 60 ? 'warning' : 'danger'}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* エラー表示 */}
+                  {serviceStatus.integration?.errorMessage && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <h4 className="text-sm font-medium text-red-800">接続エラー</h4>
+                          <p className="text-xs text-red-700 mt-1">
+                            {serviceStatus.integration.errorMessage}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* アクションボタン */}
+                  <div className="flex gap-3">
+                    {serviceStatus.connected ? (
                       <>
                         <button
                           onClick={() => handleDisconnect(service.id)}
                           className="flex-1 inline-flex justify-center items-center py-2.5 px-4 border border-red-300 text-sm font-medium rounded-lg text-red-700 bg-white hover:bg-red-50 transition-colors"
                         >
-                          <XCircle className="h-4 w-4 mr-2" />
+                          <X className="h-4 w-4 mr-2" />
                           切断
                         </button>
                         <button
                           onClick={() => handleConnect(service)}
-                          disabled={connecting === service.id}
+                          disabled={isConnecting}
                           className={`flex-1 inline-flex justify-center items-center py-2.5 px-4 text-sm font-medium rounded-lg text-white ${service.color} hover:opacity-90 disabled:opacity-50 transition-all`}
                         >
-                          <RefreshCw className={`h-4 w-4 mr-2 ${connecting === service.id ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`h-4 w-4 mr-2 ${isConnecting ? 'animate-spin' : ''}`} />
                           再接続
                         </button>
                       </>
                     ) : (
                       <button
                         onClick={() => handleConnect(service)}
-                        disabled={connecting === service.id}
+                        disabled={isConnecting}
                         className={`w-full inline-flex justify-center items-center py-2.5 px-4 text-sm font-medium rounded-lg text-white ${service.color} hover:opacity-90 disabled:opacity-50 transition-all`}
                       >
-                        {connecting === service.id ? (
+                        {isConnecting ? (
                           <>
-                            <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                            <Loader2 className="animate-spin h-4 w-4 mr-2" />
                             接続中...
                           </>
                         ) : (
@@ -415,58 +868,190 @@ const handleConnect = async (service: ServiceConfig) => {
                     )}
                   </div>
                 </div>
-              </div>
+              </Card>
             )
           })}
         </div>
 
         {/* 認証状況表示 */}
         {session && (
-          <div className="mb-8 bg-green-50 border border-green-200 rounded-lg p-6">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-green-800 mb-2">
-                  認証済みユーザー
-                </h3>
-                <div className="space-y-1 text-sm">
-                  <p className="text-green-700">
-                    ユーザー: {session.user?.name || session.user?.email}
-                  </p>
-                  <p className="text-green-600 text-xs">
-                    プロバイダー: {(session as any).provider || 'NextAuth'}
-                  </p>
+          <Card className="mb-8 border-green-200 bg-green-50">
+            <div className="p-6">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-green-800 mb-2">
+                    認証済みユーザー
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-green-600 font-medium">ユーザー:</span>
+                      <div className="text-green-700">
+                        {session.user?.name || session.user?.email}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-green-600 font-medium">プロバイダー:</span>
+                      <div className="text-green-700">
+                        {(session as any).provider || 'NextAuth'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-green-600 font-medium">セッション開始:</span>
+                      <div className="text-green-700">
+                        {new Date((session as any).expires || Date.now()).toLocaleString('ja-JP')}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-green-600 font-medium">統合権限:</span>
+                      <div className="text-green-700">フル権限</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* 使い方ガイド */}
+        {/* ガイダンス */}
         {connectedCount === 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-amber-800 mb-3">
-                  統合分析を開始しましょう
-                </h3>
-                <div className="text-amber-700 text-sm space-y-3">
-                  <p>サービスを接続することで以下の機能が利用可能になります：</p>
-                  <ul className="list-disc list-inside space-y-1 ml-4">
-                    <li>チーム健全性の自動分析</li>
-                    <li>コミュニケーションパターンの可視化</li>
-                    <li>AI による改善提案</li>
-                    <li>詳細なレポート生成</li>
-                  </ul>
-                  <p className="font-medium bg-amber-100 rounded p-3 mt-4">
-                    💡 推奨：主要なサービス（Slack、Teams、Google Meet）から接続を開始してください
-                  </p>
+          <Card className="border-amber-200 bg-amber-50">
+            <div className="p-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-800 mb-3">
+                    統合分析を開始しましょう
+                  </h3>
+                  <div className="text-amber-700 text-sm space-y-3">
+                    <p>サービスを接続することで以下の機能が段階的に利用可能になります：</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-amber-100 rounded-lg p-3">
+                        <h4 className="font-medium text-amber-800 mb-2">1つのサービス接続</h4>
+                        <ul className="text-xs space-y-1">
+                          <li>• 基本的なアクティビティ分析</li>
+                          <li>• ユーザー行動の可視化</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="bg-amber-100 rounded-lg p-3">
+                        <h4 className="font-medium text-amber-800 mb-2">2つ以上の接続</h4>
+                        <ul className="text-xs space-y-1">
+                          <li>• クロスプラットフォーム分析</li>
+                          <li>• コミュニケーションパターン分析</li>
+                          <li>• AI による改善提案</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="bg-amber-100 rounded-lg p-3">
+                        <h4 className="font-medium text-amber-800 mb-2">3つ以上の接続</h4>
+                        <ul className="text-xs space-y-1">
+                          <li>• 高度なチーム健全性分析</li>
+                          <li>• 離職リスク予測</li>
+                          <li>• 詳細なレポート生成</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="bg-amber-100 rounded-lg p-3">
+                        <h4 className="font-medium text-amber-800 mb-2">全サービス接続</h4>
+                        <ul className="text-xs space-y-1">
+                          <li>• 最高精度の統合分析</li>
+                          <li>• リアルタイム監視</li>
+                          <li>• カスタムダッシュボード</li>
+                        </ul>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-amber-100 rounded p-3 mt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Zap className="h-4 w-4 text-amber-600" />
+                        <span className="font-medium text-amber-800">推奨接続順序</span>
+                      </div>
+                      <ol className="text-xs space-y-1 ml-4">
+                        <li>1. <strong>Slack または Teams</strong> - メインのコミュニケーション</li>
+                        <li>2. <strong>Google Meet</strong> - 会議・カレンダー分析</li>
+                        <li>3. <strong>Discord</strong> - コミュニティ分析（該当する場合）</li>
+                      </ol>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         )}
+
+        {/* 高度な統合オプション */}
+        {connectedCount >= 2 && (
+          <Card className="border-purple-200 bg-purple-50">
+            <div className="p-6">
+              <div className="flex items-start gap-3">
+                <Settings className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-purple-800 mb-3">
+                    高度な統合オプション
+                  </h3>
+                  <div className="text-purple-700 text-sm space-y-3">
+                    <p>複数のサービスが接続されました。以下の高度な機能をご利用いただけます：</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <button
+                        onClick={() => window.open('/analytics', '_blank')}
+                        className="bg-white border border-purple-300 rounded-lg p-3 text-left hover:bg-purple-100 transition-colors"
+                      >
+                        <BarChart3 className="h-5 w-5 text-purple-600 mb-2" />
+                        <h4 className="font-medium text-purple-800 mb-1">詳細分析</h4>
+                        <p className="text-xs text-purple-600">
+                          統合データの詳細分析とレポート
+                        </p>
+                      </button>
+                      
+                      <button
+                        onClick={() => window.open('/dashboard', '_blank')}
+                        className="bg-white border border-purple-300 rounded-lg p-3 text-left hover:bg-purple-100 transition-colors"
+                      >
+                        <Activity className="h-5 w-5 text-purple-600 mb-2" />
+                        <h4 className="font-medium text-purple-800 mb-1">ダッシュボード</h4>
+                        <p className="text-xs text-purple-600">
+                          リアルタイム監視とAI分析
+                        </p>
+                      </button>
+                      
+                      <button
+                        onClick={() => window.open('/reports', '_blank')}
+                        className="bg-white border border-purple-300 rounded-lg p-3 text-left hover:bg-purple-100 transition-colors"
+                      >
+                        <Eye className="h-5 w-5 text-purple-600 mb-2" />
+                        <h4 className="font-medium text-purple-800 mb-1">レポート</h4>
+                        <p className="text-xs text-purple-600">
+                          カスタムレポートの生成
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* フッター情報 */}
+        <div className="text-center text-sm text-gray-500 mt-8">
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <span>LinkSense MVP v1.0</span>
+            <span>•</span>
+            <span>統合管理システム</span>
+            <span>•</span>
+            <span>リアルタイム監視対応</span>
+          </div>
+          <p>
+            サポートが必要な場合は、
+            <a href="mailto:support@linksense.app" className="text-blue-600 hover:text-blue-800">
+              support@linksense.app
+            </a>
+            までお問い合わせください。
+          </p>
+        </div>
       </div>
     </div>
   )

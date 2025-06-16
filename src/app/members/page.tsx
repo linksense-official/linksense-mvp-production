@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { UnifiedUser, TeamHealthMetrics, RiskAnalysis } from '@/types/unified-user'
 import { 
   Users, 
   AlertTriangle, 
@@ -25,62 +26,6 @@ import {
   Phone
 } from 'lucide-react'
 
-interface UnifiedUser {
-  id: string;
-  name: string;
-  email?: string;
-  avatar?: string;
-  service: string;
-  role?: string;
-  department?: string;
-  lastActivity?: string;
-  isActive: boolean;
-  activityScore: number;
-  communicationScore: number;
-  isolationRisk: 'low' | 'medium' | 'high';
-  metadata: {
-    messageCount?: number;
-    meetingCount?: number;
-    responseTime?: number;
-    workingHours?: string;
-    timezone?: string;
-    joinDate?: string;
-  };
-}
-
-interface TeamHealthMetrics {
-  totalMembers: number;
-  activeMembers: number;
-  healthScore: number;
-  isolationRisks: {
-    high: number;
-    medium: number;
-    low: number;
-  };
-  serviceDistribution: Record<string, number>;
-  lastUpdated: string;
-}
-
-interface RiskAnalysis {
-  summary: {
-    total: number;
-    highRisk: number;
-    mediumRisk: number;
-    lowRisk: number;
-  };
-  recommendations: Array<{
-    priority: string;
-    action: string;
-    targets: string[];
-    reason: string;
-  }>;
-  trends: {
-    improving: number;
-    declining: number;
-    stable: number;
-  };
-}
-
 export default function MembersPage() {
   const { user, isAuthenticated } = useAuth()
   const [users, setUsers] = useState<UnifiedUser[]>([])
@@ -96,7 +41,7 @@ export default function MembersPage() {
   const [serviceFilter, setServiceFilter] = useState<string>('all')
   const [showSensitiveData, setShowSensitiveData] = useState(false)
 
-  // リアルデータ取得
+  // リアルデータ取得（最適化版）
   const fetchRealData = async () => {
     if (!isAuthenticated) return
 
@@ -104,9 +49,21 @@ export default function MembersPage() {
       setLoading(true)
       setError(null)
       
-      console.log('🔄 リアルデータ取得開始')
+      console.log('🔄 最適化データ取得開始')
       
-      const response = await fetch('/api/integrations/data')
+      // タイムアウト設定（30秒）
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      
+      const response = await fetch('/api/integrations/data', {
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      
+      clearTimeout(timeoutId)
       
       if (!response.ok) {
         throw new Error(`データ取得エラー: ${response.status}`)
@@ -115,21 +72,43 @@ export default function MembersPage() {
       const data = await response.json()
       
       if (data.success) {
-        setUsers(data.data.users || [])
+        // データ検証とフィルタリング
+        const validUsers = (data.data.users || []).filter((user: any) => 
+          user && user.id && user.name && user.service
+        )
+        
+        setUsers(validUsers)
         setTeamHealth(data.data.teamHealth || null)
         setRiskAnalysis(data.data.riskAnalysis || null)
         setLastUpdated(data.data.metadata?.dataFreshness || new Date().toISOString())
         
-        console.log('✅ リアルデータ取得成功:', {
-          userCount: data.data.users?.length || 0,
-          healthScore: data.data.teamHealth?.healthScore || 0
+        console.log('✅ 最適化データ取得成功:', {
+          userCount: validUsers.length,
+          healthScore: data.data.teamHealth?.healthScore || 0,
+          processingTime: data.data.metadata?.processingStats?.totalProcessingTime || 0
         })
+        
+        // パフォーマンス警告
+        const processingTime = data.data.metadata?.processingStats?.totalProcessingTime || 0
+        if (processingTime > 20000) {
+          console.warn(`⚠️ 処理時間が長いです: ${processingTime}ms`)
+        }
+        
       } else {
         throw new Error(data.error || 'データ取得に失敗しました')
       }
     } catch (error) {
       console.error('❌ データ取得エラー:', error)
-      setError(error instanceof Error ? error.message : 'データ取得に失敗しました')
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          setError('データ取得がタイムアウトしました。しばらく待ってから再試行してください。')
+        } else {
+          setError(error.message)
+        }
+      } else {
+        setError('データ取得に失敗しました')
+      }
     } finally {
       setLoading(false)
     }
@@ -139,17 +118,39 @@ export default function MembersPage() {
     fetchRealData()
   }, [isAuthenticated])
 
-  // フィルタリング処理
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  // フィルタリング処理（最適化版）
+  const filteredUsers = useMemo(() => {
+    if (!users.length) return []
     
-    const matchesRisk = riskFilter === 'all' || user.isolationRisk === riskFilter
-    const matchesService = serviceFilter === 'all' || user.service.includes(serviceFilter)
-    
-    return matchesSearch && matchesRisk && matchesService
-  })
+    return users.filter(user => {
+      // 検索フィルター（大文字小文字を区別しない）
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase()
+        const matchesSearch = 
+          user.name?.toLowerCase().includes(searchLower) ||
+          user.email?.toLowerCase().includes(searchLower) ||
+          user.department?.toLowerCase().includes(searchLower) ||
+          user.role?.toLowerCase().includes(searchLower)
+        
+        if (!matchesSearch) return false
+      }
+      
+      // リスクフィルター
+      if (riskFilter !== 'all' && user.isolationRisk !== riskFilter) {
+        return false
+      }
+      
+      // サービスフィルター
+      if (serviceFilter !== 'all') {
+        const userServices = user.service.toLowerCase().split(',').map(s => s.trim())
+        if (!userServices.includes(serviceFilter.toLowerCase())) {
+          return false
+        }
+      }
+      
+      return true
+    })
+  }, [users, searchTerm, riskFilter, serviceFilter])
 
   // リスクレベル別の色とアイコン
   const getRiskStyle = (risk: string) => {
@@ -191,35 +192,75 @@ export default function MembersPage() {
     return '🔗'
   }
 
-  // CSV エクスポート
-  const exportToCSV = () => {
-    const csvData = filteredUsers.map(user => ({
-      名前: user.name,
-      メール: showSensitiveData ? user.email : '***',
-      部署: user.department,
-      サービス: user.service,
-      活動スコア: user.activityScore,
-      コミュニケーションスコア: user.communicationScore,
-      離職リスク: user.isolationRisk,
-      最終活動: user.lastActivity ? new Date(user.lastActivity).toLocaleDateString() : '不明',
-      アクティブ: user.isActive ? 'はい' : 'いいえ'
-    }))
+   // CSV エクスポート（最適化版）
+  const exportToCSV = useCallback(() => {
+    if (!filteredUsers.length) {
+      alert('エクスポートするデータがありません')
+      return
+    }
+    
+    try {
+      console.log('📊 CSV エクスポート開始:', filteredUsers.length, '件')
+      
+      const csvData = filteredUsers.map(user => ({
+        名前: user.name || '',
+        メール: showSensitiveData ? (user.email || '') : '***',
+        部署: user.department || '',
+        サービス: user.service || '',
+        役割: user.role || '',
+        活動スコア: user.activityScore || 0,
+        コミュニケーションスコア: user.communicationScore || 0,
+        離職リスク: user.isolationRisk || '',
+        関係性: user.relationshipType || '',
+        関係性強度: user.relationshipStrength || 0,
+        最終活動: user.lastActivity ? new Date(user.lastActivity).toLocaleDateString('ja-JP') : '不明',
+        アクティブ: user.isActive ? 'はい' : 'いいえ',
+        処理モード: user.metadata?.processingMode || '標準'
+      }))
 
-    const csv = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
-    ].join('\n')
+      // CSVヘッダーとデータを結合
+      const headers = Object.keys(csvData[0])
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => 
+          headers.map(header => {
+            const value = row[header as keyof typeof row]
+            // カンマやダブルクォートを含む値をエスケープ
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+              return `"${value.replace(/"/g, '""')}"`
+            }
+            return value
+          }).join(',')
+        )
+      ].join('\n')
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `team_members_${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
+      // BOMを追加してExcelでの文字化けを防ぐ
+      const bom = '\uFEFF'
+      const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
+      
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      const timestamp = new Date().toISOString().split('T')[0]
+      const filename = `team_members_optimized_${timestamp}.csv`
+      
+      link.setAttribute('href', url)
+      link.setAttribute('download', filename)
+      link.style.visibility = 'hidden'
+      
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // メモリクリーンアップ
+      URL.revokeObjectURL(url)
+      
+      console.log('✅ CSV エクスポート完了:', filename)
+      
+    } catch (error) {
+      console.error('❌ CSV エクスポートエラー:', error)
+      alert('CSVエクスポートに失敗しました')
+    }
+  }, [filteredUsers, showSensitiveData])
 
   if (!isAuthenticated) {
     return (
@@ -439,11 +480,19 @@ export default function MembersPage() {
         </div>
 
         {/* メンバー一覧 */}
-        {loading ? (
+         {loading ? (
           <div className="bg-white rounded-lg shadow p-12">
             <div className="text-center">
               <RefreshCw className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
-              <p className="text-gray-600">リアルデータを取得中...</p>
+              <div className="space-y-2">
+                <p className="text-gray-600 font-medium">最適化データを取得中...</p>
+                <p className="text-gray-500 text-sm">各サービスから並行してデータを取得しています</p>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+              </div>
             </div>
           </div>
         ) : filteredUsers.length === 0 ? (
@@ -581,12 +630,24 @@ export default function MembersPage() {
                       </span>
                     </div>
 
-                    {/* 詳細情報 */}
-                    {member.metadata.workingHours && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        勤務地: {member.metadata.workingHours}
-                      </div>
-                    )}
+                      {/* 詳細情報（最適化版） */}
+                    <div className="mt-2 space-y-1">
+                      {member.metadata?.workingHours && (
+                        <div className="text-xs text-gray-500">
+                          勤務地: {member.metadata.workingHours}
+                        </div>
+                      )}
+                         {member.metadata?.processingMode && (
+                        <div className="text-xs text-blue-500">
+                          処理モード: {member.metadata.processingMode}
+                        </div>
+                      )}
+                      {member.metadata?.processingTime && (
+                        <div className="text-xs text-gray-400">
+                          取得時間: {member.metadata.processingTime}ms
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -621,6 +682,46 @@ export default function MembersPage() {
                 </p>
                 <p className="text-sm text-gray-600">高リスク</p>
               </div>
+            </div>
+          </div>
+        )}
+          {/* パフォーマンス統計（最適化版） */}
+        {filteredUsers.length > 0 && lastUpdated && (
+          <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-600" />
+              パフォーマンス統計
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                <div>
+                <p className="text-2xl font-bold text-blue-600">
+                    {users.filter(u => u.metadata?.processingMode === 'optimized').length}
+                </p>
+                <p className="text-sm text-gray-600">最適化処理</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-green-600">
+                   {users.filter(u => u.metadata?.processingTime && u.metadata.processingTime < 5000).length}
+                </p>
+                <p className="text-sm text-gray-600">高速取得(&lt;5s)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-orange-600">
+                  {users.filter(u => u.metadata?.processingMode === 'fallback').length}
+                </p>
+                <p className="text-sm text-gray-600">フォールバック</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-purple-600">
+                  {new Set(users.map(u => u.service.split(',').map(s => s.trim())).flat()).size}
+                </p>
+                <p className="text-sm text-gray-600">統合サービス</p>
+              </div>
+            </div>
+            <div className="mt-4 text-center">
+              <p className="text-sm text-gray-500">
+                最終更新: {new Date(lastUpdated).toLocaleString('ja-JP')}
+              </p>
             </div>
           </div>
         )}
