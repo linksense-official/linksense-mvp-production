@@ -415,137 +415,137 @@ class DashboardService {
 
     try {
       // 1. チーム健全性に基づくインサイト
-      if (teamHealth) {
-        if (teamHealth.healthScore < 60) {
-          insights.push({
-            id: `health-${Date.now()}`,
-            type: 'warning',
-            priority: 'high',
-            title: 'チーム健全性の低下を検出',
-            description: `チーム健全性スコアが${teamHealth.healthScore}%に低下しています。`,
-            impact: '生産性低下とメンバーの離職リスク増加の可能性',
-            actionItems: [
-              '1on1ミーティングの頻度を増やす',
-              'チームビルディング活動の実施',
-              'ワークロード分散の見直し'
-            ],
-            confidence: 85,
-            generatedAt: now,
-            affectedUsers: users.filter(u => u.isolationRisk === 'high').map(u => u.name),
-            relatedServices: integrations.map(i => i.service)
-          });
-        }
+if (teamHealth) {
+  if (teamHealth.healthScore < 60) {
+    insights.push({
+      id: `health-${Date.now()}`,
+      type: 'warning',
+      priority: 'high',
+      title: 'チームの元気度が下がっています',
+      description: `チームの元気度スコアが${teamHealth.healthScore}%になっています。`,
+      impact: 'メンバーのやる気低下や退職の可能性があります',
+      actionItems: [
+        '個別面談の回数を増やす',
+        'チームで楽しい活動を企画する',
+        '仕事の負担を見直す'
+      ],
+      confidence: 85,
+      generatedAt: now,
+      affectedUsers: users.filter(u => u.isolationRisk === 'high').map(u => u.name),
+      relatedServices: integrations.map(i => i.service)
+    });
+  }
 
-        if (teamHealth.isolationRisks.high > 0) {
-          insights.push({
-            id: `isolation-${Date.now()}`,
-            type: 'warning',
-            priority: 'critical',
-            title: '高リスクメンバーの早急な対応が必要',
-            description: `${teamHealth.isolationRisks.high}名のメンバーが高い離職リスクを示しています。`,
-            impact: 'チーム結束力の低下と知識の流出リスク',
-            actionItems: [
-              '緊急1on1ミーティングの実施',
-              'メンタルヘルスサポートの提供',
-              '業務負荷の再分配'
-            ],
-            confidence: 92,
-            generatedAt: now,
-            affectedUsers: users.filter(u => u.isolationRisk === 'high').map(u => u.name)
-          });
-        }
-      }
+  if (teamHealth.isolationRisks.high > 0) {
+    insights.push({
+      id: `isolation-${Date.now()}`,
+      type: 'warning',
+      priority: 'critical',
+      title: '心配なメンバーがいます - 早めの対応をお勧めします',
+      description: `${teamHealth.isolationRisks.high}名のメンバーが孤立している可能性があります。`,
+      impact: 'チームの結束が弱くなり、大切な知識を失う可能性があります',
+      actionItems: [
+        '今すぐ個別に話を聞く時間を作る',
+        'メンタルヘルスのサポートを提供する',
+        '仕事の量を調整する'
+      ],
+      confidence: 92,
+      generatedAt: now,
+      affectedUsers: users.filter(u => u.isolationRisk === 'high').map(u => u.name)
+    });
+  }
+}
 
-      // 2. コミュニケーションパターン分析
-      if (users.length > 0) {
-        const avgCommunicationScore = users.reduce((sum, u) => sum + u.communicationScore, 0) / users.length;
-        
-        if (avgCommunicationScore < 50) {
-          insights.push({
-            id: `communication-${Date.now()}`,
-            type: 'recommendation',
-            priority: 'medium',
-            title: 'コミュニケーション活性化の機会',
-            description: `チーム全体のコミュニケーションスコアが${Math.round(avgCommunicationScore)}%です。`,
-            impact: 'チーム協調性と情報共有の改善余地',
-            actionItems: [
-              '定期的なチーム会議の設定',
-              'カジュアルな交流機会の創出',
-              'コミュニケーションツールの活用促進'
-            ],
-            confidence: 78,
-            generatedAt: now
-          });
-        }
+// 2. コミュニケーションパターン分析
+if (users.length > 0) {
+  const avgCommunicationScore = users.reduce((sum, u) => sum + u.communicationScore, 0) / users.length;
+  
+  if (avgCommunicationScore < 50) {
+    insights.push({
+      id: `communication-${Date.now()}`,
+      type: 'recommendation',
+      priority: 'medium',
+      title: 'チーム内のコミュニケーションを活発にしませんか？',
+      description: `チーム全体のコミュニケーション活発度が${Math.round(avgCommunicationScore)}%です。`,
+      impact: 'チームワークと情報共有がもっと良くなります',
+      actionItems: [
+        '定期的なチーム会議を設定する',
+        '気軽に話せる機会を作る',
+        'コミュニケーションツールをもっと活用する'
+      ],
+      confidence: 78,
+      generatedAt: now
+    });
+  }
 
-        // 3. サービス利用パターン分析
-        const serviceUsage = users.reduce((acc, user) => {
-          user.service.split(',').forEach(service => {
-            acc[service.trim()] = (acc[service.trim()] || 0) + 1;
-          });
-          return acc;
-        }, {} as Record<string, number>);
+  // 3. サービス利用パターン分析
+  const serviceUsage = users.reduce((acc, user) => {
+    user.service.split(',').forEach(service => {
+      acc[service.trim()] = (acc[service.trim()] || 0) + 1;
+    });
+    return acc;
+  }, {} as Record<string, number>);
 
-        const dominantService = Object.entries(serviceUsage).sort(([,a], [,b]) => b - a)[0];
-        if (dominantService && dominantService[1] / users.length > 0.8) {
-          insights.push({
-            id: `service-diversity-${Date.now()}`,
-            type: 'opportunity',
-            priority: 'low',
-            title: 'コミュニケーションツールの多様化推奨',
-            description: `${dominantService[0]}への依存度が高い状況です（${Math.round(dominantService[1] / users.length * 100)}%）。`,
-            impact: '単一ツール障害時のリスク軽減と効率性向上',
-            actionItems: [
-              '他のコミュニケーションツールの導入検討',
-              'ツール間の連携強化',
-              'バックアップコミュニケーション手段の確立'
-            ],
-            confidence: 65,
-            generatedAt: now,
-            relatedServices: [dominantService[0]]
-          });
-        }
-      }
+  const dominantService = Object.entries(serviceUsage).sort(([,a], [,b]) => b - a)[0];
+  if (dominantService && dominantService[1] / users.length > 0.8) {
+    insights.push({
+      id: `service-diversity-${Date.now()}`,
+      type: 'opportunity',
+      priority: 'low',
+      title: '他のコミュニケーションツールも試してみませんか？',
+      description: `${dominantService[0]}をよく使っています（${Math.round(dominantService[1] / users.length * 100)}%）。`,
+      impact: '一つのツールに問題があっても大丈夫になり、効率も上がります',
+      actionItems: [
+        '他のコミュニケーションツールを試してみる',
+        'ツール同士の連携を強化する',
+        '予備のコミュニケーション手段を準備する'
+      ],
+      confidence: 65,
+      generatedAt: now,
+      relatedServices: [dominantService[0]]
+    });
+  }
+}
 
-      // 4. 統合サービス最適化提案
-      const activeIntegrations = integrations.filter(i => i.isActive);
-      if (activeIntegrations.length < 3) {
-        insights.push({
-          id: `integration-${Date.now()}`,
-          type: 'opportunity',
-          priority: 'medium',
-          title: '分析精度向上のための統合拡張',
-          description: `現在${activeIntegrations.length}個のサービスが統合されています。`,
-          impact: 'より包括的な分析と正確な離職予測の実現',
-          actionItems: [
-            '主要コミュニケーションツールの追加統合',
-            'カレンダーサービスとの連携',
-            'プロジェクト管理ツールとの統合'
-          ],
-          confidence: 70,
-          generatedAt: now,
-          relatedServices: integrations.map(i => i.service)
-        });
-      }
+// 4. 統合サービス最適化提案
+const activeIntegrations = integrations.filter(i => i.isActive);
+if (activeIntegrations.length < 3) {
+  insights.push({
+    id: `integration-${Date.now()}`,
+    type: 'opportunity',
+    priority: 'medium',
+    title: 'もっと詳しい分析のために、他のツールも連携しませんか？',
+    description: `現在${activeIntegrations.length}個のツールを連携しています。`,
+    impact: 'より正確で詳しいチーム分析ができるようになります',
+    actionItems: [
+      'よく使うコミュニケーションツールを追加する',
+      'カレンダーアプリと連携する',
+      'プロジェクト管理ツールと連携する'
+    ],
+    confidence: 70,
+    generatedAt: now,
+    relatedServices: integrations.map(i => i.service)
+  });
+}
 
-      // 5. パフォーマンストレンド分析
-      if (users.some(u => u.metadata?.processingMode === 'optimized')) {
-        insights.push({
-          id: `performance-${Date.now()}`,
-          type: 'trend',
-          priority: 'low',
-          title: 'システムパフォーマンス最適化効果',
-          description: '最適化されたデータ処理により分析速度が向上しています。',
-          impact: 'リアルタイム分析精度の向上と応答性の改善',
-          actionItems: [
-            '最適化設定の維持',
-            '定期的なパフォーマンス監視',
-            'さらなる最適化機会の探索'
-          ],
-          confidence: 88,
-          generatedAt: now
-        });
-      }
+// 5. パフォーマンストレンド分析
+if (users.some(u => u.metadata?.processingMode === 'optimized')) {
+  insights.push({
+    id: `performance-${Date.now()}`,
+    type: 'trend',
+    priority: 'low',
+    title: 'システムの動作が最適化されています',
+    description: 'データ処理が改善され、分析速度が向上しています。',
+    impact: 'リアルタイムで正確な分析結果が得られています',
+    actionItems: [
+      '現在の設定を維持する',
+      '定期的にシステム状態をチェックする',
+      'さらなる改善の機会を探す'
+    ],
+    confidence: 88,
+    generatedAt: now
+  });
+}
 
     } catch (error) {
       console.error('AI インサイト生成エラー:', error);
@@ -650,16 +650,17 @@ class DashboardService {
   }
 
   private static getServiceDisplayName(service: string): string {
-    const names: { [key: string]: string } = {
-      slack: 'Slack',
-      discord: 'Discord',
-      teams: 'Microsoft Teams',
-      'azure-ad': 'Microsoft Teams',
-      google: 'Google Meet',
-      'google-meet': 'Google Meet'
-    };
-    return names[service] || service;
-  }
+  const names: { [key: string]: string } = {
+    slack: 'Slack',
+    discord: 'Discord',
+    teams: 'Microsoft Teams',
+    'azure-ad': 'Microsoft Teams',
+    'microsoft-teams': 'Microsoft Teams',
+    google: 'Google Meet',
+    'google-meet': 'Google Meet'
+  };
+  return names[service] || service;
+}
 
   private static isCacheValid(): boolean {
     return this.cache.data !== null && (Date.now() - this.cache.timestamp) < this.CACHE_DURATION;
@@ -726,12 +727,12 @@ class DashboardService {
 const getServiceName = (service: string) => {
   const names: { [key: string]: string } = {
     google: 'Google Meet',
+    'google-meet': 'Google Meet',
     slack: 'Slack',
     discord: 'Discord',
     'azure-ad': 'Microsoft Teams',
     teams: 'Microsoft Teams',
-    chatwork: 'ChatWork',
-    'line-works': 'LINE WORKS'
+    'microsoft-teams': 'Microsoft Teams'
   };
   return names[service] || service;
 };
@@ -974,28 +975,28 @@ const DashboardPage: React.FC = () => {
                 LinkSense ダッシュボード
               </h1>
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 sm:h-5 w-4 sm:w-5 text-green-600" />
-                  <span className="text-green-600 font-semibold">
-                    {stats.connectedServices > 0 ? '統合分析アクティブ' : '統合分析待機中'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Network className="h-4 w-4" />
-                  <span>{stats.connectedServices}/{stats.totalServices}サービス接続</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  <span className="hidden sm:inline">最終更新: </span>
-                  <span>{new Date(stats.lastUpdated).toLocaleString('ja-JP')}</span>
-                </div>
-                {performance && (
-                  <div className="flex items-center gap-2">
-                    <Timer className="h-4 w-4" />
-                    <span>処理時間: {performance.apiResponseTime}ms</span>
-                  </div>
-                )}
-              </div>
+  <div className="flex items-center gap-2">
+    <Shield className="h-4 sm:h-5 w-4 sm:w-5 text-green-600" />
+    <span className="text-green-600 font-semibold">
+      {stats.connectedServices > 0 ? 'チーム分析実行中' : 'チーム分析準備中'}
+    </span>
+  </div>
+  <div className="flex items-center gap-2">
+    <Network className="h-4 w-4" />
+    <span>{stats.connectedServices}/{stats.totalServices}つのツールを接続</span>
+  </div>
+  <div className="flex items-center gap-2">
+    <Clock className="h-4 w-4" />
+    <span className="hidden sm:inline">最新情報: </span>
+    <span>{new Date(stats.lastUpdated).toLocaleString('ja-JP')}</span>
+  </div>
+  {performance && (
+    <div className="flex items-center gap-2">
+      <Timer className="h-4 w-4" />
+      <span>分析時間: {performance.apiResponseTime}ms</span>
+    </div>
+  )}
+</div>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {/* リアルタイム更新トグル */}
@@ -1164,36 +1165,139 @@ const DashboardPage: React.FC = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
             {/* チーム健全性スコア */}
             <Card className="hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">チーム健全性スコア</CardTitle>
-                <Heart className="h-4 sm:h-5 w-4 sm:w-5 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end space-x-1 sm:space-x-2">
-                  <div className={`text-xl sm:text-3xl font-bold ${getHealthScoreConfig(stats.averageHealthScore).color}`}>
-                    {stats.averageHealthScore}
-                  </div>
-                  <div className="text-xs sm:text-sm text-gray-500 mb-1">/100</div>
-                  <Badge 
-  variant={getHealthScoreConfig(stats.averageHealthScore).variant} 
-  className={`${getHealthScoreConfig(stats.averageHealthScore).bgColor} text-xs`}
->
-  {getHealthScoreConfig(stats.averageHealthScore).label}
-</Badge>
-                </div>
-                <Progress 
-                  value={stats.averageHealthScore} 
-                  variant={stats.averageHealthScore >= 70 ? 'success' : stats.averageHealthScore >= 50 ? 'warning' : 'danger'}
-                  className="mt-2 sm:mt-4" 
-                />
-                <p className="text-xs text-gray-500 mt-1 sm:mt-2">
-                  {stats.connectedServices > 0 
-                    ? `${stats.connectedServices}サービスからの統合分析`
-                    : 'サービス接続で分析精度が向上します'
-                  }
-                </p>
-              </CardContent>
-            </Card>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-xs sm:text-sm font-medium">チーム元気度</CardTitle>
+    <Heart className="h-4 sm:h-5 w-4 sm:w-5 text-red-500" />
+  </CardHeader>
+  <CardContent>
+    <div className="flex items-end space-x-1 sm:space-x-2">
+      <div className={`text-xl sm:text-3xl font-bold ${getHealthScoreConfig(stats.averageHealthScore).color}`}>
+        {stats.averageHealthScore}
+      </div>
+      <div className="text-xs sm:text-sm text-gray-500 mb-1">/100</div>
+      <Badge 
+        variant={getHealthScoreConfig(stats.averageHealthScore).variant} 
+        className={`${getHealthScoreConfig(stats.averageHealthScore).bgColor} text-xs`}
+      >
+        {getHealthScoreConfig(stats.averageHealthScore).label}
+      </Badge>
+    </div>
+    <Progress 
+      value={stats.averageHealthScore} 
+      variant={stats.averageHealthScore >= 70 ? 'success' : stats.averageHealthScore >= 50 ? 'warning' : 'danger'}
+      className="mt-2 sm:mt-4" 
+    />
+    <p className="text-xs text-gray-500 mt-1 sm:mt-2">
+      {stats.connectedServices > 0 
+        ? `${stats.connectedServices}つのツールから分析`
+        : 'ツールを連携すると詳しく分析できます'
+      }
+    </p>
+  </CardContent>
+</Card>
+
+{/* アクティブメンバー */}
+<Card className="hover:shadow-lg transition-shadow">
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-xs sm:text-sm font-medium">活発なメンバー</CardTitle>
+    <Users className="h-4 sm:h-5 w-4 sm:w-5 text-blue-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="flex items-end space-x-1 sm:space-x-2">
+      <div className="text-xl sm:text-3xl font-bold text-gray-900">
+        {stats.activeMembers}
+      </div>
+      <div className="text-sm sm:text-lg font-normal text-gray-500">
+        /{stats.totalMembers}人
+      </div>
+    </div>
+    {stats.totalMembers > 0 && (
+      <div className="mt-2 flex items-center text-xs sm:text-sm">
+        <div className="flex items-center text-green-600">
+          <TrendingUp className="h-3 sm:h-4 w-3 sm:w-4 mr-1" />
+          <span className="font-medium">{Math.round((stats.activeMembers / stats.totalMembers) * 100)}%</span>
+        </div>
+        <span className="text-gray-500 ml-2">が活発に活動中</span>
+      </div>
+    )}
+    <p className="text-xs text-gray-500 mt-1 sm:mt-2">
+      {stats.atRiskMembers > 0 && `${stats.atRiskMembers}人が心配な状態`}
+      {stats.totalMembers === 0 && 'データなし'}
+    </p>
+    {stats.totalMembers > 0 && (
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={handleMembersView}
+        className="mt-2 p-0 h-auto text-xs text-blue-600 hover:text-blue-800"
+      >
+        詳しく見る →
+      </Button>
+    )}
+  </CardContent>
+</Card>
+
+{/* 接続ツール */}
+<Card className="hover:shadow-lg transition-shadow">
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-xs sm:text-sm font-medium">連携ツール</CardTitle>
+    <Network className="h-4 sm:h-5 w-4 sm:w-5 text-green-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="flex items-end space-x-1 sm:space-x-2">
+      <div className="text-xl sm:text-3xl font-bold text-green-600">
+        {stats.connectedServices}
+      </div>
+      <div className="text-sm sm:text-lg font-normal text-gray-500">
+        /{stats.totalServices}個
+      </div>
+    </div>
+    <Progress 
+      value={(stats.connectedServices / stats.totalServices) * 100} 
+      variant="success"
+      className="mt-2 sm:mt-4" 
+    />
+    <p className="text-xs text-gray-500 mt-1 sm:mt-2">
+      {stats.connectedServices === 0 
+        ? 'ツールを連携して分析を開始'
+        : `あと${stats.totalServices - stats.connectedServices}個連携可能`
+      }
+    </p>
+    <Button 
+      variant="ghost" 
+      size="sm" 
+      onClick={handleIntegrationSettings}
+      className="mt-2 p-0 h-auto text-xs text-green-600 hover:text-green-800"
+    >
+      {stats.connectedServices === 0 ? '連携開始' : '設定'} →
+    </Button>
+  </CardContent>
+</Card>
+
+{/* チームワーク度 */}
+<Card className="hover:shadow-lg transition-shadow">
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-xs sm:text-sm font-medium">チームワーク度</CardTitle>
+    <Target className="h-4 sm:h-5 w-4 sm:w-5 text-purple-600" />
+  </CardHeader>
+  <CardContent>
+    <div className="flex items-end space-x-1 sm:space-x-2">
+      <div className={`text-xl sm:text-3xl font-bold ${getHealthScoreConfig(stats.collaborationScore).color}`}>
+        {stats.collaborationScore}
+      </div>
+      <div className="text-xs sm:text-sm text-gray-500 mb-1">/100</div>
+    </div>
+    <Progress 
+      value={stats.collaborationScore} 
+      variant={stats.collaborationScore >= 70 ? 'success' : stats.collaborationScore >= 50 ? 'warning' : 'danger'}
+      className="mt-2 sm:mt-4" 
+    />
+    <p className="text-xs text-gray-500 mt-1 sm:mt-2">
+      {stats.engagementRate > 0 && `参加率: ${stats.engagementRate}%`}
+      {stats.collaborationScore === 0 && 'データなし'}
+    </p>
+  </CardContent>
+</Card>
 
             {/* アクティブメンバー */}
             <Card className="hover:shadow-lg transition-shadow">
@@ -1790,84 +1894,84 @@ const DashboardPage: React.FC = () => {
               <CardContent>
                 <div className="space-y-4">
                   {stats.connectedServices === 0 && (
-                    <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                      <Zap className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-blue-900 text-sm sm:text-base">統合分析を開始</h4>
-                        <p className="text-xs sm:text-sm text-blue-700 mt-1 mb-3">
-                          まずは主要なコミュニケーションサービス（Slack、Teams、Google Meet）を接続して、
-                          チーム分析を開始しましょう。
-                        </p>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={handleIntegrationSettings}>
-                            <Play className="h-4 w-4 mr-1" />
-                            サービスを接続
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => router.push('/demo')}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            デモを見る
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {stats.connectedServices > 0 && stats.connectedServices < 3 && (
-                    <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
-                      <TrendingUp className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-green-900 text-sm sm:text-base">分析精度を向上</h4>
-                        <p className="text-xs sm:text-sm text-green-700 mt-1 mb-3">
-                          追加のサービスを接続することで、より包括的な分析が可能になります。
-                          現在 {stats.connectedServices}/{stats.totalServices} サービスが接続済みです。
-                        </p>
-                        <Button size="sm" variant="outline" onClick={handleIntegrationSettings}>
-                          <Network className="h-4 w-4 mr-1" />
-                          追加サービスを接続
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {stats.connectedServices >= 3 && (
-                    <div className="flex items-start gap-3 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
-                      <BarChart3 className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-purple-900 text-sm sm:text-base">高度な分析を活用</h4>
-                        <p className="text-xs sm:text-sm text-purple-700 mt-1 mb-3">
-                          複数のサービスが接続されました。AI分析機能を使って、
-                          チームの生産性とコミュニケーション効率を最適化しましょう。
-                        </p>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={handleAnalyticsView}>
-                            <Brain className="h-4 w-4 mr-1" />
-                            AI分析を確認
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={handleMembersView}>
-                            <Users className="h-4 w-4 mr-1" />
-                            メンバー分析
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {stats.atRiskMembers > 0 && (
-                    <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
-                      <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-red-900 text-sm sm:text-base">緊急対応が必要</h4>
-                        <p className="text-xs sm:text-sm text-red-700 mt-1 mb-3">
-                          {stats.atRiskMembers}名のメンバーが高い離職リスクを示しています。
-                          早急な対応が推奨されます。
-                        </p>
-                        <Button size="sm" onClick={handleMembersView} className="bg-red-600 hover:bg-red-700">
-                          <Users className="h-4 w-4 mr-1" />
-                          リスクメンバーを確認
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+  <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+    <Zap className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+    <div className="flex-1">
+      <h4 className="font-medium text-blue-900 text-sm sm:text-base">チーム分析を始めましょう</h4>
+      <p className="text-xs sm:text-sm text-blue-700 mt-1 mb-3">
+        まずは普段使っているコミュニケーションツール（Slack、Teams、Google Meet）を連携して、
+        チームの状況を把握してみましょう。
+      </p>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={handleIntegrationSettings}>
+          <Play className="h-4 w-4 mr-1" />
+          ツールを連携する
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => router.push('/demo')}>
+          <Eye className="h-4 w-4 mr-1" />
+          使い方を見る
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+
+{stats.connectedServices > 0 && stats.connectedServices < 3 && (
+  <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+    <TrendingUp className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+    <div className="flex-1">
+      <h4 className="font-medium text-green-900 text-sm sm:text-base">もっと詳しく分析しませんか？</h4>
+      <p className="text-xs sm:text-sm text-green-700 mt-1 mb-3">
+        他のツールも連携すると、より詳しくチームの状況がわかります。
+        現在 {stats.connectedServices}/{stats.totalServices} 個のツールを連携中です。
+      </p>
+      <Button size="sm" variant="outline" onClick={handleIntegrationSettings}>
+        <Network className="h-4 w-4 mr-1" />
+        他のツールも連携する
+      </Button>
+    </div>
+  </div>
+)}
+
+{stats.connectedServices >= 3 && (
+  <div className="flex items-start gap-3 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+    <BarChart3 className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+    <div className="flex-1">
+      <h4 className="font-medium text-purple-900 text-sm sm:text-base">詳しい分析結果を確認してみましょう</h4>
+      <p className="text-xs sm:text-sm text-purple-700 mt-1 mb-3">
+        複数のツールが連携されました。AI分析機能を使って、
+        チームの生産性とコミュニケーションをもっと良くしましょう。
+      </p>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={handleAnalyticsView}>
+          <Brain className="h-4 w-4 mr-1" />
+          AI分析を見る
+        </Button>
+        <Button size="sm" variant="outline" onClick={handleMembersView}>
+          <Users className="h-4 w-4 mr-1" />
+          メンバー詳細
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+
+{stats.atRiskMembers > 0 && (
+  <div className="flex items-start gap-3 p-4 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+    <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+    <div className="flex-1">
+      <h4 className="font-medium text-red-900 text-sm sm:text-base">心配なメンバーがいます</h4>
+      <p className="text-xs sm:text-sm text-red-700 mt-1 mb-3">
+        {stats.atRiskMembers}名のメンバーが孤立している可能性があります。
+        早めに声をかけてあげることをお勧めします。
+      </p>
+      <Button size="sm" onClick={handleMembersView} className="bg-red-600 hover:bg-red-700">
+        <Users className="h-4 w-4 mr-1" />
+        心配なメンバーを確認
+      </Button>
+    </div>
+  </div>
+)}
                 </div>
               </CardContent>
             </Card>

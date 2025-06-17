@@ -475,22 +475,28 @@ const integrationsMap: Map<string, any> = new Map(
     };
   }
 
- // 高度な計算メソッド
+// 高度な計算メソッド
 private static calculateServiceBreakdown(messages: any[], meetings: any[], integrationsMap: Map<string, any>) {
-  const services = ['google', 'slack', 'discord', 'azure-ad', 'chatwork', 'line-works'];
+  // 4つのサービスのみに限定
+  const services = ['slack', 'discord', 'teams', 'google'];
   const serviceNames = {
-    google: 'Google Meet',
     slack: 'Slack',
     discord: 'Discord',
-    'azure-ad': 'Microsoft Teams',
-    chatwork: 'ChatWork',
-    'line-works': 'LINE WORKS'
+    teams: 'Microsoft Teams',
+    google: 'Google Meet'
   };
 
   return services.reduce((breakdown, serviceId) => {
-    const integration = integrationsMap.get(serviceId) as any; // 型アサーション追加
-    const serviceMessages = messages.filter(m => m.service === serviceId || (serviceId === 'azure-ad' && m.service === 'teams'));
-    const serviceMeetings = meetings.filter(m => m.service === serviceId || (serviceId === 'azure-ad' && m.service === 'teams'));
+    const integration = integrationsMap.get(serviceId) as any;
+    // Teamsの場合、azure-adも含める
+    const serviceMessages = messages.filter(m => 
+      m.service === serviceId || 
+      (serviceId === 'teams' && (m.service === 'azure-ad' || m.service === 'microsoft-teams'))
+    );
+    const serviceMeetings = meetings.filter(m => 
+      m.service === serviceId || 
+      (serviceId === 'teams' && (m.service === 'azure-ad' || m.service === 'microsoft-teams'))
+    );
 
     breakdown[serviceId] = {
       name: serviceNames[serviceId as keyof typeof serviceNames] || serviceId,
@@ -1028,70 +1034,104 @@ private static calculateServiceBreakdown(messages: any[], meetings: any[], integ
     return insights;
   }
 
-  // フォールバック分析データ生成
-  static generateFallbackAnalytics(): UnifiedAnalyticsData {
-    const serviceBreakdown = {
-      google: { name: 'Google Meet', messageCount: 0, meetingCount: 0, isConnected: false, lastActivity: '未接続', healthScore: 0, userCount: 0, avgResponseTime: 0 },
-      slack: { name: 'Slack', messageCount: 0, meetingCount: 0, isConnected: false, lastActivity: '未接続', healthScore: 0, userCount: 0, avgResponseTime: 0 },
-      discord: { name: 'Discord', messageCount: 0, meetingCount: 0, isConnected: false, lastActivity: '未接続', healthScore: 0, userCount: 0, avgResponseTime: 0 },
-      'azure-ad': { name: 'Microsoft Teams', messageCount: 0, meetingCount: 0, isConnected: false, lastActivity: '未接続', healthScore: 0, userCount: 0, avgResponseTime: 0 },
-      chatwork: { name: 'ChatWork', messageCount: 0, meetingCount: 0, isConnected: false, lastActivity: '未接続', healthScore: 0, userCount: 0, avgResponseTime: 0 },
-      'line-works': { name: 'LINE WORKS', messageCount: 0, meetingCount: 0, isConnected: false, lastActivity: '未接続', healthScore: 0, userCount: 0, avgResponseTime: 0 }
-    };
+ // フォールバック分析データ生成（4サービス版）
+static generateFallbackAnalytics(): UnifiedAnalyticsData {
+  const serviceBreakdown = {
+    slack: { 
+      name: 'Slack', 
+      messageCount: 0, 
+      meetingCount: 0, 
+      isConnected: false, 
+      lastActivity: '未連携', 
+      healthScore: 0, 
+      userCount: 0, 
+      avgResponseTime: 0 
+    },
+    discord: { 
+      name: 'Discord', 
+      messageCount: 0, 
+      meetingCount: 0, 
+      isConnected: false, 
+      lastActivity: '未連携', 
+      healthScore: 0, 
+      userCount: 0, 
+      avgResponseTime: 0 
+    },
+    teams: { 
+      name: 'Microsoft Teams', 
+      messageCount: 0, 
+      meetingCount: 0, 
+      isConnected: false, 
+      lastActivity: '未連携', 
+      healthScore: 0, 
+      userCount: 0, 
+      avgResponseTime: 0 
+    },
+    google: { 
+      name: 'Google Meet', 
+      messageCount: 0, 
+      meetingCount: 0, 
+      isConnected: false, 
+      lastActivity: '未連携', 
+      healthScore: 0, 
+      userCount: 0, 
+      avgResponseTime: 0 
+    }
+  };
 
-    return {
-      overview: {
-        totalMessages: 0,
-        totalMeetings: 0,
-        totalActivities: 0,
-        connectedServices: 0,
-        dataQuality: 0,
-        lastUpdated: new Date().toISOString(),
-        processingTime: 0,
-        cacheHitRate: 0
-      },
-      serviceBreakdown,
-      crossServiceAnalysis: {
-        collaborationScore: 0,
-        communicationEfficiency: 0,
-        platformUsageBalance: 0,
-        userEngagement: 0,
-        dataConsistency: 0,
-        integrationHealth: 0
-      },
-      timelineData: [],
-      riskFactors: [{
-        id: 'no_integrations',
-        title: 'サービス統合が必要',
-        description: 'AI分析を開始するには、まずサービスを接続してください',
-        severity: 'critical' as const,
-        affectedServices: ['all'],
-        confidence: 100,
-        impact: '分析機能が利用できません',
-        recommendation: [
-          'メインコミュニケーションツールの接続',
-          '統合設定ガイドの確認',
-          'サポートチームへの相談'
-        ]
-      }],
-      predictions: [],
-      insights: [{
-        id: 'setup_required',
-        type: 'opportunity' as const,
-        title: 'セットアップを開始しましょう',
-        description: 'サービス接続により強力な分析機能が利用可能になります',
-        value: 0,
-        comparison: '設定完了率',
-        actionable: true
-      }],
-      performance: {
-        queryTime: 0,
-        dataFreshness: new Date().toISOString(),
-        cacheEfficiency: 0,
-        errorRate: 0
-      }
-    };
-  }
+  return {
+    overview: {
+      totalMessages: 0,
+      totalMeetings: 0,
+      totalActivities: 0,
+      connectedServices: 0,
+      dataQuality: 0,
+      lastUpdated: new Date().toISOString(),
+      processingTime: 0,
+      cacheHitRate: 0
+    },
+    serviceBreakdown,
+    crossServiceAnalysis: {
+      collaborationScore: 0,
+      communicationEfficiency: 0,
+      platformUsageBalance: 0,
+      userEngagement: 0,
+      dataConsistency: 0,
+      integrationHealth: 0
+    },
+    timelineData: [],
+    riskFactors: [{
+      id: 'no_integrations',
+      title: 'ツール連携が必要です',
+      description: 'チーム分析を開始するには、まず普段使っているツールを連携してください',
+      severity: 'critical' as const,
+      affectedServices: ['all'],
+      confidence: 100,
+      impact: '分析機能をご利用いただけません',
+      recommendation: [
+        'Slackやチャットツールの連携',
+        'Google MeetやTeamsなど会議ツールの連携',
+        'サポートチームへのお問い合わせ'
+      ]
+    }],
+    predictions: [],
+    insights: [{
+      id: 'setup_required',
+      type: 'opportunity' as const,
+      title: 'チーム分析を始めましょう',
+      description: 'ツールを連携すると、チームの状況を詳しく分析できるようになります',
+      value: 0,
+      comparison: '設定完了率',
+      actionable: true
+    }],
+    performance: {
+      queryTime: 0,
+      dataFreshness: new Date().toISOString(),
+      cacheEfficiency: 0,
+      errorRate: 0
+    }
+  };
+}
 
   // エクスポート機能
   static async exportAnalytics(data: UnifiedAnalyticsData, config: ExportConfig): Promise<Blob> {
@@ -1418,77 +1458,77 @@ const OptimizedAnalyticsPage = () => {
     <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ヘッダー */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4 sm:mb-6">
-            <div className="flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                高度AI統合分析
-              </h1>
-              <p className="text-gray-600">
-                全サービス統合データからの機械学習分析結果
-              </p>
-              {performanceMetrics && (
-                <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>処理時間: {performanceMetrics.responseTime}ms</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Database className="h-4 w-4" />
-                    <span>キャッシュ効率: {performanceMetrics.cacheEfficiency}%</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Activity className="h-4 w-4" />
-                    <span>エラー率: {performanceMetrics.errorRate}%</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* コントロールパネル */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant={realTimeUpdates ? "default" : "outline"}
-                size="sm"
-                onClick={() => setRealTimeUpdates(!realTimeUpdates)}
-                className="flex items-center gap-2"
-              >
-                {realTimeUpdates ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {realTimeUpdates ? 'リアルタイム' : '手動更新'}
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2"
-              >
-                <Filter className="h-4 w-4" />
-                フィルター
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExport}
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                エクスポート
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={handleRefresh} 
-                disabled={refreshing}
-                className="flex items-center gap-2"
-                size="sm"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                更新
-              </Button>
-            </div>
+<div className="mb-6 sm:mb-8">
+  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4 sm:mb-6">
+    <div className="flex-1">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+        チーム分析レポート
+      </h1>
+      <p className="text-gray-600">
+        連携したツールから、チームの活動状況を詳しく分析します
+      </p>
+      {performanceMetrics && (
+        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
+          <div className="flex items-center gap-1">
+            <Clock className="h-4 w-4" />
+            <span>分析時間: {performanceMetrics.responseTime}ms</span>
           </div>
+          <div className="flex items-center gap-1">
+            <Database className="h-4 w-4" />
+            <span>データ効率: {performanceMetrics.cacheEfficiency}%</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Activity className="h-4 w-4" />
+            <span>エラー率: {performanceMetrics.errorRate}%</span>
+          </div>
+        </div>
+      )}
+    </div>
+    
+    {/* コントロールパネル */}
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        variant={realTimeUpdates ? "default" : "outline"}
+        size="sm"
+        onClick={() => setRealTimeUpdates(!realTimeUpdates)}
+        className="flex items-center gap-2"
+      >
+        {realTimeUpdates ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+        {realTimeUpdates ? '自動更新中' : '手動更新'}
+      </Button>
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowFilters(!showFilters)}
+        className="flex items-center gap-2"
+      >
+        <Filter className="h-4 w-4" />
+        条件設定
+      </Button>
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleExport}
+        className="flex items-center gap-2"
+      >
+        <Download className="h-4 w-4" />
+        レポート出力
+      </Button>
+      
+      <Button 
+        variant="outline" 
+        onClick={handleRefresh} 
+        disabled={refreshing}
+        className="flex items-center gap-2"
+        size="sm"
+      >
+        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        更新
+      </Button>
+    </div>
+  </div>
 
           {/* フィルターパネル */}
           {showFilters && (
@@ -1551,235 +1591,235 @@ const OptimizedAnalyticsPage = () => {
           )}
 
           {/* ステータスバー */}
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-white rounded-lg border">
-            <div className="flex flex-wrap items-center gap-4">
-              <Badge 
-                variant={data.overview.connectedServices > 0 ? 'success' : 'secondary'}
-                className="flex items-center gap-1"
-              >
-                <Network className="h-3 w-3" />
-                {data.overview.connectedServices}/6 サービス統合
-              </Badge>
-              
-              <Badge 
-                variant={data.overview.dataQuality > 80 ? 'success' : data.overview.dataQuality > 60 ? 'default' : 'destructive'}
-                className="flex items-center gap-1"
-              >
-                <Database className="h-3 w-3" />
-                データ品質: {data.overview.dataQuality}%
-              </Badge>
-              
-              <Badge variant="outline" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {new Date(data.overview.lastUpdated).toLocaleTimeString('ja-JP')}
-              </Badge>
-            </div>
-            
-            <div className="text-sm text-gray-500">
-              {realTimeUpdates && <span className="flex items-center gap-1">
-                <Activity className="h-3 w-3 animate-pulse text-green-500" />
-                リアルタイム監視中
-              </span>}
-            </div>
-          </div>
+<div className="flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-white rounded-lg border">
+  <div className="flex flex-wrap items-center gap-4">
+    <Badge 
+      variant={data.overview.connectedServices > 0 ? 'success' : 'secondary'}
+      className="flex items-center gap-1"
+    >
+      <Network className="h-3 w-3" />
+      {data.overview.connectedServices}/4 つのツールを連携
+    </Badge>
+    
+    <Badge 
+      variant={data.overview.dataQuality > 80 ? 'success' : data.overview.dataQuality > 60 ? 'default' : 'destructive'}
+      className="flex items-center gap-1"
+    >
+      <Database className="h-3 w-3" />
+      データの品質: {data.overview.dataQuality}%
+    </Badge>
+    
+    <Badge variant="outline" className="flex items-center gap-1">
+      <Clock className="h-3 w-3" />
+      {new Date(data.overview.lastUpdated).toLocaleTimeString('ja-JP')}
+    </Badge>
+  </div>
+  
+  <div className="text-sm text-gray-500">
+    {realTimeUpdates && <span className="flex items-center gap-1">
+      <Activity className="h-3 w-3 animate-pulse text-green-500" />
+      自動で最新情報を取得中
+    </span>}
+  </div>
+</div>
         </div>
 
         {/* 統合概要カード */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6 mb-6">
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">総メッセージ</CardTitle>
-              <MessageSquare className="h-3 sm:h-4 w-3 sm:w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg sm:text-2xl font-bold text-blue-600">
-                {data.overview.totalMessages.toLocaleString()}
-              </div>
-              <p className="text-xs text-gray-500">
-                {data.overview.connectedServices > 0 ? '全サービス統合' : 'データなし'}
-              </p>
-            </CardContent>
-          </Card>
+<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6 mb-6">
+  <Card className="hover:shadow-lg transition-shadow">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-xs sm:text-sm font-medium">メッセージ総数</CardTitle>
+      <MessageSquare className="h-3 sm:h-4 w-3 sm:w-4 text-blue-600" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-lg sm:text-2xl font-bold text-blue-600">
+        {data.overview.totalMessages.toLocaleString()}
+      </div>
+      <p className="text-xs text-gray-500">
+        {data.overview.connectedServices > 0 ? '全ツールから取得' : 'データなし'}
+      </p>
+    </CardContent>
+  </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">総会議数</CardTitle>
-              <Video className="h-3 sm:h-4 w-3 sm:w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg sm:text-2xl font-bold text-green-600">
-                {data.overview.totalMeetings.toLocaleString()}
-              </div>
-              <p className="text-xs text-gray-500">
-                {data.overview.connectedServices > 0 ? 'Meet・Teams統合' : 'データなし'}
-              </p>
-            </CardContent>
-          </Card>
+  <Card className="hover:shadow-lg transition-shadow">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-xs sm:text-sm font-medium">会議総数</CardTitle>
+      <Video className="h-3 sm:h-4 w-3 sm:w-4 text-green-600" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-lg sm:text-2xl font-bold text-green-600">
+        {data.overview.totalMeetings.toLocaleString()}
+      </div>
+      <p className="text-xs text-gray-500">
+        {data.overview.connectedServices > 0 ? 'Meet・Teams合計' : 'データなし'}
+      </p>
+    </CardContent>
+  </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">コラボレーション</CardTitle>
-              <Users className="h-3 sm:h-4 w-3 sm:w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg sm:text-2xl font-bold text-purple-600">
-                {data.crossServiceAnalysis.collaborationScore}%
-              </div>
-              <p className="text-xs text-gray-500">クロスプラットフォーム</p>
-            </CardContent>
-          </Card>
+  <Card className="hover:shadow-lg transition-shadow">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-xs sm:text-sm font-medium">チームワーク度</CardTitle>
+      <Users className="h-3 sm:h-4 w-3 sm:w-4 text-purple-600" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-lg sm:text-2xl font-bold text-purple-600">
+        {data.crossServiceAnalysis.collaborationScore}%
+      </div>
+      <p className="text-xs text-gray-500">複数ツール活用度</p>
+    </CardContent>
+  </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">効率性</CardTitle>
-              <Zap className="h-3 sm:h-4 w-3 sm:w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg sm:text-2xl font-bold text-yellow-600">
-                {data.crossServiceAnalysis.communicationEfficiency}%
-              </div>
-              <p className="text-xs text-gray-500">コミュニケーション</p>
-            </CardContent>
-          </Card>
+  <Card className="hover:shadow-lg transition-shadow">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-xs sm:text-sm font-medium">コミュニケーション効率</CardTitle>
+      <Zap className="h-3 sm:h-4 w-3 sm:w-4 text-yellow-600" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-lg sm:text-2xl font-bold text-yellow-600">
+        {data.crossServiceAnalysis.communicationEfficiency}%
+      </div>
+      <p className="text-xs text-gray-500">やり取りの効率性</p>
+    </CardContent>
+  </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">データ整合性</CardTitle>
-              <CheckCircle className="h-3 sm:h-4 w-3 sm:w-4 text-emerald-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg sm:text-2xl font-bold text-emerald-600">
-                {data.crossServiceAnalysis.dataConsistency}%
-              </div>
-              <p className="text-xs text-gray-500">品質指標</p>
-            </CardContent>
-          </Card>
+  <Card className="hover:shadow-lg transition-shadow">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-xs sm:text-sm font-medium">データの品質</CardTitle>
+      <CheckCircle className="h-3 sm:h-4 w-3 sm:w-4 text-emerald-600" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-lg sm:text-2xl font-bold text-emerald-600">
+        {data.crossServiceAnalysis.dataConsistency}%
+      </div>
+      <p className="text-xs text-gray-500">情報の正確性</p>
+    </CardContent>
+  </Card>
 
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">統合健全性</CardTitle>
-              <Target className="h-3 sm:h-4 w-3 sm:w-4 text-indigo-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg sm:text-2xl font-bold text-indigo-600">
-                {data.crossServiceAnalysis.integrationHealth}%
-              </div>
-              <p className="text-xs text-gray-500">システム状態</p>
-            </CardContent>
-          </Card>
+  <Card className="hover:shadow-lg transition-shadow">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-xs sm:text-sm font-medium">連携の安定性</CardTitle>
+      <Target className="h-3 sm:h-4 w-3 sm:w-4 text-indigo-600" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-lg sm:text-2xl font-bold text-indigo-600">
+        {data.crossServiceAnalysis.integrationHealth}%
+      </div>
+      <p className="text-xs text-gray-500">システムの健全性</p>
+    </CardContent>
+  </Card>
+</div>
+
+       {/* 未接続時の推奨アクション */}
+{data.overview.connectedServices === 0 && (
+  <Alert className="mb-6 sm:mb-8 border-l-4 border-l-blue-500" variant="default">
+    <Settings className="h-4 w-4" />
+    <AlertTitle>チーム分析を始めてみましょう</AlertTitle>
+    <AlertDescription>
+      <div className="mt-2">
+        <p className="mb-3">
+          普段使っているコミュニケーションツールを連携すると、チームの活動状況を詳しく分析できます。
+        </p>
+        <div className="flex gap-2">
+          <Button onClick={() => window.location.href = '/integrations'} size="sm">
+            <Play className="h-4 w-4 mr-1" />
+            ツール連携を開始
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.open('/demo', '_blank')}>
+            <Eye className="h-4 w-4 mr-1" />
+            使い方を見る
+          </Button>
         </div>
-
-        {/* 未接続時の推奨アクション */}
-        {data.overview.connectedServices === 0 && (
-          <Alert className="mb-6 sm:mb-8 border-l-4 border-l-blue-500" variant="default">
-            <Settings className="h-4 w-4" />
-            <AlertTitle>高度AI分析を開始しましょう</AlertTitle>
-            <AlertDescription>
-              <div className="mt-2">
-                <p className="mb-3">
-                  機械学習による統合AI分析を活用するために、コミュニケーションサービスを接続してください。
-                </p>
-                <div className="flex gap-2">
-                  <Button onClick={() => window.location.href = '/integrations'} size="sm">
-                    <Play className="h-4 w-4 mr-1" />
-                    サービス接続を開始
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => window.open('/demo', '_blank')}>
-                    <Eye className="h-4 w-4 mr-1" />
-                    デモを確認
-                  </Button>
-                </div>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
+      </div>
+    </AlertDescription>
+  </Alert>
+)}
 
         {/* メイン分析セクション */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           {/* サービス統合状況（拡張版） */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Network className="h-5 w-5" />
-                  サービス統合詳細
-                </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleSection('services')}
-                >
-                  {expandedSections.has('services') ? 
-                    <ChevronUp className="h-4 w-4" /> : 
-                    <ChevronDown className="h-4 w-4" />
-                  }
-                </Button>
+<Card className="hover:shadow-lg transition-shadow">
+  <CardHeader>
+    <div className="flex items-center justify-between">
+      <CardTitle className="flex items-center gap-2">
+        <Network className="h-5 w-5" />
+        連携ツールの詳細状況
+      </CardTitle>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => toggleSection('services')}
+      >
+        {expandedSections.has('services') ? 
+          <ChevronUp className="h-4 w-4" /> : 
+          <ChevronDown className="h-4 w-4" />
+        }
+      </Button>
+    </div>
+    <CardDescription>
+      連携したツールの活動状況と健全性
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <div className="space-y-4">
+      {Object.entries(data.serviceBreakdown).map(([key, service]: [string, any]) => (
+        <div key={key} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${service.isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+              <div>
+                <div className="font-medium text-sm sm:text-base">{service.name}</div>
+                <div className="text-xs text-gray-600">
+                  {service.isConnected ? '連携中' : '未連携'}
+                </div>
               </div>
-              <CardDescription>
-                統合サービスの詳細状況と健全性指標
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(data.serviceBreakdown).map(([key, service]: [string, any]) => (
-                  <div key={key} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${service.isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-                        <div>
-                          <div className="font-medium text-sm sm:text-base">{service.name}</div>
-                          <div className="text-xs text-gray-600">
-                            {service.isConnected ? '統合アクティブ' : '未統合'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {service.isConnected && (
-                          <Badge variant="success" className="text-xs">
-                            健全性: {service.healthScore}%
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {expandedSections.has('services') && service.isConnected && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                        <div className="text-center p-2 bg-white rounded">
-                          <div className="font-medium text-blue-600">{service.messageCount}</div>
-                          <div className="text-gray-500">メッセージ</div>
-                        </div>
-                        <div className="text-center p-2 bg-white rounded">
-                          <div className="font-medium text-green-600">{service.meetingCount}</div>
-                          <div className="text-gray-500">会議</div>
-                        </div>
-                        <div className="text-center p-2 bg-white rounded">
-                          <div className="font-medium text-purple-600">{service.userCount}</div>
-                          <div className="text-gray-500">ユーザー</div>
-                        </div>
-                        <div className="text-center p-2 bg-white rounded">
-                          <div className="font-medium text-orange-600">{service.avgResponseTime}分</div>
-                          <div className="text-gray-500">平均応答</div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {service.isConnected && (
-                      <div className="mt-3">
-                        <div className="flex justify-between text-xs text-gray-600 mb-1">
-                          <span>健全性スコア</span>
-                          <span>{service.healthScore}%</span>
-                        </div>
-                        <Progress 
-                          value={service.healthScore} 
-                          variant={service.healthScore >= 80 ? 'success' : service.healthScore >= 60 ? 'warning' : 'danger'}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
+            </div>
+            <div className="text-right">
+              {service.isConnected && (
+                <Badge variant="success" className="text-xs">
+                  安定性: {service.healthScore}%
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          {expandedSections.has('services') && service.isConnected && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="text-center p-2 bg-white rounded">
+                <div className="font-medium text-blue-600">{service.messageCount}</div>
+                <div className="text-gray-500">メッセージ</div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-center p-2 bg-white rounded">
+                <div className="font-medium text-green-600">{service.meetingCount}</div>
+                <div className="text-gray-500">会議</div>
+              </div>
+              <div className="text-center p-2 bg-white rounded">
+                <div className="font-medium text-purple-600">{service.userCount}</div>
+                <div className="text-gray-500">メンバー数</div>
+              </div>
+              <div className="text-center p-2 bg-white rounded">
+                <div className="font-medium text-orange-600">{service.avgResponseTime}分</div>
+                <div className="text-gray-500">平均応答時間</div>
+              </div>
+            </div>
+          )}
+          
+          {service.isConnected && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-gray-600 mb-1">
+                <span>連携の安定性</span>
+                <span>{service.healthScore}%</span>
+              </div>
+              <Progress 
+                value={service.healthScore} 
+                variant={service.healthScore >= 80 ? 'success' : service.healthScore >= 60 ? 'warning' : 'danger'}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </CardContent>
+</Card>
 
           {/* 高度分析指標 */}
           <Card className="hover:shadow-lg transition-shadow">
@@ -1910,77 +1950,77 @@ const OptimizedAnalyticsPage = () => {
         {(data.riskFactors.length > 0 || filteredInsights.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* AI分析結果 */}
-            {data.riskFactors.length > 0 && (
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      AI分析結果
-                    </CardTitle>
-                    <Badge variant="outline">
-                      {data.riskFactors.length}件
-                    </Badge>
-                  </div>
-                  <CardDescription>
-                    機械学習による統合分析とリスク評価
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {data.riskFactors.map((risk, index) => (
-                      <div 
-                        key={index} 
-                        className={`p-4 rounded-lg border ${getSeverityColor(risk.severity)}`}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h4 className="font-semibold mb-1 text-sm sm:text-base">{risk.title}</h4>
-                            <p className="text-xs sm:text-sm mb-2">{risk.description}</p>
-                            <p className="text-xs font-medium mb-2">影響: {risk.impact}</p>
-                          </div>
-                          <Badge 
-                            variant={
-                              risk.severity === 'critical' ? 'destructive' : 
-                              risk.severity === 'high' ? 'destructive' :
-                              risk.severity === 'medium' ? 'default' : 
-                              'secondary'
-                            }
-                            className="ml-2"
-                          >
-                            {risk.severity === 'critical' ? '緊急' :
-                             risk.severity === 'high' ? '高' :
-                             risk.severity === 'medium' ? '中' : '低'}
-                          </Badge>
-                        </div>
-                        
-                        <div className="mb-3">
-                          <h5 className="text-xs font-medium mb-2">推奨アクション:</h5>
-                          <ul className="text-xs space-y-1">
-                            {risk.recommendation.map((action, actionIndex) => (
-                              <li key={actionIndex} className="flex items-start gap-2">
-                                <span className="text-gray-400 mt-0.5">•</span>
-                                <span>{action}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        
-                        <div className="flex justify-between items-center text-xs">
-                          <span>AI信頼度: {risk.confidence}%</span>
-                          <span>
-                            影響範囲: {risk.affectedServices.length === 1 && risk.affectedServices[0] === 'all' 
-                              ? '全体' 
-                              : `${risk.affectedServices.length}サービス`
-                            }
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+{data.riskFactors.length > 0 && (
+  <Card className="hover:shadow-lg transition-shadow">
+    <CardHeader>
+      <div className="flex items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5" />
+          チーム状況の分析結果
+        </CardTitle>
+        <Badge variant="outline">
+          {data.riskFactors.length}件
+        </Badge>
+      </div>
+      <CardDescription>
+        AIがチームの状況を分析した結果をお知らせします
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-4">
+        {data.riskFactors.map((risk, index) => (
+          <div 
+            key={index} 
+            className={`p-4 rounded-lg border ${getSeverityColor(risk.severity)}`}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <h4 className="font-semibold mb-1 text-sm sm:text-base">{risk.title}</h4>
+                <p className="text-xs sm:text-sm mb-2">{risk.description}</p>
+                <p className="text-xs font-medium mb-2">影響: {risk.impact}</p>
+              </div>
+              <Badge 
+                variant={
+                  risk.severity === 'critical' ? 'destructive' : 
+                  risk.severity === 'high' ? 'destructive' :
+                  risk.severity === 'medium' ? 'default' : 
+                  'secondary'
+                }
+                className="ml-2"
+              >
+                {risk.severity === 'critical' ? '重要' :
+                 risk.severity === 'high' ? '高' :
+                 risk.severity === 'medium' ? '中' : '低'}
+              </Badge>
+            </div>
+            
+            <div className="mb-3">
+              <h5 className="text-xs font-medium mb-2">おすすめの対応:</h5>
+              <ul className="text-xs space-y-1">
+                {risk.recommendation.map((action, actionIndex) => (
+                  <li key={actionIndex} className="flex items-start gap-2">
+                    <span className="text-gray-400 mt-0.5">•</span>
+                    <span>{action}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div className="flex justify-between items-center text-xs">
+              <span>AI分析の確信度: {risk.confidence}%</span>
+              <span>
+                影響範囲: {risk.affectedServices.length === 1 && risk.affectedServices[0] === 'all' 
+                  ? 'チーム全体' 
+                  : `${risk.affectedServices.length}つのツール`
+                }
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </CardContent>
+  </Card>
+)}
 
             {/* アクショナブルインサイト */}
             {filteredInsights.length > 0 && (
@@ -2230,80 +2270,80 @@ const OptimizedAnalyticsPage = () => {
           </Card>
         )}
 
-        {/* パフォーマンス監視 */}
-        {performanceMetrics && (
-          <Card className="mb-8 border-purple-200 bg-purple-50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Cpu className="h-5 w-5 text-purple-600" />
-                システムパフォーマンス
-              </CardTitle>
-              <CardDescription>
-                リアルタイムシステム監視とパフォーマンス指標
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-white rounded-lg">
-                  <Clock className="h-6 w-6 mx-auto mb-2 text-blue-600" />
-                  <div className="text-lg font-bold text-gray-900">
-                    {performanceMetrics.responseTime}ms
-                  </div>
-                  <div className="text-sm text-gray-600">処理時間</div>
-                  <Badge 
-                    variant={performanceMetrics.responseTime < 1000 ? 'success' : 
-                            performanceMetrics.responseTime < 3000 ? 'default' : 'destructive'}
-                    className="mt-1 text-xs"
-                  >
-                    {performanceMetrics.responseTime < 1000 ? '高速' : 
-                     performanceMetrics.responseTime < 3000 ? '良好' : '改善要'}
-                  </Badge>
-                </div>
-                
-                <div className="text-center p-3 bg-white rounded-lg">
-                  <Database className="h-6 w-6 mx-auto mb-2 text-green-600" />
-                  <div className="text-lg font-bold text-gray-900">
-                    {performanceMetrics.cacheEfficiency}%
-                  </div>
-                  <div className="text-sm text-gray-600">キャッシュ効率</div>
-                  <Badge 
-                    variant={performanceMetrics.cacheEfficiency > 80 ? 'success' : 'default'}
-                    className="mt-1 text-xs"
-                  >
-                    {performanceMetrics.cacheEfficiency > 80 ? '最適' : '標準'}
-                  </Badge>
-                </div>
-                
-                <div className="text-center p-3 bg-white rounded-lg">
-                  <Activity className="h-6 w-6 mx-auto mb-2 text-yellow-600" />
-                  <div className="text-lg font-bold text-gray-900">
-                    {performanceMetrics.errorRate}%
-                  </div>
-                  <div className="text-sm text-gray-600">エラー率</div>
-                  <Badge 
-                    variant={performanceMetrics.errorRate < 5 ? 'success' : 
-                            performanceMetrics.errorRate < 10 ? 'default' : 'destructive'}
-                    className="mt-1 text-xs"
-                  >
-                    {performanceMetrics.errorRate < 5 ? '安定' : 
-                     performanceMetrics.errorRate < 10 ? '注意' : '要対応'}
-                  </Badge>
-                </div>
-                
-                <div className="text-center p-3 bg-white rounded-lg">
-                  <RefreshCw className="h-6 w-6 mx-auto mb-2 text-purple-600" />
-                  <div className="text-lg font-bold text-gray-900">
-                    {Math.round((Date.now() - performanceMetrics.dataFreshness.getTime()) / 60000)}分前
-                  </div>
-                  <div className="text-sm text-gray-600">データ鮮度</div>
-                  <Badge variant="outline" className="mt-1 text-xs">
-                    リアルタイム
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+       {/* パフォーマンス監視 */}
+{performanceMetrics && (
+  <Card className="mb-8 border-purple-200 bg-purple-50">
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Cpu className="h-5 w-5 text-purple-600" />
+        システムの動作状況
+      </CardTitle>
+      <CardDescription>
+        リアルタイムでシステムの動作状況を監視しています
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="text-center p-3 bg-white rounded-lg">
+          <Clock className="h-6 w-6 mx-auto mb-2 text-blue-600" />
+          <div className="text-lg font-bold text-gray-900">
+            {performanceMetrics.responseTime}ms
+          </div>
+          <div className="text-sm text-gray-600">分析処理時間</div>
+          <Badge 
+            variant={performanceMetrics.responseTime < 1000 ? 'success' : 
+                    performanceMetrics.responseTime < 3000 ? 'default' : 'destructive'}
+            className="mt-1 text-xs"
+          >
+            {performanceMetrics.responseTime < 1000 ? '高速' : 
+             performanceMetrics.responseTime < 3000 ? '良好' : '改善要'}
+          </Badge>
+        </div>
+        
+        <div className="text-center p-3 bg-white rounded-lg">
+          <Database className="h-6 w-6 mx-auto mb-2 text-green-600" />
+          <div className="text-lg font-bold text-gray-900">
+            {performanceMetrics.cacheEfficiency}%
+          </div>
+          <div className="text-sm text-gray-600">データ効率</div>
+          <Badge 
+            variant={performanceMetrics.cacheEfficiency > 80 ? 'success' : 'default'}
+            className="mt-1 text-xs"
+          >
+            {performanceMetrics.cacheEfficiency > 80 ? '最適' : '標準'}
+          </Badge>
+        </div>
+        
+        <div className="text-center p-3 bg-white rounded-lg">
+          <Activity className="h-6 w-6 mx-auto mb-2 text-yellow-600" />
+          <div className="text-lg font-bold text-gray-900">
+            {performanceMetrics.errorRate}%
+          </div>
+          <div className="text-sm text-gray-600">エラー発生率</div>
+          <Badge 
+            variant={performanceMetrics.errorRate < 5 ? 'success' : 
+                    performanceMetrics.errorRate < 10 ? 'default' : 'destructive'}
+            className="mt-1 text-xs"
+          >
+            {performanceMetrics.errorRate < 5 ? '安定' : 
+             performanceMetrics.errorRate < 10 ? '注意' : '要対応'}
+          </Badge>
+        </div>
+        
+        <div className="text-center p-3 bg-white rounded-lg">
+          <RefreshCw className="h-6 w-6 mx-auto mb-2 text-purple-600" />
+          <div className="text-lg font-bold text-gray-900">
+            {Math.round((Date.now() - performanceMetrics.dataFreshness.getTime()) / 60000)}分前
+          </div>
+          <div className="text-sm text-gray-600">データ更新</div>
+          <Badge variant="outline" className="mt-1 text-xs">
+            リアルタイム
+          </Badge>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+)}
 
         {/* エクスポート設定モーダル風セクション */}
         {showFilters && (

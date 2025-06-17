@@ -182,15 +182,25 @@ export default function MembersPage() {
     }
   }
 
-  // サービスアイコン取得
-  const getServiceIcon = (service: string) => {
-    if (service.includes('slack')) return '💬'
-    if (service.includes('teams')) return '📞'
-    if (service.includes('google')) return '📧'
-    if (service.includes('discord')) return '🎮'
-    if (service.includes('chatwork')) return '💼'
-    return '🔗'
-  }
+  // サービスアイコン取得（4つのサービスのみ）
+const getServiceIcon = (service: string) => {
+  const serviceLower = service.toLowerCase();
+  if (serviceLower.includes('slack')) return '💬';
+  if (serviceLower.includes('teams') || serviceLower.includes('azure-ad') || serviceLower.includes('microsoft')) return '📞';
+  if (serviceLower.includes('google') || serviceLower.includes('meet')) return '📧';
+  if (serviceLower.includes('discord')) return '🎮';
+  return '🔗';
+};
+
+// サービス名の表示用変換
+const getServiceDisplayName = (service: string) => {
+  const serviceLower = service.toLowerCase();
+  if (serviceLower.includes('slack')) return 'Slack';
+  if (serviceLower.includes('teams') || serviceLower.includes('azure-ad') || serviceLower.includes('microsoft')) return 'Microsoft Teams';
+  if (serviceLower.includes('google') || serviceLower.includes('meet')) return 'Google Meet';
+  if (serviceLower.includes('discord')) return 'Discord';
+  return service;
+};
 
    // CSV エクスポート（最適化版）
   const exportToCSV = useCallback(() => {
@@ -283,10 +293,10 @@ export default function MembersPage() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
                 <Users className="h-8 w-8 text-blue-600" />
-                チームメンバー分析
+                チームメンバーの状況
               </h1>
               <p className="mt-2 text-gray-600">
-                リアルタイムデータに基づく離職リスク分析とチーム健全性評価
+                連携したツールから、メンバーの活動状況と心配な点を分析します
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -307,14 +317,14 @@ export default function MembersPage() {
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                更新
+                最新情報に更新
               </button>
             </div>
           </div>
 
           {lastUpdated && (
             <p className="text-sm text-gray-500">
-              最終更新: {new Date(lastUpdated).toLocaleString()}
+              最新情報: {new Date(lastUpdated).toLocaleString()}
             </p>
           )}
         </div>
@@ -325,13 +335,13 @@ export default function MembersPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
               <div>
-                <h3 className="text-red-800 font-medium">データ取得エラー</h3>
+                <h3 className="text-red-800 font-medium">データが取得できませんでした</h3>
                 <p className="text-red-700 text-sm mt-1">{error}</p>
                 <button
                   onClick={fetchRealData}
                   className="mt-2 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
                 >
-                  再試行
+                  もう一度試す
                 </button>
               </div>
             </div>
@@ -344,8 +354,8 @@ export default function MembersPage() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">総メンバー数</p>
-                  <p className="text-2xl font-bold text-gray-900">{teamHealth.totalMembers}</p>
+                  <p className="text-sm font-medium text-gray-600">チーム全体</p>
+                  <p className="text-2xl font-bold text-gray-900">{teamHealth.totalMembers}名</p>
                 </div>
                 <Users className="h-8 w-8 text-blue-600" />
               </div>
@@ -354,8 +364,8 @@ export default function MembersPage() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">アクティブメンバー</p>
-                  <p className="text-2xl font-bold text-green-600">{teamHealth.activeMembers}</p>
+                  <p className="text-sm font-medium text-gray-600">活発なメンバー</p>
+                  <p className="text-2xl font-bold text-green-600">{teamHealth.activeMembers}名</p>
                 </div>
                 <UserCheck className="h-8 w-8 text-green-600" />
               </div>
@@ -364,7 +374,7 @@ export default function MembersPage() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">チーム健全性</p>
+                  <p className="text-sm font-medium text-gray-600">チーム元気度</p>
                   <p className="text-2xl font-bold text-indigo-600">{teamHealth.healthScore}%</p>
                 </div>
                 <Heart className="h-8 w-8 text-indigo-600" />
@@ -374,8 +384,8 @@ export default function MembersPage() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">高リスク者</p>
-                  <p className="text-2xl font-bold text-red-600">{teamHealth.isolationRisks.high}</p>
+                  <p className="text-sm font-medium text-gray-600">心配なメンバー</p>
+                  <p className="text-2xl font-bold text-red-600">{teamHealth.isolationRisks.high}名</p>
                 </div>
                 <AlertTriangle className="h-8 w-8 text-red-600" />
               </div>
@@ -383,101 +393,103 @@ export default function MembersPage() {
           </div>
         )}
 
-        {/* 離職リスク分析 */}
-        {riskAnalysis && riskAnalysis.recommendations.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-600" />
-              推奨アクション
-            </h2>
-            <div className="space-y-4">
-              {riskAnalysis.recommendations.map((rec, index) => (
-                <div key={index} className={`p-4 rounded-lg border ${
-                  rec.priority === 'high' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className={`font-medium ${
-                        rec.priority === 'high' ? 'text-red-800' : 'text-yellow-800'
-                      }`}>
-                        {rec.action}
-                      </h3>
-                      <p className={`text-sm mt-1 ${
-                        rec.priority === 'high' ? 'text-red-700' : 'text-yellow-700'
-                      }`}>
-                        {rec.reason}
-                      </p>
-                      <div className="mt-2">
-                        <p className={`text-sm font-medium ${
-                          rec.priority === 'high' ? 'text-red-800' : 'text-yellow-800'
-                        }`}>
-                          対象者: {showSensitiveData ? rec.targets.join(', ') : `${rec.targets.length}名`}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      rec.priority === 'high' 
-                        ? 'bg-red-100 text-red-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {rec.priority === 'high' ? '緊急' : '要注意'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* フィルター・検索 */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+       {/* 離職リスク分析 */}
+{riskAnalysis && riskAnalysis.recommendations.length > 0 && (
+  <div className="bg-white rounded-lg shadow p-6 mb-8">
+    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <AlertTriangle className="h-5 w-5 text-orange-600" />
+      おすすめの対応
+    </h2>
+    <div className="space-y-4">
+      {riskAnalysis.recommendations.map((rec, index) => (
+        <div key={index} className={`p-4 rounded-lg border ${
+          rec.priority === 'high' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="名前、メール、部署で検索..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+              <h3 className={`font-medium ${
+                rec.priority === 'high' ? 'text-red-800' : 'text-yellow-800'
+              }`}>
+                {rec.action}
+              </h3>
+              <p className={`text-sm mt-1 ${
+                rec.priority === 'high' ? 'text-red-700' : 'text-yellow-700'
+              }`}>
+                {rec.reason}
+              </p>
+              <div className="mt-2">
+                <p className={`text-sm font-medium ${
+                  rec.priority === 'high' ? 'text-red-800' : 'text-yellow-800'
+                }`}>
+                  対象: {showSensitiveData ? rec.targets.join(', ') : `${rec.targets.length}名のメンバー`}
+                </p>
               </div>
             </div>
-            
-            <select
-              value={riskFilter}
-              onChange={(e) => setRiskFilter(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">全リスクレベル</option>
-              <option value="high">高リスク</option>
-              <option value="medium">中リスク</option>
-              <option value="low">低リスク</option>
-            </select>
-
-            {teamHealth && (
-              <select
-                value={serviceFilter}
-                onChange={(e) => setServiceFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">全サービス</option>
-                {Object.keys(teamHealth.serviceDistribution).map(service => (
-                  <option key={service} value={service}>{service}</option>
-                ))}
-              </select>
-            )}
-
-            <button
-              onClick={exportToCSV}
-              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Download className="h-4 w-4" />
-              CSV出力
-            </button>
+            <span className={`px-2 py-1 rounded text-xs font-medium ${
+              rec.priority === 'high' 
+                ? 'bg-red-100 text-red-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {rec.priority === 'high' ? '早急に対応' : '注意して見守り'}
+            </span>
           </div>
         </div>
+      ))}
+    </div>
+  </div>
+)}
+
+        {/* フィルター・検索 */}
+<div className="bg-white rounded-lg shadow p-6 mb-6">
+  <div className="flex flex-col sm:flex-row gap-4">
+    <div className="flex-1">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="名前、メール、部署で検索..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+    </div>
+    
+    <select
+      value={riskFilter}
+      onChange={(e) => setRiskFilter(e.target.value as any)}
+      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    >
+      <option value="all">すべてのメンバー</option>
+      <option value="high">心配なメンバー</option>
+      <option value="medium">少し注意</option>
+      <option value="low">元気なメンバー</option>
+    </select>
+
+    {teamHealth && (
+      <select
+        value={serviceFilter}
+        onChange={(e) => setServiceFilter(e.target.value)}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      >
+        <option value="all">すべてのツール</option>
+        {Object.keys(teamHealth.serviceDistribution)
+          .filter(service => ['slack', 'teams', 'google', 'discord', 'azure-ad', 'microsoft', 'meet'].some(s => service.toLowerCase().includes(s)))
+          .map(service => (
+          <option key={service} value={service}>{getServiceDisplayName(service)}</option>
+        ))}
+      </select>
+    )}
+
+    <button
+      onClick={exportToCSV}
+      className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+    >
+      <Download className="h-4 w-4" />
+      CSV出力
+    </button>
+  </div>
+</div>
 
         {/* メンバー一覧 */}
          {loading ? (
@@ -600,35 +612,38 @@ export default function MembersPage() {
                       </div>
                     </div>
 
-                    {/* サービス情報 */}
-                    <div className="mb-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">利用サービス</p>
-                      <div className="flex flex-wrap gap-2">
-                        {member.service.split(',').map((service, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                          >
-                            <span>{getServiceIcon(service.trim())}</span>
-                            {service.trim()}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                   {/* サービス情報 */}
+<div className="mb-4">
+  <p className="text-sm font-medium text-gray-700 mb-2">使っているツール</p>
+  <div className="flex flex-wrap gap-2">
+    {member.service.split(',').map((service, index) => {
+      const serviceName = getServiceDisplayName(service.trim());
+      return (
+        <span
+          key={index}
+          className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+        >
+          <span>{getServiceIcon(service.trim())}</span>
+          {serviceName}
+        </span>
+      );
+    })}
+  </div>
+</div>
 
-                    {/* 最終活動 */}
-                    <div className="flex items-center justify-between text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>最終活動</span>
-                      </div>
-                      <span>
-                        {member.lastActivity 
-                          ? new Date(member.lastActivity).toLocaleDateString()
-                          : '不明'
-                        }
-                      </span>
-                    </div>
+{/* 最終活動 */}
+<div className="flex items-center justify-between text-sm text-gray-600">
+  <div className="flex items-center gap-1">
+    <Clock className="h-4 w-4" />
+    <span>最後の活動</span>
+  </div>
+  <span>
+    {member.lastActivity 
+      ? new Date(member.lastActivity).toLocaleDateString('ja-JP')
+      : '不明'
+    }
+  </span>
+</div>
 
                       {/* 詳細情報（最適化版） */}
                     <div className="mt-2 space-y-1">
