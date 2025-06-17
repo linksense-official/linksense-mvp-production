@@ -97,9 +97,9 @@ const translations = {
     'security.password.description': 'パスワードの変更やリセットを安全に行います。',
     'security.password.button': 'パスワードをリセット',
     
-    // 統合設定
+     // 統合設定
     'integrations.title': '統合管理',
-    'integrations.description': 'チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（7サービス対応）',
+    'integrations.description': 'チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（4サービス対応）',
     'integrations.teams.banner': 'Microsoft Teams統合が利用可能になりました！',
     'integrations.teams.banner.description': 'Microsoft 365環境向けの高度なチーム健全性分析。会議参加、チャット活動、コラボレーションパターンを分析します。',
     'integrations.new': '新機能',
@@ -229,9 +229,9 @@ const translations = {
     'security.password.description': 'Safely change or reset your password.',
     'security.password.button': 'Reset Password',
     
-    // Integration Settings
+   // Integration Settings
     'integrations.title': 'Integration Management',
-    'integrations.description': 'Connect and manage communication platforms for team health analysis (7 services supported)',
+    'integrations.description': 'Connect and manage communication platforms for team health analysis (4 services supported)',
     'integrations.teams.banner': 'Microsoft Teams integration is now available!',
     'integrations.teams.banner.description': 'Advanced team health analysis for Microsoft 365 environments. Analyze meeting participation, chat activity, and collaboration patterns.',
     'integrations.new': 'New',
@@ -393,10 +393,10 @@ const showNotification = (message: string, type: 'success' | 'error' | 'warning'
   }));
 };
 
-// 統合ツールのデータ（日本語版）
+// 統合ツールのデータ（4サービス版）
 const integrations: Integration[] = [
   // 最優先グローバルツール（Slack & Teams）
- {
+  {
     id: 'slack',
     name: 'Slack',
     description: 'チームコミュニケーションとメッセージ分析',
@@ -424,51 +424,19 @@ const integrations: Integration[] = [
     icon: <Users className="w-5 h-5" />,
     priority: 2
   },
-
-  // 日本市場特化
   {
-    id: 'chatwork',
-    name: 'ChatWork',
-    description: '日本のビジネスチャットプラットフォーム分析',
-    category: 'communication',
-    market: 'japan',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['タスク管理統合', 'メッセージ分析', 'ファイル共有状況'],
-    setupUrl: '/api/auth/chatwork',
-    icon: <BarChart3 className="w-5 h-5" />,
-    priority: 3
-  },
-  {
-  id: 'line-works',
-  name: 'LINE WORKS',
-  description: 'LINEビジネスコミュニケーション分析',
-  category: 'communication',
-  market: 'japan',
-  isConnected: false,
-  isConnecting: false,
-  isSyncing: false,
-  features: ['トーク分析', 'カレンダー統合', 'アドレス帳活用'],
-  setupUrl: '/api/auth/lineworksauth',  // ✅ 正しい
-  icon: <MessageSquare className="w-5 h-5" />,
-  priority: 4
-},
-
-  // 残りのグローバルツール
-  {
-    id: 'zoom',
-    name: 'Zoom',
-    description: 'ビデオ会議とエンゲージメント分析',
+    id: 'discord',
+    name: 'Discord',
+    description: 'ゲーミングとクリエイティブチーム分析',
     category: 'communication',
     market: 'global',
     isConnected: false,
     isConnecting: false,
     isSyncing: false,
-    features: ['会議参加率', '発言時間', 'カメラ使用率', '会議満足度'],
-    setupUrl: '/api/auth/zoom',
-    icon: <Zap className="w-5 h-5" />,
-    priority: 5
+    features: ['ボイスチャット時間', 'サーバー活動', 'コミュニティ健全性'],
+    setupUrl: '/api/auth/discord',
+    icon: <Users className="w-5 h-5" />,
+    priority: 3
   },
   {
     id: 'google-meet',
@@ -482,21 +450,7 @@ const integrations: Integration[] = [
     features: ['会議時間分析', '参加者エンゲージメント', 'Googleカレンダー統合'],
     setupUrl: '/api/auth/google-meet',
     icon: <Globe className="w-5 h-5" />,
-    priority: 6
-  },
-  {
-    id: 'discord',
-    name: 'Discord',
-    description: 'ゲーミングとクリエイティブチーム分析',
-    category: 'communication',
-    market: 'global',
-    isConnected: false,
-    isConnecting: false,
-    isSyncing: false,
-    features: ['ボイスチャット時間', 'サーバー活動', 'コミュニティ健全性'],
-    setupUrl: '/api/auth/discord',
-    icon: <Users className="w-5 h-5" />,
-    priority: 7
+    priority: 4
   }
 ];
 
@@ -2233,13 +2187,13 @@ const SettingsPageContent: React.FC = () => {
               </div>
             )}
 
-            {/* 統合設定タブ - 日本語版 */}
+            {/* 統合設定タブ - 4サービス版 */}
             {activeTab === 'integrations' && (
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">統合管理</h3>
                   <p className="text-sm text-gray-600 mb-6">
-                    チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（7サービス対応）
+                    チーム健全性分析のためのコミュニケーションプラットフォームを接続・管理（4サービス対応）
                   </p>
                 </div>
 
@@ -2441,14 +2395,14 @@ const SettingsPageContent: React.FC = () => {
                   ))}
                 </div>
 
-                {/* 接続統計 - 日本語版 */}
+                {/* 接続統計 - 4サービス版 */}
                 <div className="space-y-6">
                   {/* 基本統計 */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
                       <h4 className="text-sm font-medium text-blue-800 flex items-center space-x-2">
                         <BarChart3 className="w-4 h-4" />
-                        <span>接続ステータス（7サービス対応）</span>
+                        <span>接続ステータス（4サービス対応）</span>
                       </h4>
                       <button
                         onClick={async () => {
@@ -2492,7 +2446,7 @@ const SettingsPageContent: React.FC = () => {
                       <div className="flex items-center space-x-2">
                         <Database className="w-4 h-4 text-blue-600 flex-shrink-0" />
                         <span className="text-blue-600">総サービス数:</span>
-                        <span className="font-medium">{integrationsState.length}</span>
+                        <span className="font-medium">4</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />

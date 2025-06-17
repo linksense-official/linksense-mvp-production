@@ -1467,22 +1467,6 @@ const OptimizedAnalyticsPage = () => {
       <p className="text-gray-600">
         連携したツールから、チームの活動状況を詳しく分析します
       </p>
-      {performanceMetrics && (
-        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
-          <div className="flex items-center gap-1">
-            <Clock className="h-4 w-4" />
-            <span>分析時間: {performanceMetrics.responseTime}ms</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Database className="h-4 w-4" />
-            <span>データ効率: {performanceMetrics.cacheEfficiency}%</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Activity className="h-4 w-4" />
-            <span>エラー率: {performanceMetrics.errorRate}%</span>
-          </div>
-        </div>
-      )}
     </div>
     
     {/* コントロールパネル */}
@@ -1590,7 +1574,7 @@ const OptimizedAnalyticsPage = () => {
             </Card>
           )}
 
-          {/* ステータスバー */}
+           {/* ステータスバー */}
 <div className="flex flex-wrap items-center justify-between gap-4 mb-6 p-4 bg-white rounded-lg border">
   <div className="flex flex-wrap items-center gap-4">
     <Badge 
@@ -2270,81 +2254,6 @@ const OptimizedAnalyticsPage = () => {
           </Card>
         )}
 
-       {/* パフォーマンス監視 */}
-{performanceMetrics && (
-  <Card className="mb-8 border-purple-200 bg-purple-50">
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2">
-        <Cpu className="h-5 w-5 text-purple-600" />
-        システムの動作状況
-      </CardTitle>
-      <CardDescription>
-        リアルタイムでシステムの動作状況を監視しています
-      </CardDescription>
-    </CardHeader>
-    <CardContent>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="text-center p-3 bg-white rounded-lg">
-          <Clock className="h-6 w-6 mx-auto mb-2 text-blue-600" />
-          <div className="text-lg font-bold text-gray-900">
-            {performanceMetrics.responseTime}ms
-          </div>
-          <div className="text-sm text-gray-600">分析処理時間</div>
-          <Badge 
-            variant={performanceMetrics.responseTime < 1000 ? 'success' : 
-                    performanceMetrics.responseTime < 3000 ? 'default' : 'destructive'}
-            className="mt-1 text-xs"
-          >
-            {performanceMetrics.responseTime < 1000 ? '高速' : 
-             performanceMetrics.responseTime < 3000 ? '良好' : '改善要'}
-          </Badge>
-        </div>
-        
-        <div className="text-center p-3 bg-white rounded-lg">
-          <Database className="h-6 w-6 mx-auto mb-2 text-green-600" />
-          <div className="text-lg font-bold text-gray-900">
-            {performanceMetrics.cacheEfficiency}%
-          </div>
-          <div className="text-sm text-gray-600">データ効率</div>
-          <Badge 
-            variant={performanceMetrics.cacheEfficiency > 80 ? 'success' : 'default'}
-            className="mt-1 text-xs"
-          >
-            {performanceMetrics.cacheEfficiency > 80 ? '最適' : '標準'}
-          </Badge>
-        </div>
-        
-        <div className="text-center p-3 bg-white rounded-lg">
-          <Activity className="h-6 w-6 mx-auto mb-2 text-yellow-600" />
-          <div className="text-lg font-bold text-gray-900">
-            {performanceMetrics.errorRate}%
-          </div>
-          <div className="text-sm text-gray-600">エラー発生率</div>
-          <Badge 
-            variant={performanceMetrics.errorRate < 5 ? 'success' : 
-                    performanceMetrics.errorRate < 10 ? 'default' : 'destructive'}
-            className="mt-1 text-xs"
-          >
-            {performanceMetrics.errorRate < 5 ? '安定' : 
-             performanceMetrics.errorRate < 10 ? '注意' : '要対応'}
-          </Badge>
-        </div>
-        
-        <div className="text-center p-3 bg-white rounded-lg">
-          <RefreshCw className="h-6 w-6 mx-auto mb-2 text-purple-600" />
-          <div className="text-lg font-bold text-gray-900">
-            {Math.round((Date.now() - performanceMetrics.dataFreshness.getTime()) / 60000)}分前
-          </div>
-          <div className="text-sm text-gray-600">データ更新</div>
-          <Badge variant="outline" className="mt-1 text-xs">
-            リアルタイム
-          </Badge>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-)}
-
         {/* エクスポート設定モーダル風セクション */}
         {showFilters && (
           <Card className="mb-8 border-green-200 bg-green-50">
@@ -2443,7 +2352,7 @@ const OptimizedAnalyticsPage = () => {
             <span>•</span>
             <span>データ品質: {data.overview.dataQuality}%</span>
             <span>•</span>
-            <span>統合サービス: {data.overview.connectedServices}/6</span>
+            <span>統合サービス: {data.overview.connectedServices}/4</span>
             <span>•</span>
             <span>処理時間: {data.overview.processingTime}ms</span>
           </div>

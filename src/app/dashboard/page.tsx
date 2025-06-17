@@ -601,7 +601,7 @@ if (users.some(u => u.metadata?.processingMode === 'optimized')) {
     return activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 10);
   }
 
-  private static calculateAdvancedStats(
+   private static calculateAdvancedStats(
     users: UnifiedUser[], 
     teamHealth: TeamHealthMetrics | null, 
     integrations: Integration[],
@@ -633,10 +633,10 @@ if (users.some(u => u.metadata?.processingMode === 'optimized')) {
       totalMembers: totalUsers,
       atRiskMembers: atRiskUsers,
       teamSatisfaction: Math.round(avgCommunicationScore),
-      alertsCount: atRiskUsers > 0 ? 1 : 0,
-      criticalAlertsCount: atRiskUsers > 2 ? 1 : 0,
+      alertsCount: atRiskUsers > 0 ? 1 : 0, // 修正: 実際のリスク状況に基づく
+      criticalAlertsCount: atRiskUsers > 2 ? 1 : 0, // 修正: 実際のリスク状況に基づく
       connectedServices,
-      totalServices: 4, // Slack, Discord, Teams, Google Meet
+      totalServices: 4, // 修正: 6から4に変更（Slack, Discord, Teams, Google Meet）
       lastUpdated: new Date().toISOString(),
       totalMessages,
       totalMeetings,
@@ -644,7 +644,7 @@ if (users.some(u => u.metadata?.processingMode === 'optimized')) {
       responseTimeAverage: Math.round(responseTimeAverage),
       collaborationScore: Math.round(avgHealthScore * 0.8 + avgCommunicationScore * 0.2),
       burnoutRiskCount: users.filter(u => u.activityScore < 30).length,
-      dataQualityScore: Math.round((connectedServices / 4) * 100),
+      dataQualityScore: Math.round((connectedServices / 4) * 100), // 修正: 4で除算
       processingTime: Date.now() - startTime
     };
   }
@@ -673,7 +673,7 @@ if (users.some(u => u.metadata?.processingMode === 'optimized')) {
     };
   }
 
-  private static getFallbackData(): DashboardData {
+    private static getFallbackData(): DashboardData {
     return {
       stats: {
         averageHealthScore: 0,
@@ -681,10 +681,10 @@ if (users.some(u => u.metadata?.processingMode === 'optimized')) {
         totalMembers: 0,
         atRiskMembers: 0,
         teamSatisfaction: 0,
-        alertsCount: 1,
+        alertsCount: 0, // 修正: データなしの場合は0
         criticalAlertsCount: 0,
         connectedServices: 0,
-        totalServices: 4,
+        totalServices: 4, // 修正: 6から4に変更
         lastUpdated: new Date().toISOString(),
         totalMessages: 0,
         totalMeetings: 0,

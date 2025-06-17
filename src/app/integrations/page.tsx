@@ -216,7 +216,7 @@ export default function IntegrationsPage() {
     }
   }, [])
 
-  // 並行データ取得の最適化
+ // 並行データ取得の最適化
   const fetchIntegrationsOptimized = useCallback(async (): Promise<void> => {
     if (!session?.user?.id) return
 
@@ -224,45 +224,82 @@ export default function IntegrationsPage() {
       setError(null)
       console.log('🚀 統合状態の並行取得開始')
       
-      // 並行でデータ取得
+      // 並行でデータ取得（エラーハンドリング強化）
       const [integrationsResult, statsResult] = await Promise.allSettled([
         fetch('/api/integrations/user', {
           headers: { 'Cache-Control': 'no-cache' }
+        }).catch(error => {
+          console.warn('統合API接続エラー:', error);
+          return { ok: false, status: 404, statusText: 'API Endpoint Not Found' };
         }),
         fetch('/api/integrations/stats', {
           headers: { 'Cache-Control': 'no-cache' }
+        }).catch(error => {
+          console.warn('統計API接続エラー:', error);
+          return { ok: false, status: 404, statusText: 'API Endpoint Not Found' };
         })
       ])
 
       let enhancedIntegrations: Integration[] = []
 
-      // 統合情報処理
+      // 統合情報処理（改善されたエラーハンドリング）
       if (integrationsResult.status === 'fulfilled') {
-        const integrationsResponse = integrationsResult.value
+        const integrationsResponse = integrationsResult.value as Response
         if (integrationsResponse.ok) {
-          const data = await integrationsResponse.json()
-          
-          // 拡張情報付きで設定
-          enhancedIntegrations = (data.integrations || []).map((integration: any) => ({
-            ...integration,
-            lastSync: integration.lastSync || new Date().toISOString(),
-            syncStatus: integration.isActive ? 'completed' : 'pending',
-            userCount: integration.userCount || 0,
-            dataQuality: integration.dataQuality || (integration.isActive ? 85 : 0),
-            connectionHealth: integration.connectionHealth || (integration.isActive ? 95 : 0)
-          }))
-          
-          setIntegrations(enhancedIntegrations)
+          try {
+            const contentType = integrationsResponse.headers.get('content-type')
+            if (contentType && contentType.includes('application/json')) {
+              const data = await integrationsResponse.json()
+              
+              // 拡張情報付きで設定
+              enhancedIntegrations = (data.integrations || []).map((integration: any) => ({
+                ...integration,
+                lastSync: integration.lastSync || new Date().toISOString(),
+                syncStatus: integration.isActive ? 'completed' : 'pending',
+                userCount: integration.userCount || 0,
+                dataQuality: integration.dataQuality || (integration.isActive ? 85 : 0),
+                connectionHealth: integration.connectionHealth || (integration.isActive ? 95 : 0)
+              }))
+              
+              setIntegrations(enhancedIntegrations)
+            } else {
+              console.warn('API応答がJSON形式ではありません:', contentType)
+              // フォールバック: 空の統合リスト
+              setIntegrations([])
+            }
+          } catch (parseError) {
+            console.warn('JSON解析エラー:', parseError)
+            // フォールバック: 空の統合リスト
+            setIntegrations([])
+          }
+        } else {
+          console.warn('統合API応答エラー:', integrationsResponse.status, integrationsResponse.statusText)
+          // フォールバック: 空の統合リスト
+          setIntegrations([])
         }
+      } else {
+        console.warn('統合API取得失敗:', integrationsResult.reason)
+        setIntegrations([])
       }
 
-      // 統計情報処理
+      // 統計情報処理（改善されたエラーハンドリング）
       let calculatedStats: IntegrationStats
       if (statsResult.status === 'fulfilled') {
-        const statsResponse = statsResult.value
+        const statsResponse = statsResult.value as Response
         if (statsResponse.ok) {
-          const statsData = await statsResponse.json()
-          calculatedStats = statsData.stats
+          try {
+            const contentType = statsResponse.headers.get('content-type')
+            if (contentType && contentType.includes('application/json')) {
+              const statsData = await statsResponse.json()
+              calculatedStats = statsData.stats
+            } else {
+              // フォールバック統計計算
+              calculatedStats = calculateStats(enhancedIntegrations)
+            }
+          } catch (parseError) {
+            console.warn('統計JSON解析エラー:', parseError)
+            calculatedStats = calculateStats(enhancedIntegrations)
+          }
         } else {
           // フォールバック統計計算
           calculatedStats = calculateStats(enhancedIntegrations)
@@ -281,7 +318,23 @@ export default function IntegrationsPage() {
 
     } catch (error) {
       console.error('❌ 統合情報取得エラー:', error)
-      setError(error instanceof Error ? error.message : '統合情報の取得に失敗しました')
+      // より具体的なエラーメッセージ
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        setError('サーバーに接続できません。ネットワーク接続を確認してください。')
+      } else {
+        setError('統合情報の取得に失敗しました。しばらく待ってから再試行してください。')
+      }
+      
+      // フォールバック状態設定
+      setIntegrations([])
+      setStats({
+        totalConnected: 0,
+        activeConnections: 0,
+        totalUsers: 0,
+        lastSyncTime: new Date().toISOString(),
+        healthScore: 0,
+        dataQuality: 0
+      })
     } finally {
       setLoading(false)
     }
@@ -583,7 +636,7 @@ useEffect(() => {
           </Card>
         )}
 
-        {/* 統合状況サマリー */}
+         {/* 統合状況サマリー（4サービス版） */}
 {stats && !loading && (
   <Card className="mb-8">
     <div className="p-6">
@@ -678,7 +731,7 @@ useEffect(() => {
           </Card>
         )}
 
-       {/* サービス一覧 */}
+      {/* サービス一覧（シンプル版） */}
 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
   {sortedServices.map((service) => {
     const serviceStatus = getServiceStatus(service.id)
@@ -695,7 +748,7 @@ useEffect(() => {
         }`}
       >
         <div className="p-6">
-          {/* サービスヘッダー */}
+          {/* サービスヘッダー（シンプル版） */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-start space-x-4">
               <div className={`flex-shrink-0 rounded-lg p-3 text-white ${
@@ -748,66 +801,39 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* 機能一覧 */}
-          <div className="mb-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">このツールで分析できること:</h4>
-            <div className="flex flex-wrap gap-1">
-              {service.features.map((feature, index) => (
-                <span
-                  key={index}
-                  className="inline-block px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
-                >
-                  {feature}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* 接続詳細情報 */}
+          {/* 接続詳細情報（簡略版） */}
           {serviceStatus.integration && (
             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-gray-600">連携開始日:</span>
+                  <span className="text-gray-600">連携開始:</span>
                   <div className="font-medium text-gray-900">
                     {new Date(serviceStatus.integration.createdAt).toLocaleDateString('ja-JP')}
                   </div>
                 </div>
                 <div>
-                  <span className="text-gray-600">最新データ取得:</span>
+                  <span className="text-gray-600">最新データ:</span>
                   <div className="font-medium text-gray-900">
                     {serviceStatus.lastSync ? 
                       new Date(serviceStatus.lastSync).toLocaleTimeString('ja-JP') : 
-                      'まだ取得していません'
+                      '取得中'
                     }
                   </div>
                 </div>
                 {serviceStatus.userCount > 0 && (
                   <div>
-                    <span className="text-gray-600">分析対象人数:</span>
+                    <span className="text-gray-600">対象人数:</span>
                     <div className="font-medium text-gray-900">
                       {serviceStatus.userCount.toLocaleString()}名
                     </div>
                   </div>
                 )}
                 <div>
-                  <span className="text-gray-600">データの品質:</span>
+                  <span className="text-gray-600">データ品質:</span>
                   <div className="font-medium text-gray-900">
                     {serviceStatus.dataQuality}%
                   </div>
                 </div>
-              </div>
-              
-              {/* データ品質インジケーター */}
-              <div className="mt-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-600">データの品質</span>
-                  <span className="text-xs text-gray-600">{serviceStatus.dataQuality}%</span>
-                </div>
-                <Progress 
-                  value={serviceStatus.dataQuality} 
-                  variant={serviceStatus.dataQuality >= 80 ? 'success' : serviceStatus.dataQuality >= 60 ? 'warning' : 'danger'}
-                />
               </div>
             </div>
           )}
@@ -818,7 +844,7 @@ useEffect(() => {
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
                 <div>
-                  <h4 className="text-sm font-medium text-red-800">連携でエラーが発生しています</h4>
+                  <h4 className="text-sm font-medium text-red-800">連携エラー</h4>
                   <p className="text-xs text-red-700 mt-1">
                     {serviceStatus.integration.errorMessage}
                   </p>
@@ -836,7 +862,7 @@ useEffect(() => {
                   className="flex-1 inline-flex justify-center items-center py-2.5 px-4 border border-red-300 text-sm font-medium rounded-lg text-red-700 bg-white hover:bg-red-50 transition-colors"
                 >
                   <X className="h-4 w-4 mr-2" />
-                  連携を解除
+                  連携解除
                 </button>
                 <button
                   onClick={() => handleConnect(service)}

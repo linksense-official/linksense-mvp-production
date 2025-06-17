@@ -49,15 +49,6 @@ interface LoginMetrics {
   userAgent: string;
 }
 
-// セキュリティ設定
-const SECURITY_CONFIG = {
-  MAX_LOGIN_ATTEMPTS: 5,
-  LOCKOUT_DURATION: 15 * 60 * 1000, // 15分
-  PASSWORD_MIN_LENGTH: 8,
-  SESSION_TIMEOUT: 30 * 60 * 1000, // 30分
-  DEVICE_TRUST_DURATION: 30 * 24 * 60 * 60 * 1000 // 30日
-};
-
 // エンタープライズUIコンポーネント
 const EnterpriseCard: React.FC<{ 
   children: React.ReactNode; 
@@ -113,6 +104,9 @@ const LoadingSpinner: React.FC<{ size?: 'sm' | 'md' | 'lg'; color?: string }> = 
 
 // メインログインコンポーネント
 const EnterpriseLoginPage: React.FC = () => {
+  // 環境判定
+  const isProduction = process.env.NODE_ENV === 'production';
+  
   // 基本状態管理
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -125,6 +119,15 @@ const EnterpriseLoginPage: React.FC = () => {
   const [twoFactorData, setTwoFactorData] = useState<TwoFactorData | null>(null);
   const [isBackupCode, setIsBackupCode] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(false);
+  
+  // セキュリティ設定（本番環境対応）
+  const SECURITY_CONFIG = {
+    MAX_LOGIN_ATTEMPTS: isProduction ? 3 : 5, // 本番環境では試行回数を厳しく
+    LOCKOUT_DURATION: isProduction ? 30 * 60 * 1000 : 15 * 60 * 1000, // 本番環境では30分ロック
+    PASSWORD_MIN_LENGTH: 8,
+    SESSION_TIMEOUT: 30 * 60 * 1000, // 30分
+    DEVICE_TRUST_DURATION: 30 * 24 * 60 * 60 * 1000 // 30日
+  };
   
   // セキュリティ状態管理
   const [securityContext, setSecurityContext] = useState<SecurityContext>({
@@ -141,6 +144,30 @@ const EnterpriseLoginPage: React.FC = () => {
     deviceType: typeof window !== 'undefined' ? (window.innerWidth < 768 ? 'mobile' : 'desktop') : 'unknown',
     userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown'
   });
+
+  // ログ制御関数
+  const logInfo = (message: string, data?: any) => {
+    if (!isProduction) {
+      console.log(message, data);
+    }
+  };
+
+  const logError = (message: string, error?: any) => {
+    // エラーは本番環境でも記録（ただし機密情報は除外）
+    if (isProduction) {
+      // 本番環境では機密情報を除外したエラーのみ記録
+      console.error(message, error?.message || 'エラーが発生しました');
+    } else {
+      console.error(message, error);
+    }
+  };
+
+  const logSecure = (message: string, data?: any) => {
+    // セキュリティ関連のログは開発環境でのみ出力
+    if (!isProduction) {
+      console.log(`🔒 [SECURITY] ${message}`, data);
+    }
+  };
 
   // フック
   const { 
@@ -192,7 +219,7 @@ const EnterpriseLoginPage: React.FC = () => {
   // 認証チェックとリダイレクト
   useEffect(() => {
     if (!isLoading && isAuthenticated && !requiresTwoFactor) {
-      console.log('認証済みユーザーをダッシュボードにリダイレクトしています');
+      logInfo('認証済みユーザーをダッシュボードにリダイレクトしています');
       router.push('/dashboard');
     }
   }, [isAuthenticated, isLoading, requiresTwoFactor, router]);
@@ -203,7 +230,7 @@ const EnterpriseLoginPage: React.FC = () => {
     
     if (verified === 'true') {
       setError(null);
-      console.log('メールアドレス認証が完了しました');
+      logInfo('メールアドレス認証が完了しました');
       timer = setTimeout(() => {
         // URLパラメータをクリア
         const url = new URL(window.location.href);
@@ -214,12 +241,12 @@ const EnterpriseLoginPage: React.FC = () => {
     
     if (reset === 'success') {
       setError(null);
-      console.log('パスワードリセットが完了しました');
+      logInfo('パスワードリセットが完了しました');
     }
 
     if (sessionExpired === 'true') {
       setError('セッションの有効期限が切れました。再度ログインしてください。');
-      console.log('セッション期限切れによるログアウト');
+      logInfo('セッション期限切れによるログアウト');
     }
 
    // OAuth エラーハンドリング強化（Microsoft365対応）
@@ -229,12 +256,12 @@ if (errorParam) {
   const errorDescription = searchParams.get('error_description');
   const state = searchParams.get('state');
   
-  console.log('🔧 OAuth認証エラー詳細分析:', {
+  logError('OAuth認証エラー詳細分析', {
     error: errorParam,
     provider: provider,
     errorDescription: errorDescription,
     state: state,
-    fullURL: window.location.href,
+    fullURL: isProduction ? '[REDACTED]' : window.location.href,
     timestamp: new Date().toISOString()
   });
 
@@ -298,7 +325,7 @@ if (errorParam) {
   }
   
   setError(errorMessage);
-  console.error(`🚨 OAuth認証エラー: ${errorParam}`, { 
+  logError(`OAuth認証エラー: ${errorParam}`, { 
     errorMessage, 
     provider,
     errorDescription,
@@ -307,12 +334,12 @@ if (errorParam) {
   
   // 特定のエラーに対する追加アクション
   if (errorParam === 'EmailVerificationRequired') {
-    console.log('✉️ メール認証が必要 - 認証メール再送信済み');
+    logInfo('メール認証が必要 - 認証メール再送信済み');
   }
   
   // Slack固有のエラー処理
   if (provider === 'slack') {
-    console.log('🔧 Slack認証エラー - 詳細診断:', {
+    logError('Slack認証エラー - 詳細診断', {
       error: errorParam,
       description: errorDescription,
       possibleCauses: [
@@ -326,7 +353,7 @@ if (errorParam) {
   
   // Azure AD固有のエラー処理
   if (provider === 'azure-ad') {
-    console.log('🔧 Microsoft 365認証エラー - 詳細診断:', {
+    logError('Microsoft 365認証エラー - 詳細診断', {
       error: errorParam,
       description: errorDescription,
       possibleCauses: [
@@ -342,7 +369,7 @@ if (errorParam) {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [verified, reset, errorParam, sessionExpired]);
+  }, [verified, reset, errorParam, sessionExpired, searchParams, isProduction]);
 
   // セキュリティチェック
   const checkSecurityLockout = useCallback((): boolean => {
@@ -364,7 +391,7 @@ if (errorParam) {
       }
     }
     return false;
-  }, [securityContext]);
+  }, [securityContext, SECURITY_CONFIG.LOCKOUT_DURATION]);
 
   // ログイン試行回数管理
   const handleLoginAttempt = useCallback((success: boolean) => {
@@ -376,16 +403,16 @@ if (errorParam) {
         lastAttempt: null,
         isLocked: false
       }));
-      console.log('ログイン成功 - セキュリティカウンターをリセット');
+      logInfo('ログイン成功 - セキュリティカウンターをリセット');
     } else {
       setSecurityContext(prev => {
         const newAttempts = prev.loginAttempts + 1;
         const shouldLock = newAttempts >= SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS;
         
-        console.log(`ログイン失敗 - 試行回数: ${newAttempts}/${SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS}`);
+        logSecure(`ログイン失敗 - 試行回数: ${newAttempts}/${SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS}`);
         
         if (shouldLock) {
-          console.log('セキュリティロックアウトを実行');
+          logSecure('セキュリティロックアウトを実行');
         }
         
         return {
@@ -396,7 +423,7 @@ if (errorParam) {
         };
       });
     }
-  }, []);
+  }, [SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS]);
 
   // メインログイン処理
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
@@ -408,17 +435,20 @@ if (errorParam) {
     setError(null);
 
     try {
-      console.log('エンタープライズログイン処理を開始', {
-        email,
-        deviceFingerprint: securityContext.deviceFingerprint,
-        timestamp: new Date().toISOString()
+      logSecure('エンタープライズログイン処理を開始', {
+        timestamp: new Date().toISOString(),
+        // 本番環境では機密情報を除外
+        ...(isProduction ? {} : { 
+          email, 
+          deviceFingerprint: securityContext.deviceFingerprint 
+        })
       });
 
       const result = await login(email, password);
       
       if (result.success) {
         handleLoginAttempt(true);
-        console.log('ログイン成功 - ダッシュボードにリダイレクト');
+        logInfo('ログイン成功 - ダッシュボードにリダイレクト');
         router.push('/dashboard');
       } else if (result.requiresTwoFactor && result.userId) {
         handleLoginAttempt(true);
@@ -430,14 +460,14 @@ if (errorParam) {
           deviceTrusted: false
         });
         setShowTwoFactor(true);
-        console.log('2要素認証が必要です');
+        logInfo('2要素認証が必要です');
       } else {
         handleLoginAttempt(false);
         setError(result.error || 'ログインに失敗しました。認証情報を確認してください。');
       }
     } catch (error) {
       handleLoginAttempt(false);
-      console.error('ログイン処理エラー:', error);
+      logError('ログイン処理エラー', error);
       setError('ログイン処理中にシステムエラーが発生しました。しばらく時間をおいて再度お試しください。');
     } finally {
       setLoading(false);
@@ -453,11 +483,13 @@ if (errorParam) {
     setError(null);
 
     try {
-      console.log('2要素認証を実行中', {
-        userId: twoFactorData.userId,
+      logSecure('2要素認証を実行中', {
         isBackupCode,
         rememberDevice,
-        deviceFingerprint: securityContext.deviceFingerprint
+        ...(isProduction ? {} : { 
+          userId: twoFactorData.userId,
+          deviceFingerprint: securityContext.deviceFingerprint 
+        })
       });
 
       const result = await verifyTwoFactor(
@@ -467,15 +499,15 @@ if (errorParam) {
       );
 
       if (result.success) {
-        console.log('2要素認証成功 - ダッシュボードにリダイレクト');
+        logInfo('2要素認証成功 - ダッシュボードにリダイレクト');
         router.push('/dashboard');
       } else {
         setError(result.error || '認証コードが正しくありません。再度お試しください。');
         setTwoFactorCode('');
-        console.log('2要素認証失敗');
+        logInfo('2要素認証失敗');
       }
     } catch (error) {
-      console.error('2要素認証エラー:', error);
+      logError('2要素認証エラー', error);
       setError('認証処理中にエラーが発生しました。再度お試しください。');
       setTwoFactorCode('');
     } finally {
@@ -489,10 +521,10 @@ if (errorParam) {
     setError(null);
 
     try {
-      console.log(`${provider}ソーシャルログインを開始`, {
+      logSecure(`${provider}ソーシャルログインを開始`, {
         provider,
-        deviceFingerprint: securityContext.deviceFingerprint,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        ...(isProduction ? {} : { deviceFingerprint: securityContext.deviceFingerprint })
       });
 
       const result = await signIn(provider, {
@@ -501,14 +533,14 @@ if (errorParam) {
       });
 
       if (result?.error) {
-        console.error(`${provider}ログインエラー:`, result.error);
+        logError(`${provider}ログインエラー`, result.error);
         setError(`${getProviderDisplayName(provider)}ログインに失敗しました。再度お試しください。`);
       } else if (result?.url) {
-        console.log(`${provider}ログイン成功 - リダイレクト中`);
+        logInfo(`${provider}ログイン成功 - リダイレクト中`);
         window.location.href = result.url;
       }
     } catch (error) {
-      console.error(`${provider}ログイン例外:`, error);
+      logError(`${provider}ログイン例外`, error);
       setError(`${getProviderDisplayName(provider)}ログイン中にエラーが発生しました。`);
     } finally {
       setSocialLoading(null);
@@ -526,13 +558,19 @@ if (errorParam) {
 
   // デモアカウントログイン強化
   const handleDemoLogin = async (demoEmail: string, demoPassword: string, role: string): Promise<void> => {
+    // 本番環境ではデモログインを無効化
+    if (isProduction) {
+      setError('デモアカウントは開発環境でのみ利用可能です。');
+      return;
+    }
+
     setEmail(demoEmail);
     setPassword(demoPassword);
     setLoading(true);
     setError(null);
 
     try {
-      console.log(`デモアカウントログイン開始: ${role}`, {
+      logInfo(`デモアカウントログイン開始: ${role}`, {
         email: demoEmail,
         role,
         timestamp: new Date().toISOString()
@@ -541,7 +579,7 @@ if (errorParam) {
       const result = await login(demoEmail, demoPassword);
       
       if (result.success) {
-        console.log(`デモアカウント(${role})ログイン成功`);
+        logInfo(`デモアカウント(${role})ログイン成功`);
         router.push('/dashboard');
       } else if (result.requiresTwoFactor && result.userId) {
         setTwoFactorData({
@@ -552,12 +590,12 @@ if (errorParam) {
           deviceTrusted: false
         });
         setShowTwoFactor(true);
-        console.log(`デモアカウント(${role})で2要素認証が必要`);
+        logInfo(`デモアカウント(${role})で2要素認証が必要`);
       } else {
         setError(result.error || `デモアカウント(${role})ログインに失敗しました`);
       }
     } catch (error) {
-      console.error(`デモアカウント(${role})ログインエラー:`, error);
+      logError(`デモアカウント(${role})ログインエラー`, error);
       setError('デモアカウントログイン中にエラーが発生しました');
     } finally {
       setLoading(false);
@@ -572,7 +610,7 @@ if (errorParam) {
     setIsBackupCode(false);
     setRememberDevice(false);
     setError(null);
-    console.log('2要素認証状態をリセット');
+    logInfo('2要素認証状態をリセット');
   };
 
   // パスワード強度チェック
@@ -665,7 +703,7 @@ if (errorParam) {
               <div className="flex items-center justify-center space-x-4 mt-4">
                 <div className="flex items-center text-sm text-gray-500">
                   <Globe className="h-4 w-4 mr-1" />
-                  8プラットフォーム統合
+                  4プラットフォーム統合
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
                   <Users className="h-4 w-4 mr-1" />
@@ -932,57 +970,59 @@ if (errorParam) {
                     </div>
                   </form>
 
-                  {/* デモアカウント */}
-                  <div className="mt-8" data-testid="demo-accounts-section">
-                    <div className="relative mb-6">
-                      <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-200" />
+                   {/* デモアカウント（本番環境では非表示） */}
+                  {process.env.NODE_ENV !== 'production' && (
+                    <div className="mt-8" data-testid="demo-accounts-section">
+                      <div className="relative mb-6">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-200" />
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-4 bg-white text-gray-500 font-medium">デモアカウント体験</span>
+                        </div>
                       </div>
-                      <div className="relative flex justify-center text-sm">
-                        <span className="px-4 bg-white text-gray-500 font-medium">デモアカウント体験</span>
+
+                      <div className="space-y-3">
+                        {[
+                          { email: 'demo@company.com', password: 'demo123', role: 'デモユーザー', icon: Users, description: '基本機能を体験' },
+                          { email: 'admin@company.com', password: 'admin123', role: '管理者', icon: Settings, description: '管理機能を体験' },
+                          { email: 'manager@company.com', password: 'manager123', role: 'マネージャー', icon: Building2, description: 'チーム管理を体験' }
+                        ].map(({ email, password, role, icon: Icon, description }) => (
+                          <button
+                            key={email}
+                            type="button"
+                            onClick={() => handleDemoLogin(email, password, role)}
+                            disabled={loading || socialLoading !== null}
+                            className="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                            data-testid={`demo-${role.toLowerCase()}-login-button`}
+                          >
+                            <div className="flex items-center">
+                              <div className="h-10 w-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center mr-3">
+                                <Icon className="h-5 w-5 text-gray-600" />
+                              </div>
+                              <div className="text-left">
+                                <div className="text-sm font-medium text-gray-900">{role}</div>
+                                <div className="text-xs text-gray-500">{description}</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-400">{email}</div>
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                    </div>
 
-                    <div className="space-y-3">
-                      {[
-                        { email: 'demo@company.com', password: 'demo123', role: 'デモユーザー', icon: Users, description: '基本機能を体験' },
-                        { email: 'admin@company.com', password: 'admin123', role: '管理者', icon: Settings, description: '管理機能を体験' },
-                        { email: 'manager@company.com', password: 'manager123', role: 'マネージャー', icon: Building2, description: 'チーム管理を体験' }
-                      ].map(({ email, password, role, icon: Icon, description }) => (
-                        <button
-                          key={email}
-                          type="button"
-                          onClick={() => handleDemoLogin(email, password, role)}
-                          disabled={loading || socialLoading !== null}
-                          className="w-full flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                          data-testid={`demo-${role.toLowerCase()}-login-button`}
-                        >
-                          <div className="flex items-center">
-                            <div className="h-10 w-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center mr-3">
-                              <Icon className="h-5 w-5 text-gray-600" />
-                            </div>
-                            <div className="text-left">
-                              <div className="text-sm font-medium text-gray-900">{role}</div>
-                              <div className="text-xs text-gray-500">{description}</div>
-                            </div>
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-start">
+                          <Info className="h-4 w-4 text-blue-500 mt-0.5 mr-2" />
+                          <div className="text-xs text-blue-700">
+                            <p className="font-medium mb-1">デモアカウントについて</p>
+                            <p>実際のワークスペースデータを模擬した環境で、LinkSenseの全機能をお試しいただけます。</p>
                           </div>
-                          <div className="text-right">
-                            <div className="text-xs text-gray-400">{email}</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start">
-                        <Info className="h-4 w-4 text-blue-500 mt-0.5 mr-2" />
-                        <div className="text-xs text-blue-700">
-                          <p className="font-medium mb-1">デモアカウントについて</p>
-                          <p>実際のワークスペースデータを模擬した環境で、LinkSenseの全機能をお試しいただけます。</p>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="mt-8 text-center">
                     <p className="text-sm text-gray-600">

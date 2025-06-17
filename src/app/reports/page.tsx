@@ -170,15 +170,33 @@ class RealDataReportsService {
     }
   }
   
-  static async generateReportsFromIntegrationData(
+   static async generateReportsFromIntegrationData(
     integrations: any[], 
     activeIntegrations: any[]
   ): Promise<{ reports: TeamHealthReport[], summary: ReportSummary }> {
     
     const connectedServices = activeIntegrations.length;
     
-    // 接続済みサービスに基づいてチーム生成
+    // 実際の統合データからチーム生成
     const teams = this.generateTeamsFromIntegrations(activeIntegrations);
+    
+    // チームが生成されない場合の処理
+    if (teams.length === 0) {
+      return {
+        reports: [],
+        summary: {
+          totalTeams: 0,
+          averageHealthScore: 0,
+          teamsImproving: 0,
+          teamsDeclining: 0,
+          criticalIssues: 0,
+          lastSyncTime: new Date(),
+          dataCompleteness: 0,
+          totalIntegrations: integrations.length,
+          activeIntegrations: connectedServices
+        }
+      };
+    }
     
     const reports: TeamHealthReport[] = teams.map((teamName, index) => {
       // 統合データに基づくスコア計算（実際のサービス接続状況を反映）
@@ -201,7 +219,7 @@ class RealDataReportsService {
       );
       
       return {
-        id: `real_report_${teamName.replace(/\s+/g, '_')}_${Date.now()}_${index}`,
+        id: `integrated_report_${teamName.replace(/\s+/g, '_')}_${Date.now()}_${index}`,
         teamName,
         period: `${new Date().getFullYear()}年${new Date().getMonth() + 1}月`,
         healthScore: Math.round(currentScore),
@@ -236,35 +254,39 @@ class RealDataReportsService {
 
   static generateTeamsFromIntegrations(activeIntegrations: any[]): string[] {
     const connectedServices = activeIntegrations.length;
-    const serviceTypes = activeIntegrations.map((i: any) => i.service?.toLowerCase() || '');
     
     if (connectedServices === 0) {
       return [];
     }
     
-    const teams = [];
+    // 実際の統合データからチーム情報を抽出
+    const teams = new Set<string>();
     
-    // 基本チーム（最低1つのサービス接続で生成）
-    teams.push('プロダクト開発チーム');
+    activeIntegrations.forEach((integration: any) => {
+      // 統合データからチーム名を取得（teamNameが存在する場合）
+      if (integration.teamName && integration.teamName.trim() !== '') {
+        teams.add(integration.teamName.trim());
+      }
+      
+      // チーム名がない場合は、サービス名ベースの汎用チーム名を生成
+      if (teams.size === 0) {
+        const serviceName = integration.service?.toLowerCase() || '';
+        if (serviceName.includes('slack') || serviceName.includes('discord')) {
+          teams.add('コミュニケーションチーム');
+        } else if (serviceName.includes('google') || serviceName.includes('microsoft') || serviceName.includes('teams')) {
+          teams.add('プロジェクトチーム');
+        } else {
+          teams.add('統合チーム');
+        }
+      }
+    });
     
-    // サービス接続数に応じてチーム追加
-    if (connectedServices >= 2) {
-      teams.push('デザイン・UI/UXチーム');
+    // チーム情報が取得できない場合は、接続済みサービス数に基づく汎用チーム生成
+    if (teams.size === 0) {
+      teams.add('統合分析チーム');
     }
     
-    if (connectedServices >= 3) {
-      teams.push('マーケティング・営業チーム');
-    }
-    
-    if (connectedServices >= 4) {
-      teams.push('カスタマーサクセスチーム');
-    }
-    
-    if (connectedServices >= 5) {
-      teams.push('経営・戦略チーム');
-    }
-    
-    return teams;
+    return Array.from(teams).slice(0, 3); // 最大3チームまで
   }
 
   static calculateRealisticScore(connectedServices: number, activeIntegrations: any[], teamName: string): number {
@@ -366,11 +388,11 @@ class RealDataReportsService {
     
     // 接続状況に基づく推奨事項
     if (connectedServices < 3) {
-      recommendations.push(`${teamName}の分析精度向上のため、追加サービスの接続を推奨します。現在${connectedServices}サービス接続済み。目標: 3サービス以上の接続`);
+      recommendations.push(`チーム分析の精度向上のため、追加サービスの接続を推奨します。現在${connectedServices}サービス接続済み。目標: 3サービス以上の接続`);
     }
     
     // サービス不足に基づく推奨事項
-    if (!serviceTypes.includes('slack') && !serviceTypes.includes('discord') && !serviceTypes.includes('microsoft')) {
+    if (!serviceTypes.includes('slack') && !serviceTypes.includes('discord') && !serviceTypes.includes('teams')) {
       recommendations.push('チームコミュニケーションの可視化のため、Slack、Discord、またはMicrosoft Teamsの接続を推奨します');
     }
     
@@ -388,7 +410,7 @@ class RealDataReportsService {
     }
     
     if (metrics.collaboration < 65) {
-      recommendations.push(`コラボレーションスコア(${metrics.collaboration})改善のため、クロスファンクショナルな協働機会を増やすことを推奨します`);
+      recommendations.push(`コラボレーションスコア(${metrics.collaboration})改善のため、チーム内での協働機会を増やすことを推奨します`);
     }
     
     if (metrics.workLifeBalance < 65) {
@@ -397,9 +419,9 @@ class RealDataReportsService {
     
     // 総合スコアに基づく推奨事項
     if (currentScore >= 80) {
-      recommendations.push(`${teamName}は優秀な健全性を維持しています。現在の取り組みを継続し、他チームのベストプラクティスとして共有を推奨します`);
+      recommendations.push(`チームは優秀な健全性を維持しています。現在の取り組みを継続し、ベストプラクティスとして他チームとの共有を推奨します`);
     } else if (currentScore < 60) {
-      recommendations.push(`${teamName}は緊急対応が必要です。チームリーダーとの面談とアクションプランの策定を早急に実施してください`);
+      recommendations.push(`チーム状況の改善が必要です。チームリーダーとの面談とアクションプランの策定を早急に実施してください`);
     }
     
     return recommendations.slice(0, 4); // 最大4項目
