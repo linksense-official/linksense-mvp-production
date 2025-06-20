@@ -1,827 +1,431 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState } from 'react';
+import { 
+  HelpCircle, 
+  MessageCircle, 
+  Mail, 
+  Phone, 
+  Clock, 
+  Search, 
+  ChevronDown, 
+  ChevronRight,
+  BookOpen,
+  Settings,
+  Shield,
+  Zap,
+  Users,
+  BarChart3,
+  AlertTriangle,
+  CheckCircle,
+  ExternalLink,
+  Play
+} from 'lucide-react';
 
-interface FAQ {
+interface FAQItem {
   id: string;
-  category: string;
   question: string;
   answer: string;
-  tags: string[];
-  helpful: number;
-  lastUpdated: string;
+  category: string;
 }
 
-interface SupportTicket {
-  id: string;
-  title: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  createdAt: string;
-  lastResponse: string;
-}
+const faqData: FAQItem[] = [
+  // セットアップ・導入
+  {
+    id: '1',
+    category: 'setup',
+    question: 'LinkSenseの導入にはどのくらい時間がかかりますか？',
+    answer: 'LinkSenseの導入は非常簡単です。アカウント作成後、各サービス（Slack、Discord、Teams、Google Meet）との連携は1つあたり約2-3分で完了します。全体で10-15分程度でチーム分析を開始できます。'
+  },
+  {
+    id: '2',
+    category: 'setup',
+    question: 'どのサービスと連携できますか？',
+    answer: '現在、以下の4つの主要サービスと連携可能です：\n• Slack - チーム内コミュニケーション分析\n• Discord - コミュニティ・サーバー分析\n• Microsoft Teams - 企業内チーム分析\n• Google Meet - 会議・カレンダー分析\n\n今後、Notion、Asana等の追加統合も予定しています。'
+  },
+  {
+    id: '3',
+    category: 'setup',
+    question: '管理者権限は必要ですか？',
+    answer: '基本的な分析機能には管理者権限は不要です。ただし、以下の高度な機能には管理者権限が必要な場合があります：\n• 組織全体のメンバー情報取得\n• チーム構造の詳細分析\n• 管理者向けレポート機能\n\n個人レベルでの利用であれば、通常のユーザー権限で十分ご利用いただけます。'
+  },
 
-const HelpPage = () => {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('faq');
-  const [faqs, setFaqs] = useState<FAQ[]>([]);
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showContactForm, setShowContactForm] = useState(false);
-  const [contactForm, setContactForm] = useState({
-    subject: '',
-    category: 'general',
-    priority: 'medium',
-    description: ''
-  });
+  // 機能・分析
+  {
+    id: '4',
+    category: 'features',
+    question: 'どのような分析ができますか？',
+    answer: 'LinkSenseでは以下の分析が可能です：\n\n📊 チーム健全性分析\n• コミュニケーション頻度測定\n• メンバー参加状況の可視化\n• 孤立メンバーの検出\n\n📈 生産性インサイト\n• チャンネル・チーム活動状況\n• 会議効率性の分析\n• ワークフローの最適化提案\n\n🎯 カスタムレポート\n• 週次・月次レポート生成\n• 部門別分析\n• トレンド分析'
+  },
+  {
+    id: '5',
+    category: 'features',
+    question: 'リアルタイムで分析結果は更新されますか？',
+    answer: 'はい、LinkSenseはリアルタイム分析に対応しています：\n\n⚡ リアルタイム更新\n• ダッシュボードデータ：5分間隔\n• アラート通知：即座\n• チーム状況：15分間隔\n\n📅 定期更新\n• 詳細レポート：毎日午前6時\n• 週次サマリー：毎週月曜日\n• 月次分析：毎月1日\n\nEnterprise プランでは、更新頻度をカスタマイズ可能です。'
+  },
+  {
+    id: '6',
+    category: 'features',
+    question: 'アラート機能について教えてください',
+    answer: 'LinkSenseのアラート機能は、チームの健全性に関する重要な変化を即座に通知します：\n\n🚨 重要アラート\n• 孤立メンバーの検出\n• コミュニケーション急減\n• チーム参加率の低下\n\n📧 通知方法\n• メール通知\n• ダッシュボード内通知\n• Slack/Teams連携通知\n\n⚙️ カスタマイズ\n• 通知頻度の調整\n• アラートしきい値の設定\n• 通知対象者の指定'
+  },
 
-  useEffect(() => {
-    const fetchHelpData = async () => {
-      setIsLoading(true);
-      
-      // モックFAQデータ
-      const mockFAQs: FAQ[] = [
-        {
-          id: '1',
-          category: 'getting-started',
-          question: 'LinkSenseの基本的な使い方を教えてください',
-          answer: `LinkSenseは組織のチーム健全性を分析・監視するツールです。以下の手順で開始できます：
+  // プライバシー・セキュリティ
+  {
+    id: '7',
+    category: 'privacy',
+    question: 'メッセージの内容は分析されますか？',
+    answer: 'いいえ、LinkSenseはメッセージの内容を読み取ったり保存したりすることはありません。\n\n🔒 分析対象（安全）\n• メッセージ送信頻度\n• チャンネル参加状況\n• アクティブ時間帯\n• メンバー間のやり取り頻度\n\n❌ 分析対象外\n• メッセージの具体的内容\n• 個人的な会話内容\n• ファイル・画像の内容\n• プライベートな情報\n\nプライバシーファーストの設計により、個人情報は厳格に保護されます。'
+  },
+  {
+    id: '8',
+    category: 'privacy',
+    question: 'データはどこに保存されますか？',
+    answer: 'お客様のデータは以下の方針で安全に管理されています：\n\n🌍 データセンター\n• 主要：日本国内（AWS Tokyo リージョン）\n• バックアップ：米国（暗号化済み）\n• GDPR準拠の適切な保護措置\n\n🔐 セキュリティ対策\n• AES-256暗号化\n• TLS 1.3通信暗号化\n• SOC2 Type II準拠\n• 定期的セキュリティ監査\n\n📝 データ保持期間\n• アクティブデータ：最大2年\n• バックアップ：最大90日\n• アカウント削除時：30日以内に完全削除'
+  },
 
-1. **ダッシュボード**: 組織全体の健全性スコアと主要メトリクスを確認
-2. **チームメンバー**: 個別メンバーの状況を詳細に分析
-3. **アラート**: 注意が必要な状況を即座に把握
-4. **レポート**: 定期的な健全性レポートを生成・共有
-5. **設定**: 通知やプライバシー設定をカスタマイズ
+  // 料金・プラン
+  {
+    id: '9',
+    category: 'pricing',
+    question: '料金プランについて教えてください',
+    answer: 'LinkSenseでは、チームサイズに応じた柔軟な料金プランをご用意しています：\n\n🆓 Freeプラン（無料）\n• 最大50名まで\n• 基本ダッシュボード\n• 月次レポート\n\n💼 Professional（¥2,980/月）\n• 最大500名まで\n• 高度な分析機能\n• 週次レポート\n• メール通知\n\n🏢 Enterprise（¥9,800/月）\n• 無制限メンバー\n• リアルタイム分析\n• API アクセス\n• 専用サポート\n\n全プランで14日間の無料トライアルをご利用いただけます。'
+  },
+  {
+    id: '10',
+    category: 'pricing',
+    question: 'プラン変更はいつでも可能ですか？',
+    answer: 'はい、プランの変更はいつでも可能です：\n\n⬆️ アップグレード\n• 即座に適用\n• 日割り計算で課金\n• データ移行は自動\n\n⬇️ ダウングレード\n• 次回請求日から適用\n• 現在の期間は継続利用可能\n• データは保持（制限内）\n\n💳 支払い方法\n• クレジットカード\n• 銀行振込（年間契約）\n• 請求書払い（Enterprise）\n\nご不明な点がございましたら、サポートチームまでお気軽にお問い合わせください。'
+  },
 
-各機能の詳細な使い方は、該当ページの「？」アイコンからヘルプを確認できます。`,
-          tags: ['基本操作', 'チュートリアル', '初心者'],
-          helpful: 156,
-          lastUpdated: '2025-05-20'
-        },
-        {
-          id: '2',
-          category: 'features',
-          question: '健全性スコアはどのように計算されますか？',
-          answer: `健全性スコアは以下の5つの要素を総合的に評価して算出されます：
-
-**1. ストレスレベル (20%)**
-- 作業負荷、締切プレッシャー、技術的課題の複雑さ
-- 低いほど良い（逆算）
-
-**2. チーム満足度 (25%)**
-- 職場環境、同僚との関係、仕事内容への満足度
-- アンケート結果とコミュニケーション分析
-
-**3. エンゲージメント (20%)**
-- 積極的な参加、提案頻度、自主的な学習
-- 会議参加率、貢献度指標
-
-**4. ワークライフバランス (20%)**
-- 勤務時間、休暇取得率、時間外労働
-- カレンダー分析とアクティビティ監視
-
-**5. スキル成長 (15%)**
-- 学習活動、スキル向上、目標達成率
-- 研修参加、資格取得、プロジェクト成果
-
-スコアは0-100で表示され、80以上が「良好」、60-79が「普通」、60未満が「要注意」となります。`,
-          tags: ['健全性スコア', 'メトリクス', '計算方法'],
-          helpful: 203,
-          lastUpdated: '2025-05-18'
-        },
-        {
-          id: '3',
-          category: 'privacy',
-          question: '個人データのプライバシーはどのように保護されていますか？',
-          answer: `LinkSenseは最高レベルのプライバシー保護を提供します：
-
-**データ暗号化**
-- 保存時・転送時ともにAES-256暗号化
-- エンドツーエンド暗号化による通信保護
-
-**アクセス制御**
-- ロールベースアクセス制御（RBAC）
-- 最小権限の原則に基づく情報アクセス
-- 二要素認証（2FA）対応
-
-**データ匿名化**
-- 個人を特定できない形でのデータ集計
-- 統計処理時の個人情報除去
-- 差分プライバシー技術の採用
-
-**コンプライアンス**
-- GDPR（EU一般データ保護規則）完全準拠
-- SOC 2 Type II認証取得
-- ISO 27001情報セキュリティ管理システム認証
-
-**ユーザー制御**
-- データ削除権の保証
-- 設定画面からの詳細なプライバシー制御
-- データポータビリティ対応`,
-          tags: ['プライバシー', 'セキュリティ', 'GDPR', 'データ保護'],
-          helpful: 89,
-          lastUpdated: '2025-05-15'
-        },
-        {
-          id: '4',
-          category: 'integrations',
-          question: 'Slackとの連携でどのような情報が取得されますか？',
-          answer: `Slack連携では以下の情報を分析に活用します：
-
-**取得する情報**
-- メッセージ送信頻度（内容は取得しません）
-- チャンネル参加状況
-- リアクション（絵文字）の使用パターン
-- オンライン/オフライン状況
-- 応答時間パターン
-
-**分析内容**
-- コミュニケーション活発度
-- チーム内の連携状況
-- ストレス指標（応答時間の変化など）
-- エンゲージメントレベル
-
-**プライバシー保護**
-- メッセージ内容は一切取得・保存しません
-- 個人を特定できない統計データのみ使用
-- ユーザーが連携を無効化可能
-- GDPR準拠の同意管理
-
-設定画面から詳細な制御が可能で、いつでも連携を停止できます。`,
-          tags: ['Slack', '統合', 'プライバシー', 'データ取得'],
-          helpful: 134,
-          lastUpdated: '2025-05-22'
-        },
-        {
-          id: '5',
-          category: 'troubleshooting',
-          question: 'ダッシュボードにデータが表示されない場合の対処法',
-          answer: `データが表示されない場合、以下を順番に確認してください：
-
-**1. 権限の確認**
-- 適切なロール（管理者・マネージャー）が割り当てられているか
-- チーム/部署の閲覧権限があるか
-
-**2. データ同期の確認**
-- 統合設定ページで外部ツールが正常に接続されているか
-- 最終同期時刻が最近のものか
-- エラーメッセージが表示されていないか
-
-**3. フィルター設定の確認**
-- 期間フィルターが適切に設定されているか
-- チーム/部署フィルターで除外されていないか
-
-**4. ブラウザの問題**
-- ページの再読み込み（Ctrl+F5）
-- ブラウザキャッシュのクリア
-- 別のブラウザでの動作確認
-
-**5. システム状態の確認**
-- ステータスページでサービス稼働状況を確認
-- メンテナンス情報の確認
-
-それでも解決しない場合は、サポートチケットを作成してください。`,
-          tags: ['トラブルシューティング', 'データ', 'ダッシュボード'],
-          helpful: 78,
-          lastUpdated: '2025-05-25'
-        },
-        {
-          id: '6',
-          category: 'billing',
-          question: 'プランのアップグレード・ダウングレードはいつでも可能ですか？',
-          answer: `はい、プランの変更はいつでも可能です：
-
-**アップグレード**
-- 即座に適用（プロレート課金）
-- 新機能へのアクセスが即座に有効
-- 追加料金は次回請求時に調整
-
-**ダウングレード**
-- 次回請求サイクルから適用
-- 現在の期間中は上位プランの機能を継続利用可能
-- データは制限内に調整が必要な場合があります
-
-**年間プランの場合**
-- アップグレード：差額を即座に請求
-- ダウングレード：次回更新時に適用
-- 返金ポリシーに基づく差額調整
-
-**注意事項**
-- ダウングレード時、利用制限を超える場合は事前通知
-- データエクスポート機能で重要情報のバックアップ推奨
-- カスタム設定は可能な限り保持
-
-サブスクリプションページから簡単に変更できます。`,
-          tags: ['料金', 'プラン変更', 'アップグレード', 'ダウングレード'],
-          helpful: 67,
-          lastUpdated: '2025-05-19'
-        }
-      ];
-
-      // モックサポートチケットデータ
-      const mockTickets: SupportTicket[] = [
-        {
-          id: 'TICK-001',
-          title: 'Slack統合でデータが同期されない',
-          status: 'in-progress',
-          priority: 'high',
-          createdAt: '2025-05-24T09:00:00Z',
-          lastResponse: '2025-05-25T14:30:00Z'
-        },
-        {
-          id: 'TICK-002',
-          title: 'レポート生成時のエラーについて',
-          status: 'resolved',
-          priority: 'medium',
-          createdAt: '2025-05-20T16:45:00Z',
-          lastResponse: '2025-05-21T10:15:00Z'
-        },
-        {
-          id: 'TICK-003',
-          title: '新機能のリクエスト：カスタムダッシュボード',
-          status: 'open',
-          priority: 'low',
-          createdAt: '2025-05-18T11:20:00Z',
-          lastResponse: '2025-05-18T11:20:00Z'
-        }
-      ];
-
-      setTimeout(() => {
-        setFaqs(mockFAQs);
-        setTickets(mockTickets);
-        setIsLoading(false);
-      }, 500);
-    };
-
-    fetchHelpData();
-    return undefined;
-  }, []);
-
-  const categories = [
-    { id: 'all', name: 'すべて' },
-    { id: 'getting-started', name: '使い方' },
-    { id: 'features', name: '機能' },
-    { id: 'integrations', name: '統合' },
-    { id: 'privacy', name: 'プライバシー' },
-    { id: 'billing', name: '料金' },
-    { id: 'troubleshooting', name: 'トラブル' }
-  ];
-
-  const filteredFAQs = faqs.filter(faq => {
-    const matchesSearch = faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         faq.answer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         faq.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = selectedCategory === 'all' || faq.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'open': return 'bg-blue-100 text-blue-800';
-      case 'in-progress': return 'bg-yellow-100 text-yellow-800';
-      case 'resolved': return 'bg-green-100 text-green-800';
-      case 'closed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const handleContactSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // モック送信処理
-    const newTicket: SupportTicket = {
-      id: `TICK-${String(tickets.length + 1).padStart(3, '0')}`,
-      title: contactForm.subject,
-      status: 'open',
-      priority: contactForm.priority as any,
-      createdAt: new Date().toISOString(),
-      lastResponse: new Date().toISOString()
-    };
-    setTickets([newTicket, ...tickets]);
-    setContactForm({ subject: '', category: 'general', priority: 'medium', description: '' });
-    setShowContactForm(false);
-    setActiveTab('tickets');
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
+  // トラブルシューティング
+  {
+    id: '11',
+    category: 'troubleshooting',
+    question: '連携がうまくいかない場合の対処法は？',
+    answer: '連携でお困りの場合は、以下の手順をお試しください：\n\n🔧 基本的な対処法\n1. ブラウザの再読み込み\n2. 別のブラウザで試行\n3. プライベートモードで接続\n4. ブラウザキャッシュの削除\n\n⚙️ 権限関連\n• 必要な権限が付与されているか確認\n• 組織の管理者に権限申請\n• 2要素認証の一時無効化\n\n📞 それでも解決しない場合\n• サポートチャット（平日9-18時）\n• メールサポート（24時間以内返信）\n• 画面共有サポート（予約制）'
+  },
+  {
+    id: '12',
+    category: 'troubleshooting',
+    question: 'データが表示されない・更新されない',
+    answer: 'データ表示の問題については、以下をご確認ください：\n\n⏱️ 更新タイミング\n• 初回連携後：最大30分\n• 通常の更新：5-15分間隔\n• 大量データ：最大2時間\n\n🔍 確認項目\n1. 連携サービスでの活動があるか\n2. 必要な権限が維持されているか\n3. サービス側でのAPI制限\n4. ネットワーク接続状況\n\n🛠️ 解決方法\n• 統合設定の再接続\n• データ同期の手動実行\n• ページの完全リロード\n\n問題が継続する場合は、エラーメッセージのスクリーンショットと併せてサポートまでご連絡ください。'
   }
+];
+
+const categories = [
+  { id: 'all', name: 'すべて', icon: BookOpen },
+  { id: 'setup', name: 'セットアップ', icon: Settings },
+  { id: 'features', name: '機能・分析', icon: BarChart3 },
+  { id: 'privacy', name: 'プライバシー', icon: Shield },
+  { id: 'pricing', name: '料金・プラン', icon: Zap },
+  { id: 'troubleshooting', name: 'トラブル解決', icon: AlertTriangle }
+];
+
+export default function HelpPage() {
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
+
+  const filteredFAQs = faqData.filter(faq => {
+    const matchesCategory = selectedCategory === 'all' || faq.category === selectedCategory;
+    const matchesSearch = faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const toggleFAQ = (id: string) => {
+    setExpandedFAQ(expandedFAQ === id ? null : id);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* ヘッダー */}
-        <div className="mb-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">ヘルプ・サポート</h1>
-            <p className="text-lg text-gray-600 mb-6">
-              LinkSenseの使い方やよくある質問、サポートへのお問い合わせ
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* ヘッダー */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-3 mb-4">
+              <HelpCircle className="h-10 w-10 text-blue-600" />
+              <h1 className="text-4xl font-bold text-gray-900">ヘルプ・サポート</h1>
+            </div>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              LinkSenseの使い方、よくある質問、トラブル解決方法をご案内します
             </p>
-            <div className="flex justify-center space-x-4">
-              <button
-                onClick={() => setShowContactForm(true)}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.456L3 21l2.456-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
-                </svg>
-                サポートに問い合わせ
-              </button>
-              <a
-                href="mailto:support@linksense.com"
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                メールでお問い合わせ
-              </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* クイックアクセス */}
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center space-x-3 mb-4">
+              <MessageCircle className="h-8 w-8 text-green-600" />
+              <h3 className="text-lg font-semibold text-gray-900">チャットサポート</h3>
             </div>
+            <p className="text-gray-600 mb-4">
+              リアルタイムでサポートスタッフと直接やり取りできます
+            </p>
+            <div className="flex items-center text-sm text-gray-500 mb-4">
+              <Clock className="h-4 w-4 mr-1" />
+              平日 9:00-18:00 (JST)
+            </div>
+            <button className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+              チャットを開始
+            </button>
           </div>
 
-          {/* クイックリンク */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">クイックスタートガイド</h3>
-              <p className="text-gray-600 text-sm mb-4">基本的な使い方を5分で学習</p>
-              <button className="text-blue-600 hover:text-blue-800 font-medium text-sm">
-                ガイドを見る →
-              </button>
+          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center space-x-3 mb-4">
+              <Mail className="h-8 w-8 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-900">メールサポート</h3>
             </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">ビデオチュートリアル</h3>
-              <p className="text-gray-600 text-sm mb-4">動画で分かりやすく解説</p>
-              <button className="text-blue-600 hover:text-blue-800 font-medium text-sm">
-                動画を見る →
-              </button>
+            <p className="text-gray-600 mb-4">
+              詳細な質問や技術的な問題についてメールでお問い合わせ
+            </p>
+            <div className="flex items-center text-sm text-gray-500 mb-4">
+              <Clock className="h-4 w-4 mr-1" />
+              24時間以内に返信
             </div>
+            <a 
+              href="mailto:support@linksense-mvp.vercel.app"
+              className="block w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-center"
+            >
+              メールを送信
+            </a>
+          </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">ベストプラクティス</h3>
-              <p className="text-gray-600 text-sm mb-4">効果的な活用方法</p>
-              <button className="text-blue-600 hover:text-blue-800 font-medium text-sm">
-                事例を見る →
-              </button>
+          <div className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center space-x-3 mb-4">
+              <Play className="h-8 w-8 text-purple-600" />
+              <h3 className="text-lg font-semibold text-gray-900">動画ガイド</h3>
+            </div>
+            <p className="text-gray-600 mb-4">
+              セットアップから高度な機能まで、動画で分かりやすく解説
+            </p>
+            <div className="flex items-center text-sm text-gray-500 mb-4">
+              <Users className="h-4 w-4 mr-1" />
+              初心者から上級者まで
+            </div>
+            <button className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors">
+              動画を見る
+            </button>
+          </div>
+        </div>
+
+        {/* 検索バー */}
+        <div className="mb-8">
+          <div className="max-w-2xl mx-auto">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="質問を検索..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
           </div>
         </div>
 
-        {/* タブナビゲーション */}
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'faq', label: 'よくある質問', icon: '❓' },
-              { id: 'tickets', label: 'サポートチケット', icon: '🎫' },
-              { id: 'resources', label: 'リソース', icon: '📚' },
-              { id: 'status', label: 'システム状況', icon: '🔧' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <span className="mr-2">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+        {/* カテゴリフィルター */}
+        <div className="mb-8">
+          <div className="flex flex-wrap justify-center gap-3">
+            {categories.map((category) => {
+              const IconComponent = category.icon;
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                    selectedCategory === category.id
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  }`}
+                >
+                  <IconComponent className="h-4 w-4" />
+                  <span>{category.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* FAQ タブ */}
-        {activeTab === 'faq' && (
-          <div>
-            {/* 検索・フィルター */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">検索</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="質問や回答から検索..."
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">カテゴリ</label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* FAQ一覧 */}
-            <div className="space-y-4">
-              {filteredFAQs.map((faq) => (
-                <div key={faq.id} className="bg-white rounded-lg shadow-sm">
-                  <button
-                    onClick={() => setExpandedFAQ(expandedFAQ === faq.id ? null : faq.id)}
-                    className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50"
-                  >
-                    <h3 className="text-lg font-medium text-gray-900">{faq.question}</h3>
-                    <svg
-                      className={`w-5 h-5 text-gray-500 transform transition-transform ${
-                        expandedFAQ === faq.id ? 'rotate-180' : ''
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  
-                  {expandedFAQ === faq.id && (
-                    <div className="px-6 pb-6">
-                      <div className="prose max-w-none text-gray-700 mb-4">
-                        {faq.answer.split('\n').map((paragraph, index) => (
-                          <p key={index} className="mb-2 whitespace-pre-line">
-                            {paragraph}
-                          </p>
-                        ))}
-                      </div>
-                      
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                        <div className="flex flex-wrap gap-2">
-                          {faq.tags.map((tag, index) => (
-                            <span
-                              key={index}
-                              className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500">
-                          <span>👍 {faq.helpful}人が参考になったと回答</span>
-                          <span>更新: {new Date(faq.lastUpdated).toLocaleDateString('ja-JP')}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 flex space-x-2">
-                        <button className="px-3 py-1 bg-green-100 text-green-800 rounded text-sm hover:bg-green-200">
-                          👍 参考になった
-                        </button>
-                        <button className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200">
-                          💬 コメント
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {filteredFAQs.length === 0 && (
+        {/* FAQ セクション */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">よくある質問</h2>
+          <div className="max-w-4xl mx-auto">
+            {filteredFAQs.length === 0 ? (
               <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900">該当するFAQが見つかりません</h3>
-                <p className="mt-1 text-sm text-gray-500">検索条件を変更するか、サポートにお問い合わせください。</p>
+                <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 text-lg">該当する質問が見つかりませんでした</p>
+                <p className="text-gray-400 mt-2">検索条件を変更するか、直接サポートにお問い合わせください</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredFAQs.map((faq) => (
+                  <div key={faq.id} className="bg-white rounded-lg shadow-sm border">
+                    <button
+                      onClick={() => toggleFAQ(faq.id)}
+                      className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="font-medium text-gray-900 pr-4">{faq.question}</span>
+                      {expandedFAQ === faq.id ? (
+                        <ChevronDown className="h-5 w-5 text-gray-500 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-500 flex-shrink-0" />
+                      )}
+                    </button>
+                    {expandedFAQ === faq.id && (
+                      <div className="px-6 pb-4">
+                        <div className="text-gray-700 leading-relaxed whitespace-pre-line">
+                          {faq.answer}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        )}
+        </div>
 
-        {/* サポートチケット タブ */}
-        {activeTab === 'tickets' && (
-          <div>
-            <div className="bg-white rounded-lg shadow-sm">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">あなたのサポートチケット</h3>
-              </div>
-              <div className="divide-y divide-gray-200">
-                {tickets.map((ticket) => (
-                  <div key={ticket.id} className="px-6 py-4 hover:bg-gray-50">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-3">
-                        <span className="font-medium text-gray-900">#{ticket.id}</span>
-                        <h4 className="text-gray-900">{ticket.title}</h4>
-                      </div>
-                      <div className="flex space-x-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
-                          {ticket.status === 'open' ? '未対応' :
-                           ticket.status === 'in-progress' ? '対応中' :
-                           ticket.status === 'resolved' ? '解決済み' : '完了'}
-                        </span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
-                          {ticket.priority === 'urgent' ? '緊急' :
-                           ticket.priority === 'high' ? '高' :
-                           ticket.priority === 'medium' ? '中' : '低'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>作成日: {new Date(ticket.createdAt).toLocaleDateString('ja-JP')}</span>
-                      <span>最終更新: {new Date(ticket.lastResponse).toLocaleDateString('ja-JP')}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {tickets.length === 0 && (
-                <div className="px-6 py-12 text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">サポートチケットはありません</h3>
-                  <p className="mt-1 text-sm text-gray-500">問題がある場合は、新しいチケットを作成してください。</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* リソース タブ */}
-        {activeTab === 'resources' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                title: 'API ドキュメント',
-                description: '開発者向けAPI仕様書',
-                icon: '🔧',
-                link: '/docs/api',
-                category: '開発者'
-              },
-              {
-                title: 'セキュリティガイド',
-                description: 'セキュリティベストプラクティス',
-                icon: '🔒',
-                link: '/docs/security',
-                category: 'セキュリティ'
-              },
-              {
-                title: 'データプライバシー',
-                description: 'データ取り扱いポリシー',
-                icon: '🛡️',
-                link: '/docs/privacy',
-                category: 'プライバシー'
-              },
-              {
-                title: '統合ガイド',
-                description: '外部ツール連携方法',
-                icon: '🔗',
-                link: '/docs/integrations',
-                category: '統合'
-              },
-              {
-                title: 'トラブルシューティング',
-                description: '一般的な問題の解決方法',
-                icon: '🔍',
-                link: '/docs/troubleshooting',
-                category: 'サポート'
-              },
-              {
-                title: 'リリースノート',
-                description: '最新アップデート情報',
-                icon: '📝',
-                link: '/docs/releases',
-                category: 'アップデート'
-              }
-            ].map((resource, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center mb-4">
-                  <span className="text-3xl mr-3">{resource.icon}</span>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{resource.title}</h3>
-                    <span className="text-sm text-gray-500">{resource.category}</span>
-                  </div>
-                </div>
-                <p className="text-gray-600 mb-4">{resource.description}</p>
-                <button className="text-blue-600 hover:text-blue-800 font-medium text-sm">
-                  詳細を見る →
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* システム状況 タブ */}
-        {activeTab === 'status' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">システム稼働状況</h3>
-              <div className="space-y-4">
-                {[
-                  { service: 'Webアプリケーション', status: 'operational', uptime: '99.9%' },
-                  { service: 'API サービス', status: 'operational', uptime: '99.8%' },
-                  { service: 'データ同期', status: 'operational', uptime: '99.7%' },
-                  { service: 'レポート生成', status: 'maintenance', uptime: '99.5%' },
-                  { service: '通知システム', status: 'operational', uptime: '99.9%' }
-                ].map((service, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center">
-                      <div className={`w-3 h-3 rounded-full mr-3 ${
-                        service.status === 'operational' ? 'bg-green-500' :
-                        service.status === 'maintenance' ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}></div>
-                      <span className="font-medium text-gray-900">{service.service}</span>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm text-gray-600">稼働率: {service.uptime}</span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        service.status === 'operational' ? 'bg-green-100 text-green-800' :
-                        service.status === 'maintenance' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {service.status === 'operational' ? '正常' :
-                         service.status === 'maintenance' ? 'メンテナンス中' : '障害'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* 追加リソース */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">その他のリソース</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+              <BookOpen className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <h3 className="font-semibold text-gray-900 mb-2">ユーザーガイド</h3>
+              <p className="text-gray-600 text-sm mb-4">詳細な機能説明と使い方</p>
+              <a href="#" className="text-blue-600 hover:underline text-sm flex items-center justify-center">
+                詳しく見る <ExternalLink className="h-3 w-3 ml-1" />
+              </a>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">最近のお知らせ</h3>
-              <div className="space-y-4">
-                {[
-                  {
-                    date: '2025-05-26',
-                    title: '新機能: AI予測分析の精度向上',
-                    type: 'update',
-                    description: '機械学習モデルを更新し、健全性予測の精度を15%向上させました。'
-                  },
-                  {
-                    date: '2025-05-24',
-                    title: '定期メンテナンス完了',
-                    type: 'maintenance',
-                    description: 'データベース最適化とセキュリティアップデートを実施しました。'
-                  },
-                  {
-                    date: '2025-05-20',
-                    title: 'Slack統合の機能拡張',
-                    type: 'feature',
-                    description: 'チャンネル別分析とカスタムアラート機能を追加しました。'
-                  }
-                ].map((news, index) => (
-                  <div key={index} className="border-l-4 border-blue-500 pl-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-gray-900">{news.title}</span>
-                      <span className="text-sm text-gray-500">{news.date}</span>
-                    </div>
-                    <p className="text-gray-600 text-sm">{news.description}</p>
-                  </div>
-                ))}
+            <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+              <Settings className="h-12 w-12 text-green-600 mx-auto mb-4" />
+              <h3 className="font-semibold text-gray-900 mb-2">API ドキュメント</h3>
+              <p className="text-gray-600 text-sm mb-4">開発者向けAPI仕様書</p>
+              <a href="#" className="text-green-600 hover:underline text-sm flex items-center justify-center">
+                詳しく見る <ExternalLink className="h-3 w-3 ml-1" />
+              </a>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+              <Users className="h-12 w-12 text-purple-600 mx-auto mb-4" />
+              <h3 className="font-semibold text-gray-900 mb-2">コミュニティ</h3>
+              <p className="text-gray-600 text-sm mb-4">ユーザー同士の情報交換</p>
+              <a href="#" className="text-purple-600 hover:underline text-sm flex items-center justify-center">
+                参加する <ExternalLink className="h-3 w-3 ml-1" />
+              </a>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+              <Zap className="h-12 w-12 text-orange-600 mx-auto mb-4" />
+              <h3 className="font-semibold text-gray-900 mb-2">アップデート</h3>
+              <p className="text-gray-600 text-sm mb-4">新機能とリリース情報</p>
+              <a href="#" className="text-orange-600 hover:underline text-sm flex items-center justify-center">
+                確認する <ExternalLink className="h-3 w-3 ml-1" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* 緊急時サポート */}
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-6 w-6 text-red-600 mt-1" />
+            <div>
+              <h3 className="font-semibold text-red-900 mb-2">緊急時サポート</h3>
+              <p className="text-red-800 mb-4">
+                サービスに重大な問題が発生している場合、または緊急を要する問題については、
+                以下の方法で即座にサポートチームにご連絡ください。
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <a 
+                  href="mailto:emergency@linksense-mvp.vercel.app"
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                >
+                  緊急メール送信
+                </a>
+                <a 
+                  href="tel:+81-3-XXXX-XXXX"
+                  className="bg-white text-red-600 border border-red-600 px-4 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                >
+                  緊急電話サポート
+                </a>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* お問い合わせモーダル */}
-        {showContactForm && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <form onSubmit={handleContactSubmit} className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-gray-900">サポートチケットを作成</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowContactForm(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      件名 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={contactForm.subject}
-                      onChange={(e) => setContactForm({...contactForm, subject: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">カテゴリ</label>
-                      <select
-                        value={contactForm.category}
-                        onChange={(e) => setContactForm({...contactForm, category: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="general">一般的な質問</option>
-                        <option value="technical">技術的な問題</option>
-                        <option value="billing">料金・請求</option>
-                        <option value="feature">機能リクエスト</option>
-                        <option value="bug">バグ報告</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">優先度</label>
-                      <select
-                        value={contactForm.priority}
-                        onChange={(e) => setContactForm({...contactForm, priority: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="low">低</option>
-                        <option value="medium">中</option>
-                        <option value="high">高</option>
-                        <option value="urgent">緊急</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      詳細説明 <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      value={contactForm.description}
-                      onChange={(e) => setContactForm({...contactForm, description: e.target.value})}
-                      rows={5}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="問題の詳細、発生状況、期待する結果などを具体的にご記入ください..."
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowContactForm(false)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    チケットを作成
-                  </button>
-                </div>
-              </form>
+        {/* ステータスページ */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
+          <div className="flex items-center space-x-3 mb-4">
+            <CheckCircle className="h-6 w-6 text-green-600" />
+            <h3 className="font-semibold text-green-900">システム稼働状況</h3>
+          </div>
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-2"></div>
+              <p className="text-sm text-green-800">メインサービス</p>
+              <p className="text-xs text-green-600">正常稼働</p>
+            </div>
+            <div className="text-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-2"></div>
+              <p className="text-sm text-green-800">API</p>
+              <p className="text-xs text-green-600">正常稼働</p>
+            </div>
+            <div className="text-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-2"></div>
+              <p className="text-sm text-green-800">データベース</p>
+              <p className="text-xs text-green-600">正常稼働</p>
+            </div>
+            <div className="text-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-2"></div>
+              <p className="text-sm text-green-800">統合サービス</p>
+              <p className="text-xs text-green-600">正常稼働</p>
             </div>
           </div>
-        )}
+          <div className="mt-4 text-center">
+            <a href="#" className="text-green-600 hover:underline text-sm">
+              詳細なステータス情報を見る
+            </a>
+          </div>
+        </div>
+
+        {/* フッター */}
+        <div className="text-center py-8 border-t border-gray-200">
+          <p className="text-gray-600 mb-4">
+            まだ解決しない問題がありますか？お気軽にお問い合わせください。
+          </p>
+          <div className="flex justify-center space-x-4">
+            <a 
+              href="mailto:support@linksense-mvp.vercel.app"
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              サポートに連絡
+            </a>
+            <a 
+              href="/privacy"
+              className="text-blue-600 hover:underline px-6 py-2"
+            >
+              プライバシーポリシー
+            </a>
+            <a 
+              href="/terms"
+              className="text-blue-600 hover:underline px-6 py-2"
+            >
+              利用規約
+            </a>
+          </div>
+          <p className="text-gray-500 text-sm mt-4">
+            © 2025 LinkSense. All rights reserved.
+          </p>
+        </div>
       </div>
     </div>
   );
-};
-
-export default HelpPage;
+}
