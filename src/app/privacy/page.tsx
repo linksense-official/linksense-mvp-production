@@ -1,7 +1,18 @@
 'use client';
 
 import React from 'react';
-import { Shield, Lock, Eye, Database, Mail, FileText, Users, Globe } from 'lucide-react';
+import { 
+  Shield, 
+  Lock, 
+  Eye, 
+  Database, 
+  Mail, 
+  FileText, 
+  Users, 
+  Globe,
+  CheckCircle,
+  AlertTriangle
+} from 'lucide-react';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -240,11 +251,103 @@ export default function PrivacyPolicyPage() {
           </div>
         </section>
 
+          {/* メール使用同意セクション - 新規追加 */}
+        <section className="mb-8">
+          <div className="flex items-center space-x-3 mb-4">
+            <Mail className="h-6 w-6 text-green-600" />
+            <h2 className="text-2xl font-bold text-gray-900">8. メール通信への明示的同意</h2>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+              <h3 className="font-semibold text-green-900 mb-3 flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2" />
+                事前同意の徹底
+              </h3>
+              <p className="text-green-800 mb-4">
+                LinkSenseは、お客様のメールアドレスを使用する前に、必ず明示的な同意を取得します。
+                同意なしにメール送信を行うことはありません。
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">同意取得が必要なメール送信</h4>
+                <ul className="list-disc list-inside text-gray-700 space-y-2">
+                  <li><strong>チーム健全性アラート:</strong> 孤立メンバー検出時の重要通知</li>
+                  <li><strong>定期レポート:</strong> 週次・月次のチーム分析レポート</li>
+                  <li><strong>改善提案:</strong> AIによるチーム運営改善アドバイス</li>
+                  <li><strong>セキュリティ通知:</strong> アカウント・データ保護関連の重要連絡</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">同意取得の方法</h4>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <h5 className="font-medium text-blue-900 mb-2">初回設定時</h5>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• 統合設定画面での明示的チェックボックス</li>
+                      <li>• 各通知タイプごとの個別同意</li>
+                      <li>• 同意内容の詳細説明表示</li>
+                    </ul>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <h5 className="font-medium text-purple-900 mb-2">設定変更時</h5>
+                    <ul className="text-sm text-purple-800 space-y-1">
+                      <li>• 設定画面での同意状況確認</li>
+                      <li>• ワンクリックでの配信停止</li>
+                      <li>• 同意撤回の即座反映</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">お客様の権利</h4>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <ul className="text-gray-700 space-y-2">
+                    <li className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span><strong>配信停止権:</strong> いつでも全ての通知を停止可能</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span><strong>選択的同意:</strong> 通知タイプごとの個別設定</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span><strong>透明性:</strong> 送信理由と頻度の明確な説明</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span><strong>データ保護:</strong> 第三者への提供は一切なし</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-medium text-yellow-900 mb-2">重要な保証</h4>
+                    <p className="text-yellow-800 text-sm">
+                      LinkSenseは、マーケティング目的でのメール送信は一切行いません。
+                      送信するメールは全て、チーム健全性の向上とサービス運営に必要な
+                      重要な情報のみに限定されます。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Cookie・トラッキング */}
         <section className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <Globe className="h-6 w-6 text-green-600" />
-            <h2 className="text-2xl font-bold text-gray-900">8. Cookie・トラッキング技術</h2>
+            <h2 className="text-2xl font-bold text-gray-900">9. Cookie・トラッキング技術</h2>
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="space-y-4">
@@ -282,7 +385,7 @@ export default function PrivacyPolicyPage() {
         <section className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <Globe className="h-6 w-6 text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900">9. 国際データ転送</h2>
+            <h2 className="text-2xl font-bold text-gray-900">10. 国際データ転送</h2>
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <p className="text-gray-700 leading-relaxed mb-4">
@@ -304,7 +407,7 @@ export default function PrivacyPolicyPage() {
         <section className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <Shield className="h-6 w-6 text-pink-600" />
-            <h2 className="text-2xl font-bold text-gray-900">10. 子供のプライバシー</h2>
+            <h2 className="text-2xl font-bold text-gray-900">11. 子供のプライバシー</h2>
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
@@ -320,7 +423,7 @@ export default function PrivacyPolicyPage() {
         <section className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <FileText className="h-6 w-6 text-gray-600" />
-            <h2 className="text-2xl font-bold text-gray-900">11. プライバシーポリシーの変更</h2>
+            <h2 className="text-2xl font-bold text-gray-900">12. プライバシーポリシーの変更</h2>
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <p className="text-gray-700 leading-relaxed mb-4">
@@ -342,7 +445,7 @@ export default function PrivacyPolicyPage() {
         <section className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <Mail className="h-6 w-6 text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900">12. お問い合わせ</h2>
+            <h2 className="text-2xl font-bold text-gray-900">13. お問い合わせ</h2>
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <p className="text-gray-700 leading-relaxed mb-4">
